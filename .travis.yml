@@ -1,0 +1,18 @@
+sudo: required
+language: cpp
+compiler:
+  - gcc
+jobs:
+  include:
+    - stage: EnvCPU
+      script: Tests/Env/testSetupCpuEnv.sh
+    - stage: EnvFull
+      script: Tests/Env/testSetupFullEnv.sh
+notifications:
+  email:
+    recipients:
+      - mkomm@cern.ch
+    on_success: change
+    on_failure: always
+
+

@@ -77,9 +77,9 @@ function run_setup()
     conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
     
     echo "Generate setup script"
-    echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > env_cpu.sh
+    echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
     #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_cpu.sh
-    echo "source activate tf_cpu" >> env_cpu.sh
+    echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
 
     echo "Create script for environment: env_cpu.sh "`ll env_cpu.sh`
 

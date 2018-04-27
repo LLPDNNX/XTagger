@@ -5,7 +5,9 @@ compiler:
 jobs:
   include:
     - stage: EnvCPU
-      script: Tests/Env/testSetupCpuEnv.sh
+      script: 
+        - Tests/Env/testSetupCpuEnv.sh
+        - Tests/Ops/buildOps.sh
     - stage: EnvFull
       script: Tests/Env/testSetupFullEnv.sh
 notifications:

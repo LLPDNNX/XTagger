@@ -49,12 +49,6 @@ add_library(FakeBackground
 )
 target_link_libraries(FakeBackground ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
 
-add_library(TrainTestSplitting
-    MODULE
-    TrainTestSplitting.cc
-)
-target_link_libraries(TrainTestSplitting ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
-
 add_library(Resampler
     MODULE
     Resampler.cc

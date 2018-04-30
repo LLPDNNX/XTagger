@@ -81,7 +81,6 @@ function run_setup()
     #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_cpu.sh
     echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
 
-
     source deactivate &>> $LOGFILE || return 1
     
     rm -rf $INSTALL_ABSDIR/tmp &>> $LOGFILE

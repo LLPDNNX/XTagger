@@ -152,6 +152,7 @@ featureDict = {
     
     "gen": {
         "branches":[
+            "jetorigin_ctau",
             "jetorigin_displacement"
         ]
     },
@@ -198,10 +199,10 @@ featureDict = {
             'cpf_track_chi2',
             'cpf_track_quality',
             #added to test
-            'cpf_jetmassdroprel',
-            'cpf_relIso01',
-            'cpf_isLepton',
-            'cpf_lostInnerHits'
+            #'cpf_jetmassdroprel',
+            #'cpf_relIso01',
+            #'cpf_isLepton',
+            #'cpf_lostInnerHits'
 
         ],
         "max":25
@@ -216,8 +217,8 @@ featureDict = {
             'npf_drminsv',
             'npf_puppi_weight',
             # added
-            'npf_jetmassdroprel',
-            'npf_relIso01'
+            #'npf_jetmassdroprel',
+            #'npf_relIso01'
 
         ],
         "max":25
@@ -407,9 +408,9 @@ def input_pipeline(files, batchSize):
             ).resample()
             
             # what is this?
-            #isSignal = resampled["truth"][:,4]>0.5 #index 4 is LLP
-            #resampled["gen"] = fakebackground_module.fake_background(resampled["gen"],isSignal,0)
-            #print resampled["gen"]
+            isSignal = resampled["truth"][:,4]>0.5 #index 4 is LLP
+            resampled["gen"] = fakebackground_module.fake_background(resampled["gen"],isSignal,0)
+            print resampled["gen"]
             
             resamplers.append(resampled)
         

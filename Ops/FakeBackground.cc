@@ -132,8 +132,9 @@ class FakeBackgroundOp:
             }
             else //size>1
             {
-                //morph between values
-                //std::uniform_real_distribution<float> dist(0,signal_dist.size()-1);
+                // morph between values
+                // for displacement use this:
+                // std::uniform_real_distribution<float> dist(0,signal_dist.size()-1);
                 std::uniform_int_distribution<> dist(0, signal_dist.size()-1);
                 for (size_t ibatch = 0; ibatch < n_batches; ++ibatch)
                 {
@@ -142,8 +143,8 @@ class FakeBackgroundOp:
                         if (!is_signal(ibatch) and ielem == feature_index_)
                         {
                             const float v = dist(*generator_);
-                            //std::cout << v << std::endl;
 
+                            // for displacement use this instead:
                             //const int l = int(std::floor(v));
                             //const int u = int(std::ceil(v));
                             //const float w = v-l;

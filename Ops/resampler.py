@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-resampler_module = tf.load_op_library('./libResampler.so')
+resampler_module = tf.load_op_library('Ops/libResampler.so')
 
 class resampler():       
     def __init__(self,

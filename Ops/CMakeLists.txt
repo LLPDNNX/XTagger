@@ -76,11 +76,7 @@ copy_file_if_changed(
     ${CMAKE_CURRENT_BINARY_DIR}/root_writer.py
     RootWriter
 )
-copy_file_if_changed(
-    ${CMAKE_SOURCE_DIR}/train_test_splitter.py
-    ${CMAKE_CURRENT_BINARY_DIR}/train_test_splitter.py
-    TrainTestSplitting
-)
+
 copy_file_if_changed(
     ${CMAKE_SOURCE_DIR}/resampler.py
     ${CMAKE_CURRENT_BINARY_DIR}/resampler.py

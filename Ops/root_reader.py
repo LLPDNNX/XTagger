@@ -1,6 +1,10 @@
 import tensorflow as tf
+import os
 
-rootreader_module = tf.load_op_library('Ops/libRootReader.so')
+rootreader_module = tf.load_op_library(os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    'libRootReader.so'
+))
 
 class root_reader():
     @staticmethod

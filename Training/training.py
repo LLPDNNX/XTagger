@@ -392,13 +392,13 @@ def setupModel(add_summary=False,options={}):
     print "Nclasses = ",nclasses
     
     #temporary fix
-    if isParametric:
+    if not isParametric:
         gen=None
         
     conv_prediction,lstm1_prediction,full_prediction = llp_model_simple.model(
-        gen, globalvars,cpf,npf,sv,
         globalvars,cpf,npf,sv,
         nclasses,
+        gen=gen,
         options=options,
         isParametric=isParametric
     )
@@ -520,14 +520,20 @@ while (epoch<num_epochs):
         while not coord.should_stop():
             # get the value of batch to fill histograms
             train_batch_value = sess.run(train_batch)
-            train_inputs = [train_batch_value['globalvars'],
-                train_batch_value['cpf'],
-                train_batch_value['npf'],
-                train_batch_value['sv']
-                ]
 
             if isParametric:
-                train_inputs.append(train_batch_value['gen'][:,0]
+                train_inputs = [train_batch_value['gen'][:,0],
+                    train_batch_value['globalvars'],
+                    train_batch_value['cpf'],
+                    train_batch_value['npf'],
+                    train_batch_value['sv']
+                        ]
+            else:
+                train_inputs = [train_batch_value['globalvars'],
+                    train_batch_value['cpf'],
+                    train_batch_value['npf'],
+                    train_batch_value['sv']
+                        ]
 
             train_outputs = modelTrain.train_on_batch(train_inputs, train_batch_value["truth"])
             labelsTraining = np.add(train_batch_value["truth"].sum(axis=0), labelsTraining)
@@ -574,7 +580,7 @@ while (epoch<num_epochs):
         plot_resampled("pt", "$\log{(pT/1 GeV)}$", ptArray, binningPt, truthArray)
         plot_resampled("eta", "$\eta$", etaArray, binningEta, truthArray)
         if isParametric:
-            plot_resampled("ctau", "$\log{( c \tau / 1mm )}$", ctauArray, binningctau, truthArray)
+            plot_resampled("ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truthArray)
 
     print "-"*100
     print "class labels:", resampledEventsPerClass.keys()
@@ -604,15 +610,20 @@ while (epoch<num_epochs):
         while not coord.should_stop():
             test_batch_value = sess.run(test_batch)
             
-            test_inputs = [test_batch_value['globalvars'],
-                test_batch_value['cpf'],
-                test_batch_value['npf'],
-                test_batch_value['sv']
-                ]
-
             if isParametric:
-                test_inputs.append(test_batch_value['gen'][:,0]
-                                    
+                test_inputs = [test_batch_value['gen'][:,0],
+                    test_batch_value['globalvars'],
+                    test_batch_value['cpf'],
+                    test_batch_value['npf'],
+                    test_batch_value['sv']
+                        ]
+            else:
+                test_inputs = [test_batch_value['globalvars'],
+                    test_batch_value['cpf'],
+                    test_batch_value['npf'],
+                    test_batch_value['sv']
+                        ]
+
             test_outputs = modelTest.test_on_batch(test_inputs, test_batch_value["truth"])
             test_prediction = modelTest.predict_on_batch(test_inputs)
 
@@ -668,10 +679,10 @@ while (epoch<num_epochs):
 
     if epoch == 0:
 
-        plot_resampled("testing_pt", "$\log{(pT/1 GeV)}$", ptArray, binningPt, truthArray)
+        plot_resampled("testing_pt", "$\log{(p_{T} /1 GeV)}$", ptArray, binningPt, truthArray)
         plot_resampled("testing_eta", "$\eta$", etaArray, binningEta, truthArray)
         if isParametric:
-            plot_resampled("testing_ctau", "$\log{(c \tau / 1mm)}$", ctauArray, binningctau, truthArray)
+            plot_resampled("testing_ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truthArray)
 
 
     print "Epoch duration = (%.1f min)"%((time.time()-epoch_duration)/60.)

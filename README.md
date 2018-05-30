@@ -19,3 +19,11 @@ cd Ops/build
 cmake ..
 make
 ```
+
+## Training using nanoX unpacked samples:
+
+```
+python Training/training.py --gpu -b 10000 --train samples/nanox_ctau_10_train.txt --test samples/nanox_ctau_10_test.txt -e 100 --name ctau_10 -c -n 10
+```
+This would start training using GPUs if available, with a batch size of 10000 and with specified training and testing samples.
+Furthermore, the training would be performed for 100 epochs and with class balance resampling. The output folder will be created as output/date_ctau_10

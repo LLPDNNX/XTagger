@@ -8,10 +8,9 @@ jobs:
       script: 
         - Tests/Env/testSetupCpuEnv.sh
         - Tests/Ops/buildOps.sh
+        - Tests/Training/Training.sh
     - stage: EnvFull
       script: Tests/Env/testSetupFullEnv.sh
-    - stage: Training
-      script: Tests/Training/Training.sh
 notifications:
   email:
     recipients:

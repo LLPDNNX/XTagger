@@ -89,9 +89,10 @@ def predict(x,nodes,name=None,options={}):
     return x
     
     
-def model(gen=None,globalvars,cpf,npf,sv,nclasses, isParametric=False,options={}):
+def model(globalvars,cpf,npf,sv,nclasses,gen=None, isParametric=False,options={}):
     with tf.name_scope('cpf_conv'):
         print cpf
+        print gen
         print cpf.get_shape()
         cpf_conv = conv(cpf,64,1,1,options=options)
         cpf_conv = conv(cpf_conv,32,1,1,options=options)
@@ -136,13 +137,12 @@ def model(gen=None,globalvars,cpf,npf,sv,nclasses, isParametric=False,options={}
         full_prediction = keras.layers.Concatenate()([
             gen,
             globalvars,
-            cpf_lstm1,npf_lstm1,sv_lstm1,
+            cpf_lstm1,npf_lstm1,sv_lstm1
         ])
     else:
-
         full_prediction = keras.layers.Concatenate()([
             globalvars,
-            cpf_lstm1,npf_lstm1,sv_lstm1,
+            cpf_lstm1,npf_lstm1,sv_lstm1
         ])
 
     full_prediction = dense(full_prediction,200,options=options)

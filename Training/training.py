@@ -4,6 +4,7 @@ import time
 import math
 import random
 import sys
+sys.path.append(os.path.abspath(os.path.join(sys.path[0],'../Ops')))
 import imp
 import argparse
 import datetime
@@ -11,6 +12,9 @@ import datetime
 import tensorflow as tf
 import numpy as np
 import ROOT
+import matplotlib
+matplotlib.use('pdf')
+import matplotlib.pyplot as plt
 
 from keras import backend as K
 from root_reader import root_reader
@@ -18,8 +22,8 @@ from train_test_splitter import train_test_splitter
 from resampler import resampler
 from sklearn.metrics import auc
 
-classificationweights_module = tf.load_op_library('./libClassificationWeights.so')
-fakebackground_module = tf.load_op_library('./libFakeBackground.so')
+classificationweights_module = tf.load_op_library('Ops/libClassificationWeights.so')
+fakebackground_module = tf.load_op_library('Ops/libFakeBackground.so')
 
 from root_style import *
 from sklearn.metrics import confusion_matrix, roc_auc_score
@@ -36,6 +40,7 @@ parser.add_argument('-b', '--batch', action='store', type=int, help='batch_size'
 parser.add_argument('-c', action='store_true', help='achieve class balance', default=False)
 parser.add_argument('-e', '--epoch', action='store', type=int, help='number of epochs', default=60)
 parser.add_argument('-o', '--overwrite', action='store_true', dest='overwriteFlag', help='overwrite output folder', default=False)
+parser.add_argument('-p', '--parametric', action='store_true', dest='parametric', help='train a parametric model', default=False)
 
 
 arguments = parser.parse_args()
@@ -49,6 +54,7 @@ batchSize = arguments.batch
 classBalance = arguments.c
 num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
+isParametric = arguments.parametric
 
 if isGPU:
     try:
@@ -56,11 +62,31 @@ if isGPU:
             imp.find_module('setGPU')
             import setGPU
         print "Using GPU: ",os.environ['CUDA_VISIBLE_DEVICES']
+        from tensorflow.python.client import device_lib
+        print(device_lib.list_local_devices())
     except ImportError:
         print "using CPU"
         pass
 else:
     print "using CPU"
+
+
+def plot_resampled(x, xlabel, var_array, var_binning, truth_array):
+
+        var_0 = var_array[truth_array == 0]
+        var_1 = var_array[truth_array == 1]
+        var_2 = var_array[truth_array == 2]
+        var_3 = var_array[truth_array == 3]
+        var_4 = var_array[truth_array == 4]
+
+        fig = plt.figure()
+        plt.hist([var_0, var_1, var_2, var_3, var_4], bins=var_binning, label=['b', 'c', 'ud', 'g', 'llp'], alpha=0.5)
+        plt.legend(loc='upper right')
+        plt.xlabel(xlabel)
+        plt.ylabel("# entries/ bin")
+        plt.savefig(os.path.join(outputFolder, "reweighted_"+x+".pdf"))
+        plt.close(fig)
+
 
 NRGBs = 6;
 NCont = 255;
@@ -87,7 +113,7 @@ fileListTest = []
 
 now = datetime.datetime.now()
 date = str(now.year) + str(now.month) + str(now.day)
-outputFolder = "../output/"+date+"_"+jobName
+outputFolder = "output/"+date+"_"+jobName
 
 if (os.path.exists(outputFolder) & overwriteFlag):
     print "Overwriting output folder!"
@@ -152,6 +178,7 @@ featureDict = {
     
     "gen": {
         "branches":[
+            "jetorigin_ctau",
             "jetorigin_displacement"
         ]
     },
@@ -198,10 +225,10 @@ featureDict = {
             'cpf_track_chi2',
             'cpf_track_quality',
             #added to test
-            'cpf_jetmassdroprel',
-            'cpf_relIso01',
-            'cpf_isLepton',
-            'cpf_lostInnerHits'
+            #'cpf_jetmassdroprel',
+            #'cpf_relIso01',
+            #'cpf_isLepton',
+            #'cpf_lostInnerHits'
 
         ],
         "max":25
@@ -216,8 +243,8 @@ featureDict = {
             'npf_drminsv',
             'npf_puppi_weight',
             # added
-            'npf_jetmassdroprel',
-            'npf_relIso01'
+            #'npf_jetmassdroprel',
+            #'npf_relIso01'
 
         ],
         "max":25
@@ -241,6 +268,7 @@ print "total entries",nEntries
 # Calculate weights for resampling in pt and eta
 binningPt = np.linspace(1.3,3.0,num=30)
 binningEta = np.linspace(-2.4,2.4,num=10)
+binningctau = -.5 + np.linspace(-3.,6.,num=10)
 targetShape = ROOT.TH2F("ptetaTarget","",len(binningPt)-1,binningPt,len(binningEta)-1,binningEta)
 
 targetEvents = 0
@@ -253,7 +281,6 @@ for label in featureDict["truth"]["branches"]:
     print "projecting ... ",branchName
     hist = ROOT.TH2F("pteta"+branchName,"",len(binningPt)-1,binningPt,len(binningEta)-1,binningEta)
     hist.Sumw2()
-    #hist.SetDirectory(0)
     chain.Project(hist.GetName(),"global_eta:global_pt","("+branchName+"==1)")
     
     # scale w.r.t. LLP
@@ -264,10 +291,8 @@ for label in featureDict["truth"]["branches"]:
     if hist.Integral()>0:
         print " -> entries ",hist.GetEntries()
         eventsPerClass[branchName]=hist.GetEntries()
-        #hist.Scale(1./hist.Integral())
     else:
         print " -> no entries found for class: ",branchName
-    #hist.Smooth()
     histsPerClass[branchName]=hist
     print "-"*100
 
@@ -276,9 +301,6 @@ print "class labels:", eventsPerClass.keys()
 print "class balance before resampling", [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
 print "-"*100
     
-#targetShape.Scale(1./targetShape.Integral())
-#targetShape.Smooth()
-
 for label in branchNameList:
     hist = histsPerClass[label]
     weight = targetShape.Clone(label)
@@ -298,13 +320,9 @@ for label in branchNameList:
                 if weight.GetBinContent(ibin,jbin)>0:
                     weight.SetBinContent(ibin,jbin, weight.GetBinContent(ibin,jbin)/factor)
                     the_sum += hist.GetBinContent(ibin, jbin)*weight.GetBinContent(ibin, jbin)
-                    #if label.find('fromLLP') != -1:
-                        #print the_sum
                     hist.SetBinContent(ibin,jbin,
                         targetShape.GetBinContent(ibin,jbin)/weight.GetBinContent(ibin,jbin)
                     )
-                    #if label.find('fromLLP') != -1:
-                        #print weight.GetBinContent(ibin+1, jbin+1), hist.GetBinContent(ibin+1, jbin+1), targetShape.GetBinContent(ibin+1, jbin+1)
                 else:
                     hist.SetBinContent(ibin,jbin,0)
 
@@ -312,15 +330,8 @@ for label in branchNameList:
         weight.Scale(0)
 
     print hist.GetEntries(), the_sum
-    #print the_sum
-    #print weight.GetEntries()
     resampledEventsPerClass[label] = the_sum
-    #resampledEventsPerClass[label] = hist.Clone(label)
-    #print resampledEventsPerClass[label].GetEntries()
     weightsPerClass[label]=weight
-    #resampledEventsPerClass[label].Multiply(weight)
-    #resampledEventsPerClass[label] = resampledEventsPerClass[label].GetEntries()
-    #print resampledEventsPerClass[label]
 
 print "-"*100
 print "class labels:", resampledEventsPerClass.keys()
@@ -361,11 +372,17 @@ makePlot(outputFolder, weightsEta,branchNameList,binningEta,";Jet #eta;Weight","
 
 def setupModel(add_summary=False,options={}):
     result = {}
+
+    # add displacement to globalvars
+
+    #gen = keras.layers.Input(shape=(len(featureDict["gen"]["branches"]),))
+    gen = keras.layers.Input(shape=(1,))
     globalvars = keras.layers.Input(shape=(len(featureDict["globalvars"]["branches"]),))
     cpf = keras.layers.Input(shape=(featureDict["cpf"]["max"],len(featureDict["cpf"]["branches"])))
     npf = keras.layers.Input(shape=(featureDict["npf"]["max"],len(featureDict["npf"]["branches"])))
     sv = keras.layers.Input(shape=(featureDict["sv"]["max"],len(featureDict["sv"]["branches"])))
 
+    print gen
     print globalvars
     print cpf
     print npf
@@ -373,15 +390,26 @@ def setupModel(add_summary=False,options={}):
 
     nclasses = len(featureDict["truth"]["branches"])
     print "Nclasses = ",nclasses
+    
+    #temporary fix
+    if isParametric:
+        gen=None
+        
     conv_prediction,lstm1_prediction,full_prediction = llp_model_simple.model(
+        gen, globalvars,cpf,npf,sv,
         globalvars,cpf,npf,sv,
         nclasses,
-        options=options
+        options=options,
+        isParametric=isParametric
     )
+
     w = 0.2*0.85**epoch
     print "Weighting loss: ",w
     #prediction = keras.layers.Lambda(lambda x: (x[0]+x[1])*0.5*w+x[2]*(1-w))([conv_prediction,lstm1_prediction,full_prediction])
     prediction = full_prediction
+    if isParametric:
+        return keras.Model(inputs=[gen,globalvars,cpf,npf,sv], outputs=prediction)
+    
     return keras.Model(inputs=[globalvars,cpf,npf,sv], outputs=prediction)
     
 def input_pipeline(files, batchSize):
@@ -391,7 +419,7 @@ def input_pipeline(files, batchSize):
         rootreader_op = []
         resamplers = []
         for _ in range(min(len(fileListTrain)-1,6)):
-            reader = root_reader(fileListQueue, featureDict,"jets",batch=200).batch() 
+            reader = root_reader(fileListQueue, featureDict,"jets",batch=10000).batch() 
             rootreader_op.append(reader)
             
             weight = classificationweights_module.classification_weights(
@@ -406,10 +434,11 @@ def input_pipeline(files, batchSize):
                 reader
             ).resample()
             
-            # what is this?
-            #isSignal = resampled["truth"][:,4]>0.5 #index 4 is LLP
-            #resampled["gen"] = fakebackground_module.fake_background(resampled["gen"],isSignal,0)
-            #print resampled["gen"]
+            if isParametric:
+
+                isSignal = resampled["truth"][:,4]>0.5 #index 4 is LLP
+                resampled["gen"] = fakebackground_module.fake_background(resampled["gen"],isSignal,0)
+                print resampled["gen"]
             
             resamplers.append(resampled)
         
@@ -429,6 +458,13 @@ def input_pipeline(files, batchSize):
 learning_rate_val = 0.005
 epoch = 0
 previous_train_loss = 1000
+
+# Create root file to hold resampled pt, eta, lifetime values
+#t_resampled = ROOT.TTree("resampled","resampled")
+#binningctau = np.linspace(-3.,5.,9)
+#pt_hist = ROOT.TH1F("pt","",len(binningPt)-1,binningPt)
+#eta_hist = ROOT.TH1F("eta","",len(binningEta)-1,binningEta)
+#ctau_hist = ROOT.TH1F("ctau","",len(binningctau)-1,binningctau)
 
 while (epoch<num_epochs):
 
@@ -484,20 +520,35 @@ while (epoch<num_epochs):
         while not coord.should_stop():
             # get the value of batch to fill histograms
             train_batch_value = sess.run(train_batch)
-            train_outputs = modelTrain.train_on_batch([
-                    train_batch_value['globalvars'],
-                    train_batch_value['cpf'],
-                    train_batch_value['npf'],
-                    train_batch_value['sv']
-                ],
-                train_batch_value["truth"]
-            )
-            #print train_batch_value['globalvars'][:,0]
+            train_inputs = [train_batch_value['globalvars'],
+                train_batch_value['cpf'],
+                train_batch_value['npf'],
+                train_batch_value['sv']
+                ]
+
+            if isParametric:
+                train_inputs.append(train_batch_value['gen'][:,0]
+
+            train_outputs = modelTrain.train_on_batch(train_inputs, train_batch_value["truth"])
             labelsTraining = np.add(train_batch_value["truth"].sum(axis=0), labelsTraining)
+
+            if step == 0:
+                ptArray = train_batch_value["globalvars"][:,0]
+                etaArray = train_batch_value["globalvars"][:,1]
+                truthArray = np.argmax(train_batch_value["truth"], axis=1)
+                if isParametric:
+                    ctauArray = train_batch_value["gen"][:,0]
+
+            else: 
+                ptArray = np.hstack((ptArray, train_batch_value["globalvars"][:,0]))
+                etaArray = np.hstack((etaArray, train_batch_value["globalvars"][:,1]))
+                truthArray = np.hstack((truthArray, np.argmax(train_batch_value["truth"], axis=1)))
+                if isParametric:
+                    ctauArray = np.hstack((ctauArray,train_batch_value["gen"][:,0]))
 
             step += 1
             nTrainBatch = train_batch_value["truth"].shape[0]
-            
+
             nTrain += nTrainBatch
             
             if nTrainBatch>0:
@@ -513,9 +564,17 @@ while (epoch<num_epochs):
                 )
                 
                 start_time = time.time()
+            
                 
     except tf.errors.OutOfRangeError:
         print('Done training for %d steps.' % (step))
+
+    if epoch == 0:
+
+        plot_resampled("pt", "$\log{(pT/1 GeV)}$", ptArray, binningPt, truthArray)
+        plot_resampled("eta", "$\eta$", etaArray, binningEta, truthArray)
+        if isParametric:
+            plot_resampled("ctau", "$\log{( c \tau / 1mm )}$", ctauArray, binningctau, truthArray)
 
     print "-"*100
     print "class labels:", resampledEventsPerClass.keys()
@@ -544,23 +603,36 @@ while (epoch<num_epochs):
         step = 0
         while not coord.should_stop():
             test_batch_value = sess.run(test_batch)
-            test_outputs = modelTest.test_on_batch([
-                    test_batch_value['globalvars'],
-                    test_batch_value['cpf'],
-                    test_batch_value['npf'],
-                    test_batch_value['sv']
-                ],
-                test_batch_value["truth"]
-            )
-            test_prediction = modelTest.predict_on_batch([
-                    test_batch_value['globalvars'],
-                    test_batch_value['cpf'],
-                    test_batch_value['npf'],
-                    test_batch_value['sv']
+            
+            test_inputs = [test_batch_value['globalvars'],
+                test_batch_value['cpf'],
+                test_batch_value['npf'],
+                test_batch_value['sv']
                 ]
-            )
+
+            if isParametric:
+                test_inputs.append(test_batch_value['gen'][:,0]
+                                    
+            test_outputs = modelTest.test_on_batch(test_inputs, test_batch_value["truth"])
+            test_prediction = modelTest.predict_on_batch(test_inputs)
+
+            if step == 0:
+                ptArray = test_batch_value["globalvars"][:,0]
+                etaArray = test_batch_value["globalvars"][:,1]
+                truthArray = np.argmax(test_batch_value["truth"], axis=1)
+                if isParametric:
+                    ctauArray = test_batch_value["gen"][:,0]
+
+
+            else: 
+                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:,0]))
+                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:,1]))
+                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
+                if isParametric:
+                    ctauArray = np.hstack((ctauArray,test_batch_value["gen"][:,0]))
+
             step += 1
-            nTestBatch =test_batch_value["truth"].shape[0]
+            nTestBatch = test_batch_value["truth"].shape[0]
             
             for ibatch in range(test_batch_value["truth"].shape[0]):
                 truthclass = np.argmax(test_batch_value["truth"][ibatch])
@@ -593,6 +665,14 @@ while (epoch<num_epochs):
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
+
+    if epoch == 0:
+
+        plot_resampled("testing_pt", "$\log{(pT/1 GeV)}$", ptArray, binningPt, truthArray)
+        plot_resampled("testing_eta", "$\eta$", etaArray, binningEta, truthArray)
+        if isParametric:
+            plot_resampled("testing_ctau", "$\log{(c \tau / 1mm)}$", ctauArray, binningctau, truthArray)
+
 
     print "Epoch duration = (%.1f min)"%((time.time()-epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%"%(nTrain,nTest,100.*nTest/(nTrain+nTest))
@@ -661,6 +741,7 @@ while (epoch<num_epochs):
         legend.Draw("Same")
         
         cv.Print(os.path.join(outputFolder,"roc "+names[truth_label]+" epoch"+str(epoch)+".pdf"))
+        cv.Print(os.path.join(outputFolder,"roc "+names[truth_label]+" epoch"+str(epoch)+".root"))
 
         for prob_label in range(truth_label):
             average_auc = .5*(all_aucs[prob_label,truth_label] + all_aucs[truth_label, prob_label])

@@ -88,12 +88,14 @@ class FakeBackgroundOp:
                     signal_dist.push_back(batch(ibatch*batch_length+feature_index_));
                 }
             }
-            std::sort(signal_dist.begin(),signal_dist.end());
+            //std::sort(signal_dist.begin(),signal_dist.end());
             
             if (signal_dist.size()==0)
             {
-                //just random between -5 and 5
-                std::uniform_real_distribution<float> dist(-5,5);
+                //just random between -3 and 8
+                std::uniform_real_distribution<float> dist(-3,8);
+
+                std::clog << "Warning! No signal in the batch \n" << std::endl;
                 for (size_t ibatch = 0; ibatch < n_batches; ++ibatch)
                 {
                     for (size_t ielem = 0; ielem < batch_length; ++ielem)
@@ -112,6 +114,7 @@ class FakeBackgroundOp:
             else if (signal_dist.size()==1)
             {
                 //set all background to same signal value
+                //std::clog << "Warning! Signal distribution has a single value in the batch \n" << std::endl;
                 for (size_t ibatch = 0; ibatch < n_batches; ++ibatch)
                 {
                     for (size_t ielem = 0; ielem < batch_length; ++ielem)
@@ -129,8 +132,10 @@ class FakeBackgroundOp:
             }
             else //size>1
             {
-                //morph between values
-                std::uniform_real_distribution<float> dist(0,signal_dist.size()-1);
+                // morph between values
+                // for displacement use this:
+                // std::uniform_real_distribution<float> dist(0,signal_dist.size()-1);
+                std::uniform_int_distribution<> dist(0, signal_dist.size()-1);
                 for (size_t ibatch = 0; ibatch < n_batches; ++ibatch)
                 {
                     for (size_t ielem = 0; ielem < batch_length; ++ielem)
@@ -138,10 +143,13 @@ class FakeBackgroundOp:
                         if (!is_signal(ibatch) and ielem == feature_index_)
                         {
                             const float v = dist(*generator_);
-                            const int l = int(std::floor(v));
-                            const int u = int(std::ceil(v));
-                            const float w = v-l;
-                            fake_batch(ibatch*batch_length+ielem) = signal_dist[l]*w+signal_dist[u]*(1.-w);
+
+                            // for displacement use this instead:
+                            //const int l = int(std::floor(v));
+                            //const int u = int(std::ceil(v));
+                            //const float w = v-l;
+                            //fake_batch(ibatch*batch_length+ielem) = signal_dist[l]*w+signal_dist[u]*(1.-w);
+                            fake_batch(ibatch*batch_length+ielem) = signal_dist[v];
                         }
                         else
                         {

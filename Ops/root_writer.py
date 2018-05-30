@@ -1,6 +1,10 @@
 import tensorflow as tf
+import os
 
-rootwriter_module = tf.load_op_library('Ops/libRootWriter.so')
+rootwriter_module = tf.load_op_library(os.path.join(
+    os.path.dirname(os.path.realpath(__file__)),
+    'libRootWriter.so'
+))
 
 class root_writer():       
     def __init__(self,

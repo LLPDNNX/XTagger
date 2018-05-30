@@ -10,9 +10,12 @@ jobs:
         - Tests/Ops/buildOps.sh
     - stage: EnvFull
       script: Tests/Env/testSetupFullEnv.sh
+    - stage: Training
+      script: Tests/Training/Training.sh
 notifications:
   email:
     recipients:
+      - vilius.cepaitis@cern.ch
       - mkomm@cern.ch
     on_success: change
     on_failure: always

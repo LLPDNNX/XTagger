@@ -4,7 +4,6 @@ function execute()
 {
     PROJECTDIR=$PWD
     source Env/env_cpu.sh || return 1
-    source activate tf_cpu || return 1
     git clone https://github.com/LLPDNNX/test-files || return 1
     python Training/training.py -b 100 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt -e 0 --name test 
 }

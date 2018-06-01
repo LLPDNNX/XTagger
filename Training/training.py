@@ -17,8 +17,8 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
 from keras import backend as K
-from xtagger.root_reader import root_reader
-from xtagger.resampler import resampler
+from xtagger import root_reader
+from xtagger import resampler
 from sklearn.metrics import auc
 
 classificationweights_module = tf.load_op_library('Ops/build/libClassificationWeights.so')

@@ -17,13 +17,12 @@ matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 
 from keras import backend as K
-from root_reader import root_reader
-from train_test_splitter import train_test_splitter
-from resampler import resampler
+from xtagger import root_reader
+from xtagger import resampler
 from sklearn.metrics import auc
 
-classificationweights_module = tf.load_op_library('Ops/libClassificationWeights.so')
-fakebackground_module = tf.load_op_library('Ops/libFakeBackground.so')
+classificationweights_module = tf.load_op_library('Ops/build/libClassificationWeights.so')
+fakebackground_module = tf.load_op_library('Ops/build/libFakeBackground.so')
 
 from root_style import *
 from sklearn.metrics import confusion_matrix, roc_auc_score

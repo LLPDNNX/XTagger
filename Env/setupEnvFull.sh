@@ -104,6 +104,8 @@ function run_setup()
     
     echo "Installing pip packages"
     pip install --no-cache-dir -r $SCRIPT_DIR/packages_gpu.pip &>> $LOGFILE || return 1
+    echo "Installing graphviz"
+    conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     
     #root needs to be installed after the pip packages because it seems to break yaml compilation
     echo "Installing root"

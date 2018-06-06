@@ -74,7 +74,7 @@ function run_setup()
     
     #root needs to be installed after the pip packages because it seems to break yaml compilation
     echo "Installing graphviz"
-    conda install -c anaconda graphviz --yes &>> $LOGFIRE || return 1
+    conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     echo "Installing root"
     conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
     

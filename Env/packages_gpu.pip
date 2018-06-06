@@ -7,4 +7,4 @@ matplotlib==2.0.0
 tensorflow-gpu==1.6.0
 gpustat==0.4.1
 setGPU==0.0.7
-pydot=1.2.4
+pydot==1.2.4

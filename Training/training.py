@@ -4,43 +4,44 @@ import time
 import math
 import random
 import sys
-sys.path.append(os.path.abspath(os.path.join(sys.path[0],'../Ops')))
 import imp
 import argparse
 import datetime
-
-import tensorflow as tf
-import numpy as np
-import ROOT
 import matplotlib
 matplotlib.use('pdf')
 import matplotlib.pyplot as plt
+import numpy as np
+
+import tensorflow as tf
+import ROOT
 
 from keras import backend as K
-from xtagger import root_reader
-from xtagger import resampler
+from xtagger import root_reader, resampler, classification_weights, fake_background
 from sklearn.metrics import auc
-
-classificationweights_module = tf.load_op_library('Ops/build/libClassificationWeights.so')
-fakebackground_module = tf.load_op_library('Ops/build/libFakeBackground.so')
+from feature_dict import featureDict
 
 from root_style import *
 from sklearn.metrics import confusion_matrix, roc_auc_score
 import llp_model_simple
 
-# flags
 parser = argparse.ArgumentParser()
 parser.add_argument('--train', action='store', help='input file list')
 parser.add_argument('--test', action='store', help='input file list')
-parser.add_argument('--name', action='store', help='job name',default='')
-parser.add_argument('-n', action='store', type=int, help='number of files to be processed')
-parser.add_argument('--gpu', action='store_true', dest='isGPU', help='try to use gpu', default=False)
-parser.add_argument('-b', '--batch', action='store', type=int, help='batch_size', default=10000)
-parser.add_argument('-c', action='store_true', help='achieve class balance', default=False)
-parser.add_argument('-e', '--epoch', action='store', type=int, help='number of epochs', default=60)
-parser.add_argument('-o', '--overwrite', action='store_true', dest='overwriteFlag', help='overwrite output folder', default=False)
-parser.add_argument('-p', '--parametric', action='store_true', dest='parametric', help='train a parametric model', default=False)
-
+parser.add_argument('--name', action='store', help='job name', default='')
+parser.add_argument('-n', action='store', type=int,
+        help='number of files to be processed')
+parser.add_argument('--gpu', action='store_true', dest='isGPU',
+        help='try to use gpu', default=False)
+parser.add_argument('-b', '--batch', action='store', type=int,
+        help='batch_size', default=10000)
+parser.add_argument('-c', action='store_true', 
+        help='achieve class balance', default=False)
+parser.add_argument('-e', '--epoch', action='store', type=int, 
+        help='number of epochs', default=60)
+parser.add_argument('-o', '--overwrite', action='store_true', dest='overwriteFlag', 
+        help='overwrite output folder', default=False)
+parser.add_argument('-p', '--parametric', action='store_true', dest='parametric', 
+        help='train a parametric model', default=False)
 
 arguments = parser.parse_args()
 
@@ -55,9 +56,10 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 
+# import the gpu, if needed and available
 if isGPU:
     try:
-        if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
+        if not os.environ.In('CUDA_VISIBLE_DEVICES'):
             imp.find_module('setGPU')
             import setGPU
         print "Using GPU: ",os.environ['CUDA_VISIBLE_DEVICES']
@@ -69,7 +71,7 @@ if isGPU:
 else:
     print "using CPU"
 
-
+# fn for plotting numpy arrays produced when training
 def plot_resampled(x, xlabel, var_array, var_binning, truth_array):
 
         var_0 = var_array[truth_array == 0]
@@ -79,21 +81,21 @@ def plot_resampled(x, xlabel, var_array, var_binning, truth_array):
         var_4 = var_array[truth_array == 4]
 
         fig = plt.figure()
-        plt.hist([var_0, var_1, var_2, var_3, var_4], bins=var_binning, label=['b', 'c', 'ud', 'g', 'llp'], alpha=0.5)
+        plt.hist([var_0, var_1, var_2, var_3, var_4], 
+                bins=var_binning, label=['b', 'c', 'ud', 'g', 'llp'], alpha=0.5)
         plt.legend(loc='upper right')
         plt.xlabel(xlabel)
         plt.ylabel("# entries/ bin")
         plt.savefig(os.path.join(outputFolder, "reweighted_"+x+".pdf"))
         plt.close(fig)
 
-
 NRGBs = 6;
 NCont = 255;
 
-stops = np.array( [0.00, 0.34,0.47, 0.61, 0.84, 1.00] )
-red  = np.array( [0.5, 0.00,0.1, 1., 1.00, 0.81] )
-green = np.array( [0.10, 0.71,0.85, 0.70, 0.20, 0.00] )
-blue = np.array( [0.91, 1.00, 0.12,0.1, 0.00, 0.00] )
+stops = np.array( [0.00, 0.34, 0.47, 0.61, 0.84, 1.00] )
+red  = np.array( [0.5, 0.00, 0.1, 1., 1.00, 0.81] )
+green = np.array( [0.10, 0.71, 0.85, 0.70, 0.20, 0.00] )
+blue = np.array( [0.91, 1.00, 0.12, 0.1, 0.00, 0.00] )
 
 colWheelDark = ROOT.TColor.CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont)
 
@@ -144,112 +146,6 @@ if nFiles is not None:
     fileListTest = fileListTest[:nFiles]
 
 # define the feature dictionary for training
-featureDict = {
-
-     "sv" : {
-        "branches":[
-            'sv_pt',
-            'sv_deltaR',
-            'sv_mass',
-            'sv_ntracks',
-            'sv_chi2',
-            'sv_normchi2',
-            'sv_dxy',
-            'sv_dxysig',
-            'sv_d3d',
-            'sv_d3dsig',
-            'sv_costhetasvpv',
-            'sv_enratio',
-            
-        ],
-        "max":4
-    },
-
-    "truth": {
-        "branches":[
-            'jetorigin_isB||jetorigin_isBB||jetorigin_isGBB||jetorigin_isLeptonic_B||jetorigin_isLeptonic_C',         
-            'jetorigin_isC||jetorigin_isCC||jetorigin_isGCC',
-            'jetorigin_isUD||jetorigin_isS',
-            'jetorigin_isG',
-            'jetorigin_fromLLP',
-        ],
-    },
-    
-    "gen": {
-        "branches":[
-            "jetorigin_ctau",
-            "jetorigin_displacement"
-        ]
-    },
-    
-    "globalvars": {
-        "branches": [
-            'global_pt',
-            'global_eta',
-            'global_rho',
-            'ncpf',
-            'nnpf',
-            'nsv',
-            'csv_trackSumJetEtRatio', 
-            'csv_trackSumJetDeltaR', 
-            'csv_vertexCategory', 
-            'csv_trackSip2dValAboveCharm', 
-            'csv_trackSip2dSigAboveCharm', 
-            'csv_trackSip3dValAboveCharm', 
-            'csv_trackSip3dSigAboveCharm', 
-            'csv_jetNSelectedTracks', 
-            'csv_jetNTracksEtaRel'
-        ],
-
-    },
-
-
-    "cpf": {
-        "branches": [
-            'cpf_trackEtaRel',
-            'cpf_trackPtRel',
-            'cpf_trackPPar',
-            'cpf_trackDeltaR',
-            'cpf_trackPParRatio',
-            'cpf_trackSip2dVal',
-            'cpf_trackSip2dSig',
-            'cpf_trackSip3dVal',
-            'cpf_trackSip3dSig',
-            'cpf_trackJetDistVal',
-
-            'cpf_ptrel', 
-            'cpf_drminsv',
-            'cpf_vertex_association',
-            'cpf_puppi_weight',
-            'cpf_track_chi2',
-            'cpf_track_quality',
-            #added to test
-            #'cpf_jetmassdroprel',
-            #'cpf_relIso01',
-            #'cpf_isLepton',
-            #'cpf_lostInnerHits'
-
-        ],
-        "max":25
-    },
-    
-    "npf": {
-        "branches": [
-            'npf_ptrel',
-            'npf_deltaR',
-            'npf_isGamma',
-            'npf_hcal_fraction',
-            'npf_drminsv',
-            'npf_puppi_weight',
-            # added
-            #'npf_jetmassdroprel',
-            #'npf_relIso01'
-
-        ],
-        "max":25
-    }
-}
-
 # Count the number of entries in total
 histsPerClass = {}
 weightsPerClass = {}
@@ -421,7 +317,7 @@ def input_pipeline(files, batchSize):
             reader = root_reader(fileListQueue, featureDict,"jets",batch=10000).batch() 
             rootreader_op.append(reader)
             
-            weight = classificationweights_module.classification_weights(
+            weight = classification_weights(
                 reader["truth"],
                 reader["globalvars"],
                 os.path.join(outputFolder,"weights.root"),
@@ -436,7 +332,7 @@ def input_pipeline(files, batchSize):
             if isParametric:
 
                 isSignal = resampled["truth"][:,4]>0.5 #index 4 is LLP
-                resampled["gen"] = fakebackground_module.fake_background(resampled["gen"],isSignal,0)
+                resampled["gen"] = fake_background(resampled["gen"],isSignal,0)
                 print resampled["gen"]
             
             resamplers.append(resampled)

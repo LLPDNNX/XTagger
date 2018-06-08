@@ -4,6 +4,14 @@ compiler:
   - gcc
 jobs:
   include:
+    - stage: Unpacker_v2
+    script:
+        - wget https://root.cern.ch/download/root_v6.12.06.Linux-ubuntu14-x86_64-gcc4.8.tar.gz
+        - gunzip root_v6.12.06.Linux-ubuntu14-x86_64-gcc4.8.tar.gz
+        - tar xvf root_v6.12.06.Linux-ubuntu14-x86_64-gcc4.8.tar.gz
+        - source root/env/thisroot.sh
+        - Tests/Unpacker/testUnpacker.sh
+    script:
     - stage: Unpacker
       script:
         - Tests/Env/testSetupCpuEnv.sh
@@ -18,8 +26,8 @@ jobs:
 notifications:
   email:
     recipients:
-      - vilius.cepaitis@cern.ch
-      - mkomm@cern.ch
+        #- vilius.cepaitis@cern.ch
+        #- mkomm@cern.ch
     on_success: change
     on_failure: always
 

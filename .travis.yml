@@ -4,6 +4,10 @@ compiler:
   - gcc
 jobs:
   include:
+    - stage: Unpacker
+      script:
+        - Tests/Env/testSetupCpuEnv.sh
+        - Tests/Unpacker/testUnpacker.sh
     - stage: EnvCPU
       script: 
         - Tests/Env/testSetupCpuEnv.sh
@@ -14,8 +18,8 @@ jobs:
 notifications:
   email:
     recipients:
-      - vilius.cepaitis@cern.ch
-      - mkomm@cern.ch
+        - vilius.cepaitis@cern.ch
+        - mkomm@cern.ch
     on_success: change
     on_failure: always
 

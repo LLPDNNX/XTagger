@@ -11,6 +11,8 @@ jobs:
         - Tests/Training/Training.sh
     - stage: EnvFull
       script: Tests/Env/testSetupFullEnv.sh
+    - stage: Unpacker
+      script: Tests/Unpacker/testUnpacker.sh
 notifications:
   email:
     recipients:

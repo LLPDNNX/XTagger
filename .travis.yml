@@ -4,6 +4,10 @@ compiler:
   - gcc
 jobs:
   include:
+    - stage: Unpacker
+      script:
+        - Tests/Env/testSetupCpuEnv.sh
+        - Tests/Unpacker/testUnpacker.sh
     - stage: EnvCPU
       script: 
         - Tests/Env/testSetupCpuEnv.sh
@@ -11,8 +15,6 @@ jobs:
         - Tests/Training/Training.sh
     - stage: EnvFull
       script: Tests/Env/testSetupFullEnv.sh
-    - stage: Unpacker
-      script: Tests/Unpacker/testUnpacker.sh
 notifications:
   email:
     recipients:

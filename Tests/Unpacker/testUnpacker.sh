@@ -6,6 +6,7 @@ function execute()
     cd Unpacker
     cmake . || return 1
     make || return 1
+    ./Unpacker/unpackNanoXFast /Unpacker 5 20 20 1 Unpacker/test-files.txt
 }
 
 execute

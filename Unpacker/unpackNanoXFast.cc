@@ -995,7 +995,7 @@ int main(int argc, char **argv)
         std::cout<<"Total per chain:  "<<nEvents<<std::endl;
         entries.push_back(nEvents);
         total_entries += nEvents;
-        trees.emplace_back(std::make_unique<NanoXTree>(chain,selectors[i]));
+        trees.emplace_back(std::unique_ptr<NanoXTree>(new NanoXTree (chain,selectors[i])));
     }
     std::cout<<"Total number of events: "<<total_entries<<std::endl;
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTrain;
@@ -1006,12 +1006,13 @@ int main(int argc, char **argv)
 
     for (unsigned int i = 0; i < nOutputs; ++i)
     {
-        unpackedTreesTrain.emplace_back(std::make_unique<UnpackedTree>(
-            std::string(argv[1])+"_train"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
-        ));
-        unpackedTreesTest.emplace_back(std::make_unique<UnpackedTree>(
-            std::string(argv[1])+"_test"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
-        ));
+        unpackedTreesTrain.emplace_back(std::unique_ptr<UnpackedTree>(
+            new UnpackedTree(std::string(argv[1])+"_train"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
+        )));
+
+        unpackedTreesTest.emplace_back(std::unique_ptr<UnpackedTree>(
+            new UnpackedTree(std::string(argv[1])+"_test"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
+        )));
     }
     
     

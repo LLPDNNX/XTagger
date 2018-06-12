@@ -20,10 +20,9 @@ def conv(x,filters,size,stride,options={}):
     return x
     
 def lstm_stack(x,units,reverse=True,options={}):
-    
     #run test/evaluation through non GPU version
     if os.environ.has_key('CUDA_VISIBLE_DEVICES') and options.has_key("GPULSTM") and options["GPULSTM"]:
-        x  = keras.layers.CuDNNLSTM(units,
+        x = keras.layers.CuDNNLSTM(units,
             go_backwards=reverse,
             #implementation=2,
             return_sequences=True,
@@ -32,7 +31,7 @@ def lstm_stack(x,units,reverse=True,options={}):
             #recurrent_activation='tanh'
         )(x)
     else:
-        x  = keras.layers.LSTM(units,
+        x = keras.layers.LSTM(units,
             go_backwards=reverse,
             implementation=2,
             return_sequences=True,
@@ -47,7 +46,7 @@ def lstm(x,units,reverse=True,options={}):
     
     #run test/evaluation through non GPU version
     if os.environ.has_key('CUDA_VISIBLE_DEVICES') and options.has_key("GPULSTM") and options["GPULSTM"]:
-        x  = keras.layers.CuDNNLSTM(units,
+        x = keras.layers.CuDNNLSTM(units,
             go_backwards=reverse,
             #implementation=2,
             #recurrent_dropout=0.05,
@@ -55,8 +54,7 @@ def lstm(x,units,reverse=True,options={}):
             #recurrent_activation='tanh'
         )(x)
     else:
-    
-        x  = keras.layers.LSTM(units,
+        x = keras.layers.LSTM(units,
             go_backwards=reverse,
             implementation=2,
             recurrent_dropout=0.05, #not possible with CuDNNLSTM
@@ -67,7 +65,7 @@ def lstm(x,units,reverse=True,options={}):
     return x
     
 def dense(x,nodes,dropout=0.1,options={}):
-    x= keras.layers.Dense(
+    x = keras.layers.Dense(
         nodes,
         kernel_initializer='glorot_uniform',
         bias_initializer='zeros',
@@ -78,7 +76,7 @@ def dense(x,nodes,dropout=0.1,options={}):
     return x
     
 def predict(x,nodes,name=None,options={}):
-    x= keras.layers.Dense(
+    x = keras.layers.Dense(
         nodes,
         kernel_initializer='glorot_uniform',
         bias_initializer='zeros',
@@ -88,18 +86,13 @@ def predict(x,nodes,name=None,options={}):
     )(x)
     return x
     
-    
-def model(gen=None,globalvars,cpf,npf,sv,nclasses, isParametric=False,options={}):
+def model(globalvars,cpf,npf,sv,nclasses,gen=None,isParametric=False,options={}):
     with tf.name_scope('cpf_conv'):
-        print cpf
-        print cpf.get_shape()
         cpf_conv = conv(cpf,64,1,1,options=options)
         cpf_conv = conv(cpf_conv,32,1,1,options=options)
         cpf_conv = conv(cpf_conv,32,1,1,options=options)
         cpf_conv = conv(cpf_conv,8,1,1,options=options)
         cpf_conv_pred = keras.layers.Flatten()(cpf_conv)
-        print cpf_conv_pred
-        print cpf_conv_pred.get_shape()
     
     with tf.name_scope('npf_conv'):
         npf_conv = conv(npf,32,1,1,options=options)
@@ -125,24 +118,21 @@ def model(gen=None,globalvars,cpf,npf,sv,nclasses, isParametric=False,options={}
         npf_lstm1 = lstm(npf_conv,50,True,options=options) #4*25=100 inputs
         sv_lstm1 = lstm(sv_conv,50,True,options=options) #8*4=32 inputs
         
-        
-    lstm1_prediction = keras.layers.Concatenate()([globalvars,cpf_lstm1,npf_lstm1,sv_lstm1])
-    lstm1_prediction = dense(lstm1_prediction,20,options=options)
-    lstm1_prediction = dense(lstm1_prediction,20,options=options)
-    lstm1_prediction = predict(lstm1_prediction,nclasses,name="lstm_prediction",options=options)
-    
+    lstm_prediction = keras.layers.Concatenate()([globalvars,cpf_lstm1,npf_lstm1,sv_lstm1])
+    lstm_prediction = dense(lstm_prediction,20,options=options)
+    lstm_prediction = dense(lstm_prediction,20,options=options)
+    lstm_prediction = predict(lstm_prediction,nclasses,name="lstm_prediction",options=options)
 
     if isParametric:
         full_prediction = keras.layers.Concatenate()([
             gen,
             globalvars,
-            cpf_lstm1,npf_lstm1,sv_lstm1,
+            cpf_lstm1,npf_lstm1,sv_lstm1
         ])
     else:
-
         full_prediction = keras.layers.Concatenate()([
             globalvars,
-            cpf_lstm1,npf_lstm1,sv_lstm1,
+            cpf_lstm1,npf_lstm1,sv_lstm1
         ])
 
     full_prediction = dense(full_prediction,200,options=options)
@@ -153,5 +143,5 @@ def model(gen=None,globalvars,cpf,npf,sv,nclasses, isParametric=False,options={}
     full_prediction = dense(full_prediction,100,options=options)
     full_prediction = predict(full_prediction,nclasses,name="full_prediction",options=options)
     
-    return conv_prediction,lstm1_prediction,full_prediction
+    return conv_prediction, lstm_prediction, full_prediction
     

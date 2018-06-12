@@ -79,7 +79,3 @@ foreach(pyfile ${pythonfiles})
     )
     install(FILES ${CMAKE_SOURCE_DIR}/${pyfile} DESTINATION ${SITEPACKDIR})
 endforeach(pyfile)
-
-
-
-

@@ -493,7 +493,11 @@ while (epoch < num_epochs):
     print "predicted class balance after resampling", [x / min(resampledEventsPerClass.values()) for x in resampledEventsPerClass.values()]
     print "actual class balance after training:", labelsTraining*1./np.min(labelsTraining)
     print_delimiter()
-
+    
+    epoch_path = os.path.join(outputFolder, "epoch_" + str(epoch))
+    if not (os.path.exists(epoch_path)):
+      os.makedirs(os.path.join(epoch_path))
+      
     modelTrain.save_weights(os.path.join(outputFolder, "epoch_" + str(epoch),
                             "model_epoch" + str(epoch) + ".hdf5"))
     modelTest.set_weights(modelTrain.get_weights())

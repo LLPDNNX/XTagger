@@ -18,7 +18,7 @@ arguments = parser.parse_args()
 
 
 if not os.path.exists(arguments.weightfile[0]):
-    print "Error - weight file '",parser.weightfile[0],"' does not exists"
+    print "Error - weight file '",arguments.weightfile[0],"' does not exists"
     sys.exit(1)
 if not arguments.weightfile[0].endswith(".hdf5"):
     print "Error - file '",parser.weightfile[0],"' is not a hdf5 file"

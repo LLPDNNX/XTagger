@@ -379,10 +379,11 @@ while (epoch < num_epochs):
                        loss='categorical_crossentropy', metrics=['accuracy'])
     modelTest.compile(opt,
                       loss='categorical_crossentropy', metrics=['accuracy'])
-
-    if epoch == 0:
-        plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
-
+    
+    #TODO: fix "libgvplugin_pango not found" error
+    #if epoch == 0:
+    #    plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
+    
     init_op = tf.group(
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()

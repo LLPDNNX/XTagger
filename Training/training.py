@@ -315,8 +315,13 @@ def input_pipeline(files, batchSize):
         rootreader_op = []
         resamplers = []
         for _ in range(min(len(fileListTrain)-1, 6)):
+            if isParametric:
+                reader_batch = 10000
+            else:
+                reader_batch = 100
+
             reader = root_reader(fileListQueue, featureDict,
-                                 "jets", batch=10000).batch()
+                                 "jets", batch=reader_batch).batch()
 
             rootreader_op.append(reader)
 
@@ -377,23 +382,22 @@ while (epoch < num_epochs):
     modelTest.compile(opt,
                       loss='categorical_crossentropy', metrics=['accuracy'])
 
-    if epoch == 0:
-        plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
+    #if epoch == 0:
+        #plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
 
-    init_op = tf.group(
-                    tf.global_variables_initializer(),
-                    tf.local_variables_initializer()
-                    )
+    init_op = tf.group(tf.global_variables_initializer(),
+                       tf.local_variables_initializer()
+                      )
 
     sess = K.get_session()
     sess.run(init_op)
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
     weight_path = os.path.join(
             outputFolder, "epoch_" + str(epoch-1),
-            "model_epoch"+str(epoch-1)+".hdf5"
-            )
+            "model_epoch.hdf5")
 
     if os.path.exists(weight_path):
         print "loading weights ... ", weight_path
@@ -402,12 +406,12 @@ while (epoch < num_epochs):
         print "no weights from previous epoch found"
         sys.exit(1)
 
-    total_loss_train = 0
-    total_loss_test = 0
-
     # number of events
     nTrain = 0
     nTest = 0
+    total_loss_train = 0
+    total_loss_test = 0
+
     start_time = time.time()
 
     labelsTraining = np.array([5])
@@ -464,8 +468,7 @@ while (epoch < num_epochs):
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Training step %d: loss = %.3f, \
-                        accuracy = %.2f%%, time = %.3f sec' % (
+                print 'Training step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % (
                     step,
                     train_outputs[0],
                     train_outputs[1]*100.,
@@ -499,7 +502,7 @@ while (epoch < num_epochs):
       os.makedirs(os.path.join(epoch_path))
       
     modelTrain.save_weights(os.path.join(outputFolder, "epoch_" + str(epoch),
-                            "model_epoch" + str(epoch) + ".hdf5"))
+                            "model_epoch.hdf5"))
     modelTest.set_weights(modelTrain.get_weights())
 
     hists = []
@@ -569,12 +572,7 @@ while (epoch < num_epochs):
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % (
-                    step,
-                    test_outputs[0],
-                    test_outputs[1]*100.,
-                    duration
-                )
+                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
 
                 start_time = time.time()
 
@@ -601,7 +599,7 @@ while (epoch < num_epochs):
     f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(M_score)+"\n")
     f.close()
 
-    if epoch > 2 and previous_train_loss < avgLoss_train:
+    if epoch > 1 and previous_train_loss < avgLoss_train:
         learning_rate_val = learning_rate_val*0.9
         print "Decreasing learning rate to %.4e" % (learning_rate_val)
     previous_train_loss = avgLoss_train

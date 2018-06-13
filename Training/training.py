@@ -60,6 +60,9 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 
+if len(jobName)==0:
+    print "Error - no job name specified"
+    sys.exit(1)
 
 def print_delimiter():
     print "-"*80
@@ -89,7 +92,7 @@ fileListTest = []
 
 now = datetime.datetime.now()
 date = str(now.year) + str(now.month) + str(now.day)
-outputFolder = "output/" + date + "_" + jobName
+outputFolder = "output/" + jobName
 
 if (os.path.exists(outputFolder) & overwriteFlag):
     print "Overwriting output folder!"

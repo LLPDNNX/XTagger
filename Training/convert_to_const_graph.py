@@ -4,7 +4,6 @@ import sys
 import tensorflow as tf
 import keras
 from keras import backend as K
-
 from feature_dict import featureDict
 import llp_model_simple
 

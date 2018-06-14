@@ -68,6 +68,8 @@ function run_setup()
     #conda install -c conda-forge cmake --yes || return 1
     #conda install -c nlesc root-numpy=4.4.0 --yes || return 1
     #conda install -c conda-forge boost=1.64.0 --yes || return 1
+    echo "Installing gcc"
+    conda install -c cgat gcc --yes &>> $LOGFILE
     
     echo "Installing pip packages"
     pip install --no-cache-dir -r $SCRIPT_DIR/packages_cpu.pip &>> $LOGFILE || return 1

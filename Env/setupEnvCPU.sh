@@ -68,10 +68,6 @@ function run_setup()
     #conda install -c conda-forge cmake --yes || return 1
     #conda install -c nlesc root-numpy=4.4.0 --yes || return 1
     #conda install -c conda-forge boost=1.64.0 --yes || return 1
-
-    echo "Installing gcc"
-    conda install -c cgat gcc --yes &>> $LOGFILE
-    
     echo "Installing pip packages"
     pip install --no-cache-dir -r $SCRIPT_DIR/packages_cpu.pip &>> $LOGFILE || return 1
     
@@ -80,7 +76,8 @@ function run_setup()
     conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     echo "Installing root"
     conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
-    
+    conda update -f libstdcxx-ng --yes &>> $LOGFILE || return 1
+
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
     #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_cpu.sh

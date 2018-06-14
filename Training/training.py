@@ -60,6 +60,9 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 
+if len(jobName)==0:
+    print "Error - no job name specified"
+    sys.exit(1)
 
 def print_delimiter():
     print "-"*80
@@ -89,7 +92,7 @@ fileListTest = []
 
 now = datetime.datetime.now()
 date = str(now.year) + str(now.month) + str(now.day)
-outputFolder = "output/" + date + "_" + jobName
+outputFolder = "output/" + jobName
 
 if (os.path.exists(outputFolder) & overwriteFlag):
     print "Overwriting output folder!"
@@ -315,9 +318,12 @@ def input_pipeline(files, batchSize):
         rootreader_op = []
         resamplers = []
         for _ in range(min(len(fileListTrain)-1, 6)):
-            reader = root_reader(fileListQueue, featureDict,
-                                 "jets", batch=10000).batch()
+            if isParametric:
+                reader_batch = 10000
+            else:
+                reader_batch = max(10,int(batchSize/50.))
 
+            reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
 
             weight = classification_weights(
@@ -376,10 +382,11 @@ while (epoch < num_epochs):
                        loss='categorical_crossentropy', metrics=['accuracy'])
     modelTest.compile(opt,
                       loss='categorical_crossentropy', metrics=['accuracy'])
-
-    if epoch == 0:
-        plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
-
+    
+    #TODO: fix "libgvplugin_pango not found" error
+    #if epoch == 0:
+    #    plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
+    
     init_op = tf.group(
                     tf.global_variables_initializer(),
                     tf.local_variables_initializer()
@@ -390,10 +397,10 @@ while (epoch < num_epochs):
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
     weight_path = os.path.join(
             outputFolder, "epoch_" + str(epoch-1),
-            "model_epoch"+str(epoch-1)+".hdf5"
-            )
+            "model_epoch.hdf5")
 
     if os.path.exists(weight_path):
         print "loading weights ... ", weight_path
@@ -402,12 +409,12 @@ while (epoch < num_epochs):
         print "no weights from previous epoch found"
         sys.exit(1)
 
-    total_loss_train = 0
-    total_loss_test = 0
-
     # number of events
     nTrain = 0
     nTest = 0
+    total_loss_train = 0
+    total_loss_test = 0
+
     start_time = time.time()
 
     labelsTraining = np.array([5])
@@ -415,8 +422,12 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
-            # get the value of batch to fill histograms
+            step += 1
             train_batch_value = sess.run(train_batch)
+            if train_batch_value['num'].shape[0]==0:
+                continue
+            
+
 
             if isParametric:
                 train_inputs = [train_batch_value['gen'][:, 0],
@@ -435,7 +446,7 @@ while (epoch < num_epochs):
             labelsTraining = np.add(
                     train_batch_value["truth"].sum(axis=0), labelsTraining)
 
-            if step == 0:
+            if step == 1:
                 ptArray = train_batch_value["globalvars"][:, 0]
                 etaArray = train_batch_value["globalvars"][:, 1]
                 truthArray = np.argmax(train_batch_value["truth"], axis=1)
@@ -454,7 +465,6 @@ while (epoch < num_epochs):
                     ctauArray = np.hstack(
                             (ctauArray, train_batch_value["gen"][:, 0]))
 
-            step += 1
             nTrainBatch = train_batch_value["truth"].shape[0]
 
             nTrain += nTrainBatch
@@ -464,8 +474,7 @@ while (epoch < num_epochs):
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Training step %d: loss = %.3f, \
-                        accuracy = %.2f%%, time = %.3f sec' % (
+                print 'Training step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % (
                     step,
                     train_outputs[0],
                     train_outputs[1]*100.,
@@ -499,7 +508,7 @@ while (epoch < num_epochs):
       os.makedirs(os.path.join(epoch_path))
       
     modelTrain.save_weights(os.path.join(outputFolder, "epoch_" + str(epoch),
-                            "model_epoch" + str(epoch) + ".hdf5"))
+                            "model_epoch.hdf5"))
     modelTest.set_weights(modelTrain.get_weights())
 
     hists = []
@@ -518,7 +527,10 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
+            step += 1
             test_batch_value = sess.run(test_batch)
+            if test_batch_value['num'].shape[0]==0:
+                continue
 
             if isParametric:
                 test_inputs = [test_batch_value['gen'][:, 0],
@@ -549,7 +561,7 @@ while (epoch < num_epochs):
                 if isParametric:
                     ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
 
-            step += 1
+            
             nTestBatch = test_batch_value["truth"].shape[0]
 
             for ibatch in range(test_batch_value["truth"].shape[0]):
@@ -569,12 +581,7 @@ while (epoch < num_epochs):
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % (
-                    step,
-                    test_outputs[0],
-                    test_outputs[1]*100.,
-                    duration
-                )
+                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
 
                 start_time = time.time()
 
@@ -601,7 +608,7 @@ while (epoch < num_epochs):
     f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(M_score)+"\n")
     f.close()
 
-    if epoch > 2 and previous_train_loss < avgLoss_train:
+    if epoch > 1 and previous_train_loss < avgLoss_train:
         learning_rate_val = learning_rate_val*0.9
         print "Decreasing learning rate to %.4e" % (learning_rate_val)
     previous_train_loss = avgLoss_train

@@ -40,7 +40,6 @@ featureDict = {
         "branches": [
             'global_pt',
             'global_eta',
-            'global_rho',
             'ncpf',
             'nnpf',
             'nsv',

@@ -60,6 +60,9 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 
+if len(jobName)==0:
+    print "Error - no job name specified"
+    sys.exit(1)
 
 def print_delimiter():
     print "-"*80
@@ -89,7 +92,7 @@ fileListTest = []
 
 now = datetime.datetime.now()
 date = str(now.year) + str(now.month) + str(now.day)
-outputFolder = "output/" + date + "_" + jobName
+outputFolder = "output/" + jobName
 
 if (os.path.exists(outputFolder) & overwriteFlag):
     print "Overwriting output folder!"
@@ -318,11 +321,9 @@ def input_pipeline(files, batchSize):
             if isParametric:
                 reader_batch = 10000
             else:
-                reader_batch = 100
+                reader_batch = max(10,int(batchSize/50.))
 
-            reader = root_reader(fileListQueue, featureDict,
-                                 "jets", batch=reader_batch).batch()
-
+            reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
 
             weight = classification_weights(
@@ -381,13 +382,15 @@ while (epoch < num_epochs):
                        loss='categorical_crossentropy', metrics=['accuracy'])
     modelTest.compile(opt,
                       loss='categorical_crossentropy', metrics=['accuracy'])
-
+    
+    #TODO: fix "libgvplugin_pango not found" error
     #if epoch == 0:
-        #plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
-
-    init_op = tf.group(tf.global_variables_initializer(),
-                       tf.local_variables_initializer()
-                      )
+    #    plot_model(modelTrain, to_file=os.path.join(outputFolder, 'model.eps'))
+    
+    init_op = tf.group(
+                    tf.global_variables_initializer(),
+                    tf.local_variables_initializer()
+                    )
 
     sess = K.get_session()
     sess.run(init_op)
@@ -419,8 +422,12 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
-            # get the value of batch to fill histograms
+            step += 1
             train_batch_value = sess.run(train_batch)
+            if train_batch_value['num'].shape[0]==0:
+                continue
+            
+
 
             if isParametric:
                 train_inputs = [train_batch_value['gen'][:, 0],
@@ -439,7 +446,7 @@ while (epoch < num_epochs):
             labelsTraining = np.add(
                     train_batch_value["truth"].sum(axis=0), labelsTraining)
 
-            if step == 0:
+            if step == 1:
                 ptArray = train_batch_value["globalvars"][:, 0]
                 etaArray = train_batch_value["globalvars"][:, 1]
                 truthArray = np.argmax(train_batch_value["truth"], axis=1)
@@ -458,7 +465,6 @@ while (epoch < num_epochs):
                     ctauArray = np.hstack(
                             (ctauArray, train_batch_value["gen"][:, 0]))
 
-            step += 1
             nTrainBatch = train_batch_value["truth"].shape[0]
 
             nTrain += nTrainBatch
@@ -521,7 +527,10 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
+            step += 1
             test_batch_value = sess.run(test_batch)
+            if test_batch_value['num'].shape[0]==0:
+                continue
 
             if isParametric:
                 test_inputs = [test_batch_value['gen'][:, 0],
@@ -552,7 +561,7 @@ while (epoch < num_epochs):
                 if isParametric:
                     ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
 
-            step += 1
+            
             nTestBatch = test_batch_value["truth"].shape[0]
 
             for ibatch in range(test_batch_value["truth"].shape[0]):

@@ -521,6 +521,7 @@ while (epoch < num_epochs):
         for branches2 in featureDict["truth"]["branches"]:
             probName = branches2.replace("||", "_").replace("is", "").replace("from", "")
             h = ROOT.TH1F(disName+probName, probName, 10000, 0, 1)
+            h.SetDirectory(0)
             histsPerDis.append(h)
         hists.append(histsPerDis)
 

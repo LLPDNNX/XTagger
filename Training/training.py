@@ -405,6 +405,8 @@ while (epoch < num_epochs):
     if os.path.exists(weight_path):
         print "loading weights ... ", weight_path
         modelTrain.load_weights(weight_path)
+        print "weights loaded succesfully"
+
     elif epoch > 0:
         print "no weights from previous epoch found"
         sys.exit(1)
@@ -414,7 +416,8 @@ while (epoch < num_epochs):
     nTest = 0
     total_loss_train = 0
     total_loss_test = 0
-
+    
+    print "Starting training"
     start_time = time.time()
 
     labelsTraining = np.array([5])
@@ -427,8 +430,6 @@ while (epoch < num_epochs):
             if train_batch_value['num'].shape[0]==0:
                 continue
             
-
-
             if isParametric:
                 train_inputs = [train_batch_value['gen'][:, 0],
                                 train_batch_value['globalvars'],

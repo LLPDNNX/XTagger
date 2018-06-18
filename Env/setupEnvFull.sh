@@ -77,6 +77,7 @@ function run_setup()
     conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     echo "Installing root"
     conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
+    conda update -f libstdcxx-ng --yes &>> $LOGFILE || return 1
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh

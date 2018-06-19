@@ -572,10 +572,10 @@ class NanoXTree
             
             
             //jetId is 2**0*loose_id+2**1*tight_id; so jetId>0 is passed by all loose jets
-            if (Jet_jetId[jet]==0 or Jet_cleanmask[jet]==0)
-            {
-                return false;
-            }
+            //if (Jet_jetId[jet]==0 or Jet_cleanmask[jet]==0)
+            //{
+                //return false;
+            //}
             
             if (Jet_pt[jet]<20. or std::fabs(Jet_eta[jet])>2.4)
             {

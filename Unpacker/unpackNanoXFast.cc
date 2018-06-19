@@ -240,6 +240,7 @@ class NanoXTree
         float Jet_eta[maxEntries];
         float Jet_pt[maxEntries];
         unsigned int Jet_jetId[maxEntries];
+        unsigned int Jet_nConstituents[maxEntries];
         unsigned int Jet_cleanmask[maxEntries];
         
         unsigned int njetorigin;
@@ -375,7 +376,7 @@ class NanoXTree
             tree_->SetBranchAddress("Jet_pt",&Jet_pt);
             tree_->SetBranchAddress("Jet_jetId",&Jet_jetId);
             tree_->SetBranchAddress("Jet_cleanmask",&Jet_cleanmask);
-        
+            tree_->SetBranchAddress("Jet_nConstituents",&Jet_nConstituents);
         
             tree_->SetBranchAddress("njetorigin",&njetorigin);
             
@@ -571,11 +572,13 @@ class NanoXTree
             }
             
             
-            //jetId is 2**0*loose_id+2**1*tight_id; so jetId>0 is passed by all loose jets
-            //if (Jet_jetId[jet]==0 or Jet_cleanmask[jet]==0)
-            //{
-                //return false;
             //}
+            //do not apply jet ID; require at least 2 constituents & no overlap with leptons
+            //garbage jets are anyway not considered since training is done on matched jets only
+            if (Jet_nConstituents[jet]<2 or Jet_cleanmask[jet]==0)
+            {
+                return false;
+            }
             
             if (Jet_pt[jet]<20. or std::fabs(Jet_eta[jet])>2.4)
             {

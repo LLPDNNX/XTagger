@@ -3,6 +3,7 @@ import os
 import sys
 import tensorflow as tf
 import keras
+import numpy
 from keras import backend as K
 from feature_dict import featureDict
 import llp_model_simple
@@ -67,7 +68,30 @@ else:
 init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 sess.run(init_op)
 
+def shape(tf_tensor):
+    dims = tf_tensor.shape.as_list()
+    dims[0] = 1
+    return dims
+
 model.load_weights(arguments.weightfile[0])
+
+
+
+
+#test if graph can be executed
+feed_dict={
+    tf_globalvars:numpy.zeros(shape(tf_globalvars)),
+    tf_cpf:numpy.zeros(shape(tf_cpf)),
+    tf_npf:numpy.zeros(shape(tf_npf)),
+    tf_sv:numpy.zeros(shape(tf_sv)),
+}
+if arguments.parametric:
+    feed_dict[tf_gen] = numpy.zeros(shape(tf_gen))
+
+full_prediction_val = sess.run(
+    full_prediction,
+    feed_dict=feed_dict
+)
 
 const_graph = tf.graph_util.convert_variables_to_constants(
     sess,

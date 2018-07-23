@@ -320,11 +320,7 @@ def input_pipeline(files, batchSize):
         rootreader_op = []
         resamplers = []
         for _ in range(min(len(fileListTrain)-1, 6)):
-            if isParametric:
-                reader_batch = max(10,int(batchSize/20.))
-            else:
-                reader_batch = max(10,int(batchSize/20.))
-
+            reader_batch = max(10,int(batchSize/20.))
             reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
 

@@ -67,6 +67,12 @@ if len(jobName)==0:
 def print_delimiter():
     print "-"*80
 
+OMP_NUM_THREADS = -1
+if os.environ.has_key('OMP_NUM_THREADS'):
+    try:
+        OMP_NUM_THREADS = int(os.environ["OMP_NUM_THREADS"])
+    except Exception:
+        pass
 
 # import the gpu, if needed and available
 print "Trying to import the gpu, otherwise set to GPU"
@@ -74,7 +80,7 @@ print "Trying to import the gpu, otherwise set to GPU"
 print_delimiter()
 if isGPU:
     try:
-        if not os.environ.In('CUDA_VISIBLE_DEVICES'):
+        if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
             imp.find_module('setGPU')
             import setGPU
         print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']
@@ -319,7 +325,10 @@ def input_pipeline(files, batchSize):
 
         rootreader_op = []
         resamplers = []
-        for _ in range(min(len(fileListTrain)-1, 6)):
+        maxThreads = 6
+        if OMP_NUM_THREADS>0 and OMP_NUM_THREADS<maxThreads:
+            maxThreads = OMP_NUM_THREADS
+        for _ in range(min(1+int(len(fileListTrain)/2.), maxThreads)):
             reader_batch = max(10,int(batchSize/20.))
             reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)

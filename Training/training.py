@@ -103,8 +103,9 @@ print_delimiter()
 
 f = open(filePathTrain)
 for line in f:
-    if os.path.exists(line.strip()):
-        fileListTrain.append(line.strip())
+    basepath = filePathTrain.rsplit('/',1)[0]
+    if os.path.exists(os.path.join(basepath,line.strip())):
+        fileListTrain.append(os.path.join(basepath,line.strip()))
         print "Adding file: '"+line.strip()+"'"
     else:
         print "WARNING: file '"+line.strip()+"' does not exists -> skip!"
@@ -113,8 +114,9 @@ print_delimiter()
 
 f = open(filePathTest)
 for line in f:
-    if os.path.exists(line.strip()):
-        fileListTest.append(line.strip())
+    basepath = filePathTrain.rsplit('/',1)[0]
+    if os.path.exists(os.path.join(basepath,line.strip())):
+        fileListTest.append(os.path.join(basepath,line.strip()))
         print "Adding file: '"+line.strip()+"'"
     else:
         print "WARNING: file '"+line.strip()+"' does not exists -> skip!"
@@ -319,9 +321,9 @@ def input_pipeline(files, batchSize):
         resamplers = []
         for _ in range(min(len(fileListTrain)-1, 6)):
             if isParametric:
-                reader_batch = 10000
+                reader_batch = max(10,int(batchSize/20.))
             else:
-                reader_batch = max(10,int(batchSize/50.))
+                reader_batch = max(10,int(batchSize/20.))
 
             reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
@@ -338,13 +340,6 @@ def input_pipeline(files, batchSize):
                 reader
             ).resample()
 
-            if isParametric:
-
-                isSignal = resampled["truth"][:, 4] > 0.5  # index 4 is LLP
-                resampled["gen"] = fake_background(
-                                resampled["gen"], isSignal, 0)
-                print resampled["gen"]
-
             resamplers.append(resampled)
 
         minAfterDequeue = batchSize * 2
@@ -357,6 +352,10 @@ def input_pipeline(files, batchSize):
             min_after_dequeue=minAfterDequeue,
             enqueue_many=True  # requires to read examples in batches!
         )
+        if isParametric:
+            isSignal = batch["truth"][:, 4] > 0.5  # index 4 is LLP
+            batch["gen"] = fake_background(batch["gen"], isSignal, 0)
+
         return batch
 
 

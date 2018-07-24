@@ -67,6 +67,12 @@ if len(jobName)==0:
 def print_delimiter():
     print "-"*80
 
+OMP_NUM_THREADS = -1
+if os.environ.has_key('OMP_NUM_THREADS'):
+    try:
+        OMP_NUM_THREADS = int(os.environ["OMP_NUM_THREADS"])
+    except Exception:
+        pass
 
 # import the gpu, if needed and available
 print "Trying to import the gpu, otherwise set to GPU"
@@ -103,8 +109,9 @@ print_delimiter()
 
 f = open(filePathTrain)
 for line in f:
-    if os.path.exists(line.strip()):
-        fileListTrain.append(line.strip())
+    basepath = filePathTrain.rsplit('/',1)[0]
+    if os.path.exists(os.path.join(basepath,line.strip())):
+        fileListTrain.append(os.path.join(basepath,line.strip()))
         print "Adding file: '"+line.strip()+"'"
     else:
         print "WARNING: file '"+line.strip()+"' does not exists -> skip!"
@@ -113,8 +120,9 @@ print_delimiter()
 
 f = open(filePathTest)
 for line in f:
-    if os.path.exists(line.strip()):
-        fileListTest.append(line.strip())
+    basepath = filePathTrain.rsplit('/',1)[0]
+    if os.path.exists(os.path.join(basepath,line.strip())):
+        fileListTest.append(os.path.join(basepath,line.strip()))
         print "Adding file: '"+line.strip()+"'"
     else:
         print "WARNING: file '"+line.strip()+"' does not exists -> skip!"
@@ -317,12 +325,11 @@ def input_pipeline(files, batchSize):
 
         rootreader_op = []
         resamplers = []
-        for _ in range(min(len(fileListTrain)-1, 6)):
-            if isParametric:
-                reader_batch = 10000
-            else:
-                reader_batch = max(10,int(batchSize/50.))
-
+        maxThreads = 6
+        if OMP_NUM_THREADS>0 and OMP_NUM_THREADS<maxThreads:
+            maxThreads = OMP_NUM_THREADS
+        for _ in range(min(1+int(len(fileListTrain)/2.), maxThreads)):
+            reader_batch = max(10,int(batchSize/20.))
             reader = root_reader(fileListQueue, featureDict, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
 
@@ -338,13 +345,6 @@ def input_pipeline(files, batchSize):
                 reader
             ).resample()
 
-            if isParametric:
-
-                isSignal = resampled["truth"][:, 4] > 0.5  # index 4 is LLP
-                resampled["gen"] = fake_background(
-                                resampled["gen"], isSignal, 0)
-                print resampled["gen"]
-
             resamplers.append(resampled)
 
         minAfterDequeue = batchSize * 2
@@ -357,6 +357,10 @@ def input_pipeline(files, batchSize):
             min_after_dequeue=minAfterDequeue,
             enqueue_many=True  # requires to read examples in batches!
         )
+        if isParametric:
+            isSignal = batch["truth"][:, 4] > 0.5  # index 4 is LLP
+            batch["gen"] = fake_background(batch["gen"], isSignal, 0)
+
         return batch
 
 

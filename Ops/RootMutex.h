@@ -6,7 +6,7 @@
 class RootMutex
 {
     private:
-        std::mutex mutex;
+        std::mutex _rmutex;
         RootMutex()
         {
         }
@@ -16,24 +16,34 @@ class RootMutex
         {
             friend RootMutex;
             private:
-                std::mutex& _mutex;
-                Lock(std::mutex& mutex):
-                    _mutex(mutex)
+                std::mutex& _lockmutex;
+                Lock(std::mutex& m):
+                    _lockmutex(m)
                 { 
-                    _mutex.lock();  
+                    _lockmutex.lock();  
                 }
                 
             public:
+                Lock(const Lock& lock) = delete;
+                Lock& operator=(const Lock& lock) = delete;
+                Lock& operator=(Lock&& lock) = delete;
+                Lock& operator=(Lock& lock) = delete;
+                
+                Lock(Lock&& lock):
+                    _lockmutex(lock._lockmutex)
+                {
+                }
+                
                 ~Lock()
                 {
-                    _mutex.unlock();
+                    _lockmutex.unlock();
                 }
         };
         
         static Lock lock()
         {
             static RootMutex rootMutex;
-            return rootMutex.mutex;
+            return rootMutex._rmutex;
         }  
 };
 

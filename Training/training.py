@@ -80,7 +80,7 @@ print "Trying to import the gpu, otherwise set to GPU"
 print_delimiter()
 if isGPU:
     try:
-        if not os.environ.In('CUDA_VISIBLE_DEVICES'):
+        if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
             imp.find_module('setGPU')
             import setGPU
         print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']

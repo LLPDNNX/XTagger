@@ -21,7 +21,7 @@ include_directories(${TensorFlow_INCLUDE_DIRS} ${ROOT_INCLUDE_DIR} ${PROJECT_SOU
 add_executable(testJetID
     testJetID.cc
 )
-target_link_libraries(testJetID $(ROOT_LIBRARIES) -lTreePlayer)
+target_link_libraries(testJetID ${ROOT_LIBRARIES} -lTreePlayer)
 
 add_executable(unpackNanoX
     unpackNanoX.cc

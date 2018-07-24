@@ -74,7 +74,7 @@ print "Trying to import the gpu, otherwise set to GPU"
 print_delimiter()
 if isGPU:
     try:
-        if not os.environ.In('CUDA_VISIBLE_DEVICES'):
+        if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
             imp.find_module('setGPU')
             import setGPU
         print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']
@@ -221,6 +221,15 @@ print_delimiter()
 
 dropoutPerClass = {k: min(resampledEventsPerClass.values())/v
                    for k, v in resampledEventsPerClass.iteritems()}
+
+# Hard-coded for class imbalance testing!
+#dropoutPerClass['jetorigin_isB||jetorigin_isBB||jetorigin_isGBB||jetorigin_isLeptonic_B||jetorigin_isLeptonic_C'] = dropoutPerClass['jetorigin_isB||jetorigin_isBB||jetorigin_isGBB||jetorigin_isLeptonic_B||jetorigin_isLeptonic_C']/9.
+#class labels: ['jetorigin_isB||jetorigin_isBB||jetorigin_isGBB||jetorigin_isLeptonic_B||jetorigin_isLeptonic_C', 'jetorigin_isUD||jetorigin_isS', 'jetorigin_isG', 'jetorigin_isC||jetorigin_isCC||jetorigin_isGCC', 'jetorigin_fromLLP']
+
+dropoutPerClass['jetorigin_isUD||jetorigin_isS'] =  dropoutPerClass['jetorigin_isUD||jetorigin_isS']/3.
+dropoutPerClass['jetorigin_isG'] =  dropoutPerClass['jetorigin_isG']/3.
+dropoutPerClass['jetorigin_isC||jetorigin_isCC||jetorigin_isGCC'] = dropoutPerClass['jetorigin_isC||jetorigin_isCC||jetorigin_isGCC']/3.
+
 
 print dropoutPerClass
 print_delimiter()

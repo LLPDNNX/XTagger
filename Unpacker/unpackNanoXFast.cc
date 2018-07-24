@@ -572,6 +572,7 @@ class NanoXTree
             }
             
             
+            //}
             //do not apply jet ID; require at least 2 constituents & no overlap with leptons
             //garbage jets are anyway not considered since training is done on matched jets only
             if (Jet_nConstituents[jet]<2 or Jet_cleanmask[jet]==0)

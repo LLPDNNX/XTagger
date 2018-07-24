@@ -21,8 +21,6 @@ from feature_dict import featureDict
 
 from plot_macros import plot_resampled, make_plots, makePlot
 
-import llp_model_simple
-
 # tensorflow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -46,6 +44,8 @@ parser.add_argument('-o', '--overwrite', action='store_true',
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
                     help='train a parametric model', default=False)
+parser.add_argument('-m', '--model', action='store', help='model file',
+                    default='llp_model_simple')
 
 arguments = parser.parse_args()
 
@@ -59,6 +59,11 @@ classBalance = arguments.c
 num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
+
+modelPath = arguments.model
+import importlib
+
+llp_model_simple = importlib.import_module(modelPath)
 
 if len(jobName)==0:
     print "Error - no job name specified"

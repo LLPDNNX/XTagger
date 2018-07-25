@@ -74,23 +74,38 @@ if os.environ.has_key('OMP_NUM_THREADS'):
     except Exception:
         pass
 
-# import the gpu, if needed and available
-print "Trying to import the gpu, otherwise set to GPU"
+
 
 print_delimiter()
-if isGPU:
-    try:
-        if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
-            imp.find_module('setGPU')
-            import setGPU
-        print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']
-        from tensorflow.python.client import device_lib
-        print(device_lib.list_local_devices())
-    except ImportError:
-        print "using CPU"
-        pass
-else:
-    print "using CPU"
+
+#limit CUDA_VISIBLE_DEVICES to a free GPU if unset by e.g. batch system; fails if no GPU available
+try:
+    if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
+        imp.find_module('setGPU')
+        import setGPU
+        print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']," (manually set by 'setGPU')"
+    else:
+        print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']," (taken from env)"
+except ImportError:
+    pass
+        
+#query all available devices
+nCPU = 0
+nGPU = 0
+nUnknown = 0
+from tensorflow.python.client import device_lib
+for dev in device_lib.list_local_devices():
+    if dev.device_type=="CPU":
+        nCPU+=1
+    elif dev.device_type=="GPU":
+        nGPU+=1
+    else:
+        nUnknown+=1
+print "Found %i/%i/%i (CPU/GPU/unknown) devices"%(nCPU,nGPU,nUnknown)
+        
+if isGPU and nGPU==0:
+    print "Enforcing gpu usage"
+    raise Exception("GPU usage enforced but no GPU found or available for computation")
 print_delimiter()
 
 fileListTrain = []

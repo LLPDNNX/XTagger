@@ -417,10 +417,10 @@ while (epoch < num_epochs):
 
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
-                       loss='categorical_crossentropy', metrics=['accuracy'])
+                       loss='kullback_leibler_divergence', metrics=['accuracy'])
                        
     optDomain = keras.optimizers.Adam(lr=learning_rate_val*0.1, beta_1=0.9, beta_2=0.999)
-    #alternatively: kullback_leibler_divergence
+    #alternatively: kullback_leibler_divergence, categorical_crossentropy
     
     modelDomainDiscriminator.compile(optDomain,
                        loss='binary_crossentropy', metrics=['accuracy'])

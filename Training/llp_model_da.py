@@ -127,7 +127,7 @@ class ModelDA(object):
         self.full_class_prediction.add(Dense(100,options=options))
         self.full_class_prediction.add(Dense(100,options=options))
         self.full_class_prediction.add(Dense(100,options=options))
-        self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(),options=options))
+        self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
             
         def gradientReverse(x):
             backward = tf.negative(x)
@@ -142,7 +142,7 @@ class ModelDA(object):
         #self.domain_prediction.add(Dense(100,options=options))
         #self.domain_prediction.add(Dense(100,options=options))
         #self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
-        self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options))
+        self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid',name="domain"),options=options))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)

@@ -46,6 +46,9 @@ parser.add_argument('-o', '--overwrite', action='store_true',
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
                     help='train a parametric model', default=False)
+parser.add_argument('--noda', action='store_true',
+                    dest='noda',
+                    help='deactivate DA', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='llp_model_da')
 
@@ -63,6 +66,7 @@ classBalance = arguments.c
 num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
+noDA = arguments.noda
 
 modelPath = arguments.model
 import importlib
@@ -218,12 +222,13 @@ for label in branchNameList:
 
     if (hist.Integral() > 0):
         weight.Divide(hist)
-        if weight.GetMaximum() < 1:
+      
+        if weight.GetMaximum() > 1:
             factor = weight.GetMaximum()
             print "rescale ", label, 1./factor
         else:
             factor = 1.
-
+        
         for ibin in range(hist.GetNbinsX()+1):
             for jbin in range(hist.GetNbinsY()+1):
                 if weight.GetBinContent(ibin, jbin) > 0:
@@ -462,7 +467,8 @@ while (epoch < num_epochs):
 
     modelDA = modelModule.ModelDA(
         len(featureDict["truth"]["branches"]),
-        isParametric=isParametric
+        isParametric=isParametric,
+        useLSTM=False
     )
     
     modelDiscriminators = setupDiscriminatorsFused(modelDA)
@@ -473,9 +479,9 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    relLoss = 0.5
-    classLossWeight = 1.#+relLoss*math.exp(-0.05*epoch**2)
-    domainLossWeight = 1#.-relLoss*math.exp(-0.05*epoch**2)
+    relLoss = 0.8
+    classLossWeight = 1.+relLoss*math.exp(-0.05*epoch**2)
+    domainLossWeight = 1.-relLoss*math.exp(-0.05*epoch**2)
     
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
@@ -484,14 +490,14 @@ while (epoch < num_epochs):
                        
     optDomain = keras.optimizers.Adam(lr=learning_rate_val*0.1, beta_1=0.9, beta_2=0.999)
     
-    #alternatively: kullback_leibler_divergence, categorical_crossentropy
+    #alternatively: kullback_leibler_divergence, binary_crossentropy
     modelDomainDiscriminator.compile(optDomain,
-                       loss='kullback_leibler_divergence', metrics=['accuracy'],
+                       loss='binary_crossentropy', metrics=['accuracy'],
                        loss_weights=[domainLossWeight])
     
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
-                       loss=['categorical_crossentropy','kullback_leibler_divergence'], metrics=['accuracy'],
+                       loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
     
     if epoch == 0:
@@ -527,8 +533,12 @@ while (epoch < num_epochs):
     # number of events
     nTrain = 0
     nTest = 0
+    nTestDomain = 0
     total_loss_train = 0
     total_loss_test = 0
+    
+    total_loss_train_domain = 0
+    total_loss_test_domain = 0
 
     start_time = time.time()
 
@@ -539,10 +549,12 @@ while (epoch < num_epochs):
         while not coord.should_stop():
             step += 1
             train_batch_value = sess.run(train_batch)
+            
+            
             if train_batch_value['num'].shape[0]==0:
                 continue
+                
             
-
 
             if isParametric:
                 train_inputs = [train_batch_value['gen'][:, 0],
@@ -555,20 +567,11 @@ while (epoch < num_epochs):
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
-            '''
 
-            train_outputs = modelClassDiscriminator.train_on_batch(
-                    train_inputs, train_batch_value["truth"])
-            #train_outputs = [0,0]
-            labelsTraining = np.add(
-                    train_batch_value["truth"].sum(axis=0), labelsTraining)
-                    
-            '''
-            train_batch_value_domain = sess.run(train_batch_da)
-            if train_batch_value_domain['num'].shape[0]>0:
-                #print train_batch_value_domain["isData"][:10]
-                #print train_batch_value_domain["xsecweight"][:10]
-                              
+            if not noDA:
+                train_batch_value_domain = sess.run(train_batch_da)
+                if train_batch_value_domain['num'].shape[0]==0:
+                    continue
                 if isParametric:
                     train_inputs_domain = [np.zeros((train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
@@ -580,21 +583,26 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
                                     train_batch_value_domain['sv']]
-                '''
-                train_outputs_domain = modelDomainDiscriminator.train_on_batch(
-                        train_inputs_domain, train_batch_value_domain["isData"],
-                        sample_weight=train_batch_value_domain["xsecweight"][:,0]
-                )
-                '''
+
+            if not noDA:
                 #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                 train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                     train_inputs+train_inputs_domain, 
-                    [train_batch_value["truth"],train_batch_value_domain["isData"]]
-                    #sample_weight=[1.,train_batch_value_domain["xsecweight"][:,0]]
+                    [train_batch_value["truth"],train_batch_value_domain["isData"]],
+                    sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_batch_value_domain["xsecweight"][:,0]]
                 )
-                
                 train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                 train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+                
+            else:
+                
+                train_outputs = modelClassDiscriminator.train_on_batch(
+                    train_inputs,
+                    train_batch_value["truth"]
+                )
+                train_outputs_domain = [0,0]
+            
+            
             
             if step == 1:
                 ptArray = train_batch_value["globalvars"][:, 0]
@@ -621,6 +629,7 @@ while (epoch < num_epochs):
 
             if nTrainBatch > 0:
                 total_loss_train += train_outputs[0] * nTrainBatch
+                total_loss_train_domain += train_outputs_domain[0] * nTrainBatch
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
@@ -697,7 +706,8 @@ while (epoch < num_epochs):
         while not coord.should_stop():
             step += 1
             test_batch_value = sess.run(test_batch)
-            if test_batch_value['num'].shape[0]==0:
+            test_batch_value_domain = sess.run(test_batch_da)
+            if test_batch_value['num'].shape[0]==0 or test_batch_value_domain['num'].shape[0]==0:
                 continue
 
             if isParametric:
@@ -715,34 +725,37 @@ while (epoch < num_epochs):
             test_outputs = modelClassDiscriminator.test_on_batch(test_inputs, test_batch_value["truth"])
             test_prediction = modelClassDiscriminator.predict_on_batch(test_inputs)
             
-            test_batch_value_domain = sess.run(test_batch_da)
-            if test_batch_value_domain['num'].shape[0]>0:
-                #print train_batch_value_domain["isData"][:10]
-                #print train_batch_value_domain["xsecweight"][:10]
-                              
-                if isParametric:
-                    test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
-                                    test_batch_value_domain['globalvars'],
-                                    test_batch_value_domain['cpf'],
-                                    test_batch_value_domain['npf'],
-                                    test_batch_value_domain['sv']]
-                else:
-                    test_inputs_domain = [test_batch_value_domain['globalvars'],
-                                    test_batch_value_domain['cpf'],
-                                    test_batch_value_domain['npf'],
-                                    test_batch_value_domain['sv']]
+            
+            #print train_batch_value_domain["isData"][:10]
+            #print train_batch_value_domain["xsecweight"][:10]
+                          
+            if isParametric:
+                test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
+                                test_batch_value_domain['globalvars'],
+                                test_batch_value_domain['cpf'],
+                                test_batch_value_domain['npf'],
+                                test_batch_value_domain['sv']]
+            else:
+                test_inputs_domain = [test_batch_value_domain['globalvars'],
+                                test_batch_value_domain['cpf'],
+                                test_batch_value_domain['npf'],
+                                test_batch_value_domain['sv']]
 
-                test_daprediction_class = modelClassDiscriminator.predict_on_batch(
-                        test_inputs_domain
-                )
-                
-                
-                for ibatch in range(test_batch_value_domain["isData"].shape[0]):
-                    isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
-                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
+            test_outputs_domain = modelDomainDiscriminator.test_on_batch(
+                    test_inputs_domain,test_batch_value_domain["isData"],
+                    sample_weight=test_batch_value_domain["xsecweight"][:,0]
+            )
+            test_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                    test_inputs_domain
+            )
+            
+            
+            for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
 
-                    for idis in range(len(featureDict["truth"]["branches"])):
-                        daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+                for idis in range(len(featureDict["truth"]["branches"])):
+                    daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
 
             if step == 0:
                 ptArray = test_batch_value["globalvars"][:, 0]
@@ -760,6 +773,7 @@ while (epoch < num_epochs):
 
             
             nTestBatch = test_batch_value["truth"].shape[0]
+            nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
 
             for ibatch in range(test_batch_value["truth"].shape[0]):
                 truthclass = np.argmax(test_batch_value["truth"][ibatch])
@@ -772,9 +786,11 @@ while (epoch < num_epochs):
                     hists[idis][truthclass].Fill(test_prediction[ibatch][idis])
 
             nTest += nTestBatch
+            nTestDomain += nTestBatchDomain
 
-            if nTestBatch > 0:
+            if nTestBatch > 0 and nTestBatchDomain>0:
                 total_loss_test += test_outputs[0] * nTestBatch
+                total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
@@ -787,6 +803,9 @@ while (epoch < num_epochs):
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
+    
+    avgLoss_train_domain = total_loss_train_domain/nTrain
+    avgLoss_test_domain = total_loss_test_domain/nTestDomain
 
     if epoch == 0:
 
@@ -797,17 +816,25 @@ while (epoch < num_epochs):
 
     print "Epoch duration = (%.1f min)" % ((time.time() - epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%" % (nTrain, nTest, 100. * nTest/(nTrain+nTest))
-    print "Average loss = %.4f (%.4f)" % (avgLoss_train, avgLoss_test)
+    print "Average loss class = %.4f (%.4f)" % (avgLoss_train, avgLoss_test)
+    print "Average loss domain = %.4f (%.4f)" % (avgLoss_train_domain, avgLoss_test_domain)
     print "Learning rate = %.4e" % (learning_rate_val)
 
     M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
+    labels = ["B","C","UDS","G","LLP"]
+    
     for idis in range(len(featureDict["truth"]["branches"])):
-        probName = featureDict["truth"]["branches"][idis].replace("is", "").replace("_","").replace("from", "").replace("jetorigin","").replace(" ","")
         cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
-        #cv.Divide(1,2,0,0)
-        #cv.cd(1)
-        cv.SetLogy(1)
+        cv.Divide(1,2,0,0)
+        cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
+        cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
+        cv.GetPad(1).SetFillStyle(4000)
+        cv.GetPad(2).SetFillStyle(4000)
+        cv.GetPad(1).SetMargin(0.13, 0.04, 0.45, 0.06)
+        cv.GetPad(2).SetMargin(0.13, 0.04, 0.15, 0.56)
+        cv.GetPad(1).SetLogy(1)
+        cv.cd(1)
         daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
         ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
         ymin = ymax
@@ -817,14 +844,42 @@ while (epoch < num_epochs):
             if cMC>1 and cData>1:
                 ymin = min([ymin,cMC,cData])
              
-        axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+probName+");",50,0,1,50,ymin*0.6,1.15*ymax)
+        ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
+        axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Events",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
+        axis.GetXaxis().SetLabelSize(0)
         axis.Draw("AXIS")
         daHists[idis][0].Draw("HISTSAME")
         daHists[idis][1].Draw("PESAME")
-        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+probName.replace("||","_")+".pdf"))
-        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+probName.replace("||","_")+".png"))
+        pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
+        pText.SetTextFont(43)
+        pText.SetTextAlign(32)
+        pText.SetTextSize(34)
+        pText.AddText("KS-test: %5.1f%%"%(
+            #100.*daHists[idis][0].Chi2Test(daHists[idis][1]),
+            100.*daHists[idis][0].KolmogorovTest(daHists[idis][1])
+        ))
+        pText.Draw("Same")
+        cv.cd(2)
+        axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0,2.3)
+        axisRes.Draw("AXIS")
+        axisLine = ROOT.TF1("axisLine","1",0,1)
+        axisLine.SetLineColor(ROOT.kBlack)
+        axisLine.Draw("Same")
+        axisLineUp = ROOT.TF1("axisLineUp","1.5",0,1)
+        axisLineUp.SetLineColor(ROOT.kBlack)
+        axisLineUp.SetLineStyle(2)
+        axisLineUp.Draw("Same")
+        axisLineDown = ROOT.TF1("axisLineDown","0.5",0,1)
+        axisLineDown.SetLineColor(ROOT.kBlack)
+        axisLineDown.SetLineStyle(2)
+        axisLineDown.Draw("Same")
+        daHistsRes = daHists[idis][1].Clone(daHists[idis][1].GetName()+"res")
+        daHistsRes.Divide(daHists[idis][0])
+        daHistsRes.Draw("PESAME")
+        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".pdf"))
+        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".png"))
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
-    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(M_score)+"\n")
+    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+"\n")
     f.close()
 
     if epoch > 1 and previous_train_loss < avgLoss_train:

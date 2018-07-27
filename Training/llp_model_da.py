@@ -33,7 +33,7 @@ class Conv(object):
             use_bias=True,
             kernel_initializer='glorot_uniform',
             bias_initializer='zeros',
-            kernel_regularizer=keras.regularizers.l2(10**(-8)),
+            kernel_regularizer=keras.regularizers.l2(10**(-7)),
         )
         self.dropout = keras.layers.Dropout(0.1)
         self.activation = activation
@@ -52,7 +52,8 @@ class LSTM(object):
             implementation=2,
             recurrent_dropout=0.05, #not possible with CuDNNLSTM
             activation='tanh', #same as CuDNNLSTM
-            recurrent_activation='sigmoid'  #same as CuDNNLSTM
+            recurrent_activation='sigmoid',  #same as CuDNNLSTM
+            kernel_regularizer=keras.regularizers.l2(10**(-7))
         )
         self.dropout = keras.layers.Dropout(0.1)
         
@@ -65,7 +66,7 @@ class Dense(object):
             nodes,
             kernel_initializer='glorot_uniform',
             bias_initializer='zeros',
-            kernel_regularizer=keras.regularizers.l2(10**(-8)),
+            kernel_regularizer=keras.regularizers.l2(10**(-7)),
         )
         self.dropout = keras.layers.Dropout(dropout)
         self.activation = activation
@@ -78,7 +79,7 @@ class Dense(object):
     
     
 class ModelDA(object):
-    def __init__(self,nclasses,isParametric=False,options={}):
+    def __init__(self,nclasses,isParametric=False,useLSTM=True,options={}):
         self.nclasses = nclasses
         self.isParametric = isParametric
         
@@ -100,15 +101,19 @@ class ModelDA(object):
         self.sv_conv.add(Conv(16,1,1,options=options))
         self.sv_conv.add(Conv(8,1,1,options=options))
             
-        self.cpf_lstm = LSTM(150,True,options=options) #8*25=200 inputs
-        self.npf_lstm = LSTM(50,True,options=options) #4*25=100 inputs
-        self.sv_lstm = LSTM(50,True,options=options) #8*4=32 inputs
+        if useLSTM:
+            self.cpf_lstm = LSTM(150,True,options=options) #8*25=200 inputs
+            self.npf_lstm = LSTM(50,True,options=options) #4*25=100 inputs
+            self.sv_lstm = LSTM(50,True,options=options) #8*4=32 inputs
+        else:
+            self.cpf_lstm = keras.layers.Flatten()
+            self.npf_lstm = keras.layers.Flatten()
+            self.sv_lstm = keras.layers.Flatten()
     
         self.full_features = Sequence(scope='features')
         self.full_features.add(keras.layers.Concatenate())
-        #self.full_features.add(keras.layers.GaussianNoise(0.1))
         self.full_features.add(Dense(200,activation=keras.layers.Activation('tanh',name="features"),options=options))
-        
+        self.full_features.add(keras.layers.GaussianNoise(0.1))
         '''
         self.conv_class_prediction = Sequence(scope='class_prediction')
         self.conv_class_prediction.add(keras.layers.Flatten())
@@ -127,8 +132,6 @@ class ModelDA(object):
         self.full_class_prediction.add(Dense(100,options=options))
         self.full_class_prediction.add(Dense(100,options=options))
         self.full_class_prediction.add(Dense(100,options=options))
-        self.full_class_prediction.add(Dense(100,options=options))
-        self.full_class_prediction.add(Dense(100,options=options))
         self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
             
         def gradientReverse(x):
@@ -141,10 +144,6 @@ class ModelDA(object):
         self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
         self.domain_prediction.add(Dense(100,options=options))
         self.domain_prediction.add(Dense(100,options=options))
-        #self.domain_prediction.add(Dense(100,options=options))
-        #self.domain_prediction.add(Dense(100,options=options))
-        #self.domain_prediction.add(Dense(100,options=options))
-        #self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
         self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid',name="domain"),options=options))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):

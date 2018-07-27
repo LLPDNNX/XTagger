@@ -203,7 +203,7 @@ for label in featureDict["truth"]["branches"]:
 print_delimiter()
 print "class labels:", eventsPerClass.keys()
 print "class balance before resampling", \
-        [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
+        [x  for x in eventsPerClass.values()]
 print_delimiter()
 
 for label in branchNameList:
@@ -214,7 +214,7 @@ for label in branchNameList:
 
     if (hist.Integral() > 0):
         weight.Divide(hist)
-        if weight.GetMaximum() < 1:
+        if weight.GetMaximum() > 1:
             factor = weight.GetMaximum()
             print "rescale ", label, 1./factor
         else:
@@ -243,7 +243,7 @@ for label in branchNameList:
 print_delimiter()
 print "class labels:", resampledEventsPerClass.keys()
 print "class balance after resampling", \
-    [x / min(resampledEventsPerClass.values())
+    [x 
         for x in resampledEventsPerClass.values()]
 print_delimiter()
 

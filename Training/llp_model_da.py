@@ -24,7 +24,7 @@ class Sequence(object):
 
 
 class Conv(object):
-    def __init__(self,filters,size,stride,activation=keras.layers.LeakyReLU(alpha=0.2),options={}):
+    def __init__(self,filters,size,stride,activation=keras.layers.LeakyReLU(alpha=0.1),options={}):
         self.conv = keras.layers.Conv1D(
             filters, 
             size, 
@@ -61,7 +61,7 @@ class LSTM(object):
         return self.dropout(self.lstm(x))
     
 class Dense(object):
-    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.2),options={}):
+    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.1),options={}):
         self.dense = keras.layers.Dense(
             nodes,
             kernel_initializer='glorot_uniform',
@@ -113,7 +113,7 @@ class ModelDA(object):
         self.full_features = Sequence(scope='features')
         self.full_features.add(keras.layers.Concatenate())
         self.full_features.add(Dense(200,activation=keras.layers.Activation('tanh',name="features"),options=options))
-        self.full_features.add(keras.layers.GaussianNoise(0.1))
+        #self.full_features.add(keras.layers.GaussianNoise(0.1))
         '''
         self.conv_class_prediction = Sequence(scope='class_prediction')
         self.conv_class_prediction.add(keras.layers.Flatten())

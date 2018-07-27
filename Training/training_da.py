@@ -479,11 +479,14 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    classLossWeight = 1.
-    domainLossWeight = 0.1+0.2*epoch
-    sumLossWeight = classLossWeight+domainLossWeight
-    classLossWeight /= sumLossWeight
-    domainLossWeight /= sumLossWeight
+    
+    classLossWeight = 0.4+0.55*math.exp(-0.03*epoch**1.5)
+    domainLossWeight = 0.6-0.55*math.exp(-0.03*epoch**1.5)
+    
+    if noDA:
+        classLossWeight = 1
+        domainLossWeight = 0
+
     print "Loss weights: ",classLossWeight,"/",domainLossWeight,"class/domain"
     print_delimiter()
     
@@ -536,6 +539,7 @@ while (epoch < num_epochs):
 
     # number of events
     nTrain = 0
+    nTrainDomain = 0
     nTest = 0
     nTestDomain = 0
     total_loss_train = 0
@@ -628,12 +632,17 @@ while (epoch < num_epochs):
                             (ctauArray, train_batch_value["gen"][:, 0]))
 
             nTrainBatch = train_batch_value["truth"].shape[0]
+            if not noDA:
+                nTrainBatchDomain = train_batch_value_domain["isData"].shape[0]
 
             nTrain += nTrainBatch
+            if not noDA:
+                nTrainDomain += nTrainBatchDomain
 
             if nTrainBatch > 0:
                 total_loss_train += train_outputs[0] * nTrainBatch
-                total_loss_train_domain += train_outputs_domain[0] * nTrainBatch
+                if not noDA:
+                    total_loss_train_domain += train_outputs_domain[0] * nTrainBatchDomain
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
@@ -693,11 +702,11 @@ while (epoch < num_epochs):
             
         hists.append(histsPerDis)
         
-        daMC = ROOT.TH1F(probName+"daMC", probName, 100, 0, 1)
+        daMC = ROOT.TH1F(probName+"daMC", probName, 5000, 0, 1)
         daMC.SetDirectory(0)
         daMC.SetLineColor(ROOT.kAzure-4)
         daMC.SetLineWidth(3)
-        daData = ROOT.TH1F(probName+"daData", probName, 100, 0, 1)
+        daData = ROOT.TH1F(probName+"daData", probName, 5000, 0, 1)
         daData.Sumw2()
         daData.SetDirectory(0)
         daData.SetMarkerStyle(20)
@@ -807,8 +816,10 @@ while (epoch < num_epochs):
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
-    
-    avgLoss_train_domain = total_loss_train_domain/nTrain
+    if noDA:
+        avgLoss_train_domain = 0
+    else:
+        avgLoss_train_domain = total_loss_train_domain/nTrainDomain
     avgLoss_test_domain = total_loss_test_domain/nTestDomain
 
     if epoch == 0:
@@ -835,36 +846,39 @@ while (epoch < num_epochs):
         cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
         cv.GetPad(1).SetFillStyle(4000)
         cv.GetPad(2).SetFillStyle(4000)
-        cv.GetPad(1).SetMargin(0.13, 0.04, 0.45, 0.06)
-        cv.GetPad(2).SetMargin(0.13, 0.04, 0.15, 0.56)
+        cv.GetPad(1).SetMargin(0.135, 0.04, 0.45, 0.06)
+        cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
         cv.GetPad(1).SetLogy(1)
         cv.cd(1)
         daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
         
         eventsAboveWp = {
-            0: [0.,0.],
             50: [0.,0.],
             80: [0.,0.],
+            95: [0.,0.],
         }
+        sumMC = 0.
         for ibin in range(daHists[idis][0].GetNbinsX()):
-            c = daHists[idis][0].GetBinCenter(ibin+1)
             cMC = daHists[idis][0].GetBinContent(ibin+1)
+            sumMC += cMC
             cData = daHists[idis][1].GetBinContent(ibin+1)
             for wp in eventsAboveWp.keys():
-                if c>(wp*0.01):
+                if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
                     eventsAboveWp[wp][0]+=cMC
                     eventsAboveWp[wp][1]+=cData
         statictics = ""
-        for wp in eventsAboveWp.keys():
-            statictics+="#epsilon#scale[0.7]{#lower[0.7]{%3.1f}}: %4.1f%% (%4.1f%%) "%(
-                wp*0.01,
-                100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral(),
-                100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
+        for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
+            statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
+                wp,
+                100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
             )
+            if iwp<(len(eventsAboveWp.keys())-1):
+                statictics+=","
+            statictics+="  "
         
         
-        daHists[idis][0].Rebin(4)
-        daHists[idis][1].Rebin(4)
+        daHists[idis][0].Rebin(200)
+        daHists[idis][1].Rebin(200)
         ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
         ymin = ymax
         for ibin in range(daHists[idis][0].GetNbinsX()):
@@ -876,6 +890,8 @@ while (epoch < num_epochs):
         ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
         axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
         axis.GetXaxis().SetLabelSize(0)
+        axis.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetLeftMargin()-cv.GetPad(1).GetRightMargin()))
+        axis.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetTopMargin()-cv.GetPad(1).GetBottomMargin()))
         axis.Draw("AXIS")
         daHists[idis][0].Draw("HISTSAME")
         daHists[idis][1].Draw("PESAME")
@@ -890,6 +906,8 @@ while (epoch < num_epochs):
         cv.cd(2)
         axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0.2,1.8)
         axisRes.Draw("AXIS")
+        axisRes.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetLeftMargin()-cv.GetPad(2).GetRightMargin()))
+        axisRes.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetTopMargin()-cv.GetPad(2).GetBottomMargin()))
         axisLine = ROOT.TF1("axisLine","1",0,1)
         axisLine.SetLineColor(ROOT.kBlack)
         axisLine.Draw("Same")

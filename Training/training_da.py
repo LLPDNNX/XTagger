@@ -479,16 +479,20 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    relLoss = 0.8
-    classLossWeight = 1.+relLoss*math.exp(-0.05*epoch**2)
-    domainLossWeight = 1.-relLoss*math.exp(-0.05*epoch**2)
+    classLossWeight = 1.
+    domainLossWeight = 0.1+0.2*epoch
+    sumLossWeight = classLossWeight+domainLossWeight
+    classLossWeight /= sumLossWeight
+    domainLossWeight /= sumLossWeight
+    print "Loss weights: ",classLossWeight,"/",domainLossWeight,"class/domain"
+    print_delimiter()
     
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
                        loss='categorical_crossentropy', metrics=['accuracy'],
                        loss_weights=[classLossWeight])
                        
-    optDomain = keras.optimizers.Adam(lr=learning_rate_val*0.1, beta_1=0.9, beta_2=0.999)
+    optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     
     #alternatively: kullback_leibler_divergence, binary_crossentropy
     modelDomainDiscriminator.compile(optDomain,
@@ -689,11 +693,11 @@ while (epoch < num_epochs):
             
         hists.append(histsPerDis)
         
-        daMC = ROOT.TH1F(probName+"daMC", probName, 25, 0, 1)
+        daMC = ROOT.TH1F(probName+"daMC", probName, 100, 0, 1)
         daMC.SetDirectory(0)
         daMC.SetLineColor(ROOT.kAzure-4)
         daMC.SetLineWidth(3)
-        daData = ROOT.TH1F(probName+"daData", probName, 25, 0, 1)
+        daData = ROOT.TH1F(probName+"daData", probName, 100, 0, 1)
         daData.Sumw2()
         daData.SetDirectory(0)
         daData.SetMarkerStyle(20)
@@ -836,6 +840,31 @@ while (epoch < num_epochs):
         cv.GetPad(1).SetLogy(1)
         cv.cd(1)
         daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
+        
+        eventsAboveWp = {
+            0: [0.,0.],
+            50: [0.,0.],
+            80: [0.,0.],
+        }
+        for ibin in range(daHists[idis][0].GetNbinsX()):
+            c = daHists[idis][0].GetBinCenter(ibin+1)
+            cMC = daHists[idis][0].GetBinContent(ibin+1)
+            cData = daHists[idis][1].GetBinContent(ibin+1)
+            for wp in eventsAboveWp.keys():
+                if c>(wp*0.01):
+                    eventsAboveWp[wp][0]+=cMC
+                    eventsAboveWp[wp][1]+=cData
+        statictics = ""
+        for wp in eventsAboveWp.keys():
+            statictics+="#epsilon#scale[0.7]{#lower[0.7]{%3.1f}}: %4.1f%% (%4.1f%%) "%(
+                wp*0.01,
+                100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral(),
+                100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
+            )
+        
+        
+        daHists[idis][0].Rebin(4)
+        daHists[idis][1].Rebin(4)
         ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
         ymin = ymax
         for ibin in range(daHists[idis][0].GetNbinsX()):
@@ -845,22 +874,21 @@ while (epoch < num_epochs):
                 ymin = min([ymin,cMC,cData])
              
         ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
-        axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Events",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
+        axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
         axis.GetXaxis().SetLabelSize(0)
         axis.Draw("AXIS")
         daHists[idis][0].Draw("HISTSAME")
         daHists[idis][1].Draw("PESAME")
+        
         pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
         pText.SetTextFont(43)
         pText.SetTextAlign(32)
-        pText.SetTextSize(34)
-        pText.AddText("KS-test: %5.1f%%"%(
-            #100.*daHists[idis][0].Chi2Test(daHists[idis][1]),
-            100.*daHists[idis][0].KolmogorovTest(daHists[idis][1])
-        ))
+        pText.SetTextSize(30)
+        pText.AddText(statictics)
         pText.Draw("Same")
+        
         cv.cd(2)
-        axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0,2.3)
+        axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0.2,1.8)
         axisRes.Draw("AXIS")
         axisLine = ROOT.TF1("axisLine","1",0,1)
         axisLine.SetLineColor(ROOT.kBlack)

@@ -332,13 +332,70 @@ def setupDiscriminators(modelDA,add_summary=False, options={}):
             keras.Model(
                 inputs=inputs, 
                 outputs=[domainPrediction]
-            ),
-        "all":
-            keras.Model(
-                inputs=inputs, 
-                outputs=[classPrediction,domainPrediction]
             )
     }
+    
+    
+def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
+    result = {}
+
+    if isParametric:
+        genClass = keras.layers.Input(shape=(1,))
+        genDomain = keras.layers.Input(shape=(1,))
+    else:
+        genClass = None
+        genDomain = None
+    globalvarsClass = keras.layers.Input(
+            shape=(len(featureDict["globalvars"]["branches"]),))
+    globalvarsDomain = keras.layers.Input(
+            shape=(len(featureDict["globalvars"]["branches"]),))
+    cpfClass = keras.layers.Input(shape=(
+        featureDict["cpf"]["max"], len(featureDict["cpf"]["branches"])))
+    cpfDomain = keras.layers.Input(shape=(
+        featureDict["cpf"]["max"], len(featureDict["cpf"]["branches"])))
+    npfClass = keras.layers.Input(shape=(
+        featureDict["npf"]["max"], len(featureDict["npf"]["branches"])))
+    npfDomain = keras.layers.Input(shape=(
+        featureDict["npf"]["max"], len(featureDict["npf"]["branches"])))
+    svClass = keras.layers.Input(shape=(
+        featureDict["sv"]["max"], len(featureDict["sv"]["branches"])))
+    svDomain = keras.layers.Input(shape=(
+        featureDict["sv"]["max"], len(featureDict["sv"]["branches"])))
+
+    classPrediction = modelDA.predictClass(globalvarsClass,cpfClass,npfClass,svClass,genClass)
+    domainPrediction = modelDA.predictDomain(globalvarsDomain,cpfDomain,npfDomain,svDomain,genDomain)
+
+    inputsClass = []
+    inputsDomain = []
+    if isParametric:
+        inputsClass.append(genClass)
+        inputsDomain.append(genDomain)
+    inputsClass.append(globalvarsClass)
+    inputsDomain.append(globalvarsDomain)
+    inputsClass.append(cpfClass)
+    inputsDomain.append(cpfDomain)
+    inputsClass.append(npfClass)
+    inputsDomain.append(npfDomain)
+    inputsClass.append(svClass)
+    inputsDomain.append(svDomain)
+    
+    inputs = inputsClass+inputsDomain
+    return {
+        "fused": keras.Model(
+            inputs=inputs, 
+            outputs=[classPrediction,domainPrediction]
+        ),
+        "class": keras.Model(
+            inputs=inputsClass, 
+            outputs=[classPrediction]
+        ),
+        "domain": keras.Model(
+            inputs=inputsDomain, 
+            outputs=[domainPrediction]
+        ),
+        
+    }
+        
         
 
 def input_pipeline(files, features, batchSize, resample=True,repeat=1):
@@ -408,31 +465,43 @@ while (epoch < num_epochs):
         isParametric=isParametric
     )
     
-    modelDiscriminators = setupDiscriminators(modelDA)
+    modelDiscriminators = setupDiscriminatorsFused(modelDA)
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
+    modelFusedDiscriminator = modelDiscriminators["fused"]
     
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
-
+    
+    relLoss = 0.5
+    classLossWeight = 1.#+relLoss*math.exp(-0.05*epoch**2)
+    domainLossWeight = 1#.-relLoss*math.exp(-0.05*epoch**2)
+    
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
-                       loss='kullback_leibler_divergence', metrics=['accuracy'])
+                       loss='categorical_crossentropy', metrics=['accuracy'],
+                       loss_weights=[classLossWeight])
                        
     optDomain = keras.optimizers.Adam(lr=learning_rate_val*0.1, beta_1=0.9, beta_2=0.999)
-    #alternatively: kullback_leibler_divergence, categorical_crossentropy
     
+    #alternatively: kullback_leibler_divergence, categorical_crossentropy
     modelDomainDiscriminator.compile(optDomain,
-                       loss='binary_crossentropy', metrics=['accuracy'])
+                       loss='kullback_leibler_divergence', metrics=['accuracy'],
+                       loss_weights=[domainLossWeight])
+    
+    optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
+    modelFusedDiscriminator.compile(optFused,
+                       loss=['categorical_crossentropy','kullback_leibler_divergence'], metrics=['accuracy'],
+                       loss_weights=[classLossWeight, domainLossWeight])
     
     if epoch == 0:
         modelClassDiscriminator.summary()
-        #modelDomainDiscriminator.summary()
+        modelDomainDiscriminator.summary()
     
     init_op = tf.group(
-                    tf.global_variables_initializer(),
-                    tf.local_variables_initializer()
-                    )
+        tf.global_variables_initializer(),
+        tf.local_variables_initializer()
+    )
 
     sess = K.get_session()
     sess.run(init_op)
@@ -448,9 +517,9 @@ while (epoch < num_epochs):
             "model_epoch_domain.hdf5")
 
     if os.path.exists(weight_path_class) and os.path.exists(weight_path_domain):
-        print "loading weights ... ", weight_path_class,weight_path_domain
+        print "loading weights ... ", weight_path_class#,weight_path_domain
         modelClassDiscriminator.load_weights(weight_path_class)
-        modelDomainDiscriminator.load_weights(weight_path_domain)
+        #modelDomainDiscriminator.load_weights(weight_path_domain)
     elif epoch > 0:
         print "no weights from previous epoch found"
         sys.exit(1)
@@ -486,6 +555,7 @@ while (epoch < num_epochs):
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
+            '''
 
             train_outputs = modelClassDiscriminator.train_on_batch(
                     train_inputs, train_batch_value["truth"])
@@ -493,7 +563,7 @@ while (epoch < num_epochs):
             labelsTraining = np.add(
                     train_batch_value["truth"].sum(axis=0), labelsTraining)
                     
-                    
+            '''
             train_batch_value_domain = sess.run(train_batch_da)
             if train_batch_value_domain['num'].shape[0]>0:
                 #print train_batch_value_domain["isData"][:10]
@@ -510,13 +580,22 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
                                     train_batch_value_domain['sv']]
-
+                '''
                 train_outputs_domain = modelDomainDiscriminator.train_on_batch(
                         train_inputs_domain, train_batch_value_domain["isData"],
                         sample_weight=train_batch_value_domain["xsecweight"][:,0]
                 )
-               
-
+                '''
+                #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
+                train_outputs_fused = modelFusedDiscriminator.train_on_batch(
+                    train_inputs+train_inputs_domain, 
+                    [train_batch_value["truth"],train_batch_value_domain["isData"]]
+                    #sample_weight=[1.,train_batch_value_domain["xsecweight"][:,0]]
+                )
+                
+                train_outputs = train_outputs_fused[1],train_outputs_fused[3]
+                train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+            
             if step == 1:
                 ptArray = train_batch_value["globalvars"][:, 0]
                 etaArray = train_batch_value["globalvars"][:, 1]
@@ -660,7 +739,7 @@ while (epoch < num_epochs):
                 
                 for ibatch in range(test_batch_value_domain["isData"].shape[0]):
                     isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
-                    sample_weight=train_batch_value_domain["xsecweight"][ibatch][0]
+                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
 
                     for idis in range(len(featureDict["truth"]["branches"])):
                         daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
@@ -726,6 +805,8 @@ while (epoch < num_epochs):
     for idis in range(len(featureDict["truth"]["branches"])):
         probName = featureDict["truth"]["branches"][idis].replace("is", "").replace("_","").replace("from", "").replace("jetorigin","").replace(" ","")
         cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
+        #cv.Divide(1,2,0,0)
+        #cv.cd(1)
         cv.SetLogy(1)
         daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
         ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])

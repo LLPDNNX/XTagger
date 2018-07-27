@@ -106,7 +106,9 @@ class ModelDA(object):
     
         self.full_features = Sequence(scope='features')
         self.full_features.add(keras.layers.Concatenate())
-        self.full_features.add(Dense(200,options=options))
+        #self.full_features.add(keras.layers.GaussianNoise(0.1))
+        self.full_features.add(Dense(200,activation=keras.layers.Activation('tanh',name="features"),options=options))
+        
         '''
         self.conv_class_prediction = Sequence(scope='class_prediction')
         self.conv_class_prediction.add(keras.layers.Flatten())
@@ -131,6 +133,7 @@ class ModelDA(object):
             
         def gradientReverse(x):
             backward = tf.negative(x)
+            #backward = tf.negative(x*tf.abs(x))
             forward = tf.identity(x)
             return backward + tf.stop_gradient(forward - backward)
 

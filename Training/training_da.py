@@ -480,8 +480,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.4+0.55*math.exp(-0.03*epoch**1.5)
-    domainLossWeight = 0.6-0.55*math.exp(-0.03*epoch**1.5)
+    classLossWeight = 0.2+0.75*math.exp(-0.03*epoch**1.5)
+    domainLossWeight = 0.8-0.75*math.exp(-0.03*epoch**1.5)
     
     if noDA:
         classLossWeight = 1
@@ -593,11 +593,28 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['sv']]
 
             if not noDA:
+                train_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                    train_inputs_domain
+                )
+                #train_daprediction_class_data = np.extract(train_batch_value_domain["isData"]>0.5,train_daprediction_class)
+                #train_daprediction_class_mc = np.extract(train_batch_value_domain["isData"]<0.5,train_daprediction_class)
+                train_daprediction_mean = np.mean(train_daprediction_class,axis=0)
+                train_daprediction_std = np.std(train_daprediction_class,axis=0)+1e-3
+                
+                #calculate deviations per class
+                train_da_weight = 0.1+abs(train_daprediction_class-train_daprediction_mean)/(2*train_daprediction_std)
+                #merge deviations into weight
+                train_da_weight = np.mean(train_da_weight,axis=1)
+                train_da_weight = train_da_weight*len(train_da_weight)/np.sum(train_da_weight)
+                #multiply by xsecweight
+                train_da_weight*=train_batch_value_domain["xsecweight"][:,0]
+                #print train_da_weight[:10],np.sum(train_da_weight)
+            
                 #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                 train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                     train_inputs+train_inputs_domain, 
                     [train_batch_value["truth"],train_batch_value_domain["isData"]],
-                    sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_batch_value_domain["xsecweight"][:,0]]
+                    sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]#train_batch_value_domain["xsecweight"][:,0]]
                 )
                 train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                 train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]

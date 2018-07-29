@@ -61,12 +61,13 @@ class LSTM(object):
         return self.dropout(self.lstm(x))
     
 class Dense(object):
-    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.1),options={}):
+    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.1),kernel_reg=10**(-7),bias_reg=0,options={}):
         self.dense = keras.layers.Dense(
             nodes,
             kernel_initializer='glorot_uniform',
             bias_initializer='zeros',
-            kernel_regularizer=keras.regularizers.l2(10**(-7)),
+            kernel_regularizer=keras.regularizers.l2(kernel_reg),
+            bias_regularizer=keras.regularizers.l1(bias_reg),
         )
         self.dropout = keras.layers.Dropout(dropout)
         self.activation = activation
@@ -74,7 +75,8 @@ class Dense(object):
     def __call__(self,x):
         x = self.dense(x)
         x = self.dropout(x)
-        x = self.activation(x)
+        if self.activation!=None:
+            x = self.activation(x)
         return x
     
     
@@ -135,16 +137,16 @@ class ModelDA(object):
         self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
             
         def gradientReverse(x):
-            #backward = tf.negative(x)
-            backward = tf.negative(x*tf.exp(tf.abs(x)))
+            backward = tf.negative(x)
+            #backward = tf.negative(x*tf.exp(tf.abs(x)))
             forward = tf.identity(x)
             return backward + tf.stop_gradient(forward - backward)
 
         self.domain_prediction = Sequence(scope='domain_prediction')
         self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
-        self.domain_prediction.add(Dense(100,options=options))
-        self.domain_prediction.add(Dense(100,options=options))
-        self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid',name="domain"),options=options))
+        self.domain_prediction.add(Dense(100,kernel_reg=1,bias_reg=1,options=options))
+        self.domain_prediction.add(Dense(100,kernel_reg=1,bias_reg=1,options=options))
+        self.domain_prediction.add(Dense(1,kernel_reg=1,bias_reg=1,activation=None,options=options))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)

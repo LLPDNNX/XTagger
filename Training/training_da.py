@@ -498,13 +498,18 @@ while (epoch < num_epochs):
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     
     #alternatively: kullback_leibler_divergence, binary_crossentropy
+    def wasserstein_loss(x,y):
+        return K.mean(x*y)
+        
+        
     modelDomainDiscriminator.compile(optDomain,
-                       loss='binary_crossentropy', metrics=['accuracy'],
+                       loss=wasserstein_loss, metrics=['accuracy'],
                        loss_weights=[domainLossWeight])
+    
     
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
-                       loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
+                       loss=['categorical_crossentropy',wasserstein_loss], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
     
     if epoch == 0:
@@ -608,6 +613,7 @@ while (epoch < num_epochs):
                 train_da_weight = np.mean(train_da_weight,axis=1)
                 train_da_weight = train_da_weight*len(train_da_weight)/np.sum(train_da_weight)
                 '''
+                
                 #multiply by xsecweight
                 train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)

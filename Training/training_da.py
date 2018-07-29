@@ -593,6 +593,7 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['sv']]
 
             if not noDA:
+                '''
                 train_daprediction_class = modelClassDiscriminator.predict_on_batch(
                     train_inputs_domain
                 )
@@ -606,8 +607,9 @@ while (epoch < num_epochs):
                 #merge deviations into weight
                 train_da_weight = np.mean(train_da_weight,axis=1)
                 train_da_weight = train_da_weight*len(train_da_weight)/np.sum(train_da_weight)
+                '''
                 #multiply by xsecweight
-                train_da_weight*=train_batch_value_domain["xsecweight"][:,0]
+                train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)
             
                 #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']

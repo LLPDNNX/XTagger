@@ -135,8 +135,8 @@ class ModelDA(object):
         self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
             
         def gradientReverse(x):
-            backward = tf.negative(x)
-            #backward = tf.negative(x*tf.abs(x))
+            #backward = tf.negative(x)
+            backward = tf.negative(x*tf.exp(tf.abs(x)))
             forward = tf.identity(x)
             return backward + tf.stop_gradient(forward - backward)
 

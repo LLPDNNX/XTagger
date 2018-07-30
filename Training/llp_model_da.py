@@ -144,9 +144,9 @@ class ModelDA(object):
 
         self.domain_prediction = Sequence(scope='domain_prediction')
         self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
-        self.domain_prediction.add(Dense(100,kernel_reg=1,bias_reg=1,options=options))
-        self.domain_prediction.add(Dense(100,kernel_reg=1,bias_reg=1,options=options))
-        self.domain_prediction.add(Dense(1,kernel_reg=1,bias_reg=1,activation=None,options=options))
+        self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
+        self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
+        self.domain_prediction.add(Dense(1,kernel_reg=0.1,bias_reg=0.01,activation=None,options=options))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)

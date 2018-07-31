@@ -329,7 +329,7 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
 
             sig_loose, bg_loose = find_nearest(sigEff, bgEff, 1e-1)
             sig_medium, bg_medium = find_nearest(sigEff, bgEff, 1e-2)
-            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-1)
+            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-3)
             tight_wps_sig.append(sig_tight)
             tight_wps_bg.append(bg_tight)
 

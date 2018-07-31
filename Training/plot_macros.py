@@ -314,6 +314,8 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         aucs = []
         tight_wps_sig = []
         tight_wps_bg = []
+        tight_lines_x = []
+        tight_lines_y = []
 
         for prob_label in range(dimension):
             if truth_label==prob_label:
@@ -327,10 +329,20 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
 
             sig_loose, bg_loose = find_nearest(sigEff, bgEff, 1e-1)
             sig_medium, bg_medium = find_nearest(sigEff, bgEff, 1e-2)
-            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-3)
+            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-1)
             tight_wps_sig.append(sig_tight)
             tight_wps_bg.append(bg_tight)
 
+            tight_line_x = ROOT.TLine(sig_tight, 0, sig_tight, bg_tight)
+            tight_line_x.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
+            tight_line_x.SetLineStyle(2)
+            tight_line_x.SetLineWidth(2)
+            tight_lines_x.append(tight_line_x)
+            tight_line_y = ROOT.TLine(0, bg_tight, sig_tight, bg_tight)
+            tight_line_y.SetLineColor(ROOT.kBlack)
+            tight_line_y.SetLineWidth(2)
+            tight_lines_y.append(tight_line_y)
+     
             #print sig_loose, bg_loose
             #print sig_medium, bg_medium
             #print sig_tight, bg_tight
@@ -366,15 +378,9 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         
         for prob_label,roc in enumerate(rocs):
 
-            tight_line_x = ROOT.TLine(tight_wps_sig[prob_label], 0, tight_wps_sig[prob_label], tight_wps_bg[prob_label])
-            tight_line_x.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
-            tight_line_y = ROOT.TLine(0, tight_wps_bg[prob_label], tight_wps_sig[prob_label], tight_wps_bg[prob_label])
-            tight_line_y.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
-     
-            tight_line_x.Draw("SAME")
-            tight_line_y.Draw("SAME")
-
             roc.Draw("SameL")
+            tight_lines_x[prob_label].Draw("SAMEL")
+            tight_lines_y[prob_label].Draw("SAMEL")
             legend.AddEntry(roc,name[prob_label],"L")
             legend.AddEntry("","tight WP eff: %.1f%%"%(tight_wps_sig[prob_label]*100.),"")
         legend.Draw("Same")

@@ -480,8 +480,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.2+0.75*math.exp(-0.03*epoch**1.5)
-    domainLossWeight = 0.8-0.75*math.exp(-0.03*epoch**1.5)
+    classLossWeight = 0.2+0.75*math.exp(-0.03*max(0,epoch-2)**1.5)
+    domainLossWeight = 0.8-0.75*math.exp(-0.03*max(0,epoch-2)**1.5)
     
     if noDA:
         classLossWeight = 1
@@ -493,7 +493,7 @@ while (epoch < num_epochs):
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
                        loss='categorical_crossentropy', metrics=['accuracy'],
-                       loss_weights=[classLossWeight])
+                       loss_weights=[classLossWeight*1.])
                        
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     
@@ -504,7 +504,7 @@ while (epoch < num_epochs):
         
     modelDomainDiscriminator.compile(optDomain,
                        loss='binary_crossentropy', metrics=['accuracy'],
-                       loss_weights=[domainLossWeight])
+                       loss_weights=[domainLossWeight*0.01])
     
     
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
@@ -626,7 +626,8 @@ while (epoch < num_epochs):
                 )
                 train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                 train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
-                for _ in range(10):
+                '''
+                for _ in range(2):
                     train_batch_value_domain = sess.run(train_batch_da)
                     train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                     if train_batch_value_domain['num'].shape[0]==0:
@@ -647,6 +648,7 @@ while (epoch < num_epochs):
                         train_batch_value_domain["isData"],
                         sample_weight=train_da_weight
                     )
+                '''
                 
             else:
                 

@@ -503,13 +503,13 @@ while (epoch < num_epochs):
         
         
     modelDomainDiscriminator.compile(optDomain,
-                       loss=wasserstein_loss, metrics=['accuracy'],
+                       loss='binary_crossentropy', metrics=['accuracy'],
                        loss_weights=[domainLossWeight])
     
     
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
-                       loss=['categorical_crossentropy',wasserstein_loss], metrics=['accuracy'],
+                       loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
     
     if epoch == 0:
@@ -626,6 +626,27 @@ while (epoch < num_epochs):
                 )
                 train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                 train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+                for _ in range(10):
+                    train_batch_value_domain = sess.run(train_batch_da)
+                    train_da_weight=train_batch_value_domain["xsecweight"][:,0]
+                    if train_batch_value_domain['num'].shape[0]==0:
+                        continue
+                    if isParametric:
+                        train_inputs_domain = [np.zeros((train_batch_value_domain['num'].shape[0],1)),
+                                        train_batch_value_domain['globalvars'],
+                                        train_batch_value_domain['cpf'],
+                                        train_batch_value_domain['npf'],
+                                        train_batch_value_domain['sv']]
+                    else:
+                        train_inputs_domain = [train_batch_value_domain['globalvars'],
+                                        train_batch_value_domain['cpf'],
+                                        train_batch_value_domain['npf'],
+                                        train_batch_value_domain['sv']]
+                    modelDomainDiscriminator.train_on_batch(
+                        train_inputs_domain, 
+                        train_batch_value_domain["isData"],
+                        sample_weight=train_da_weight
+                    )
                 
             else:
                 

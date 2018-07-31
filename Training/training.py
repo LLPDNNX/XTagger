@@ -200,11 +200,6 @@ for label in featureDict["truth"]["branches"]:
         print " -> no entries found for class: ", branchName
     histsPerClass[branchName] = hist
 
-print_delimiter()
-print "class labels:", eventsPerClass.keys()
-print "class balance before resampling", \
-        [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
-print_delimiter()
 
 for label in branchNameList:
     hist = histsPerClass[label]
@@ -241,18 +236,8 @@ for label in branchNameList:
     weightsPerClass[label] = weight
 
 print_delimiter()
-print "class labels:", resampledEventsPerClass.keys()
-print "class balance after resampling", \
-    [x / min(resampledEventsPerClass.values())
-        for x in resampledEventsPerClass.values()]
-print_delimiter()
-
-dropoutPerClass = {k: min(resampledEventsPerClass.values())/v
+dropoutPerClass = {k: min(1,resampledEventsPerClass["jetorigin_fromLLP"]/v)
                    for k, v in resampledEventsPerClass.iteritems()}
-
-print dropoutPerClass
-print_delimiter()
-
 weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
 for label, hist in weightsPerClass.items():
     if classBalance:
@@ -443,6 +428,15 @@ while (epoch < num_epochs):
 
     labelsTraining = np.array([5])
 
+    # Very bad...
+    dictToTF = {
+        '0':0,
+        '4':1,
+        '1':2,
+        '2':3,
+        '3':4,
+        }
+
     try:
         step = 0
         while not coord.should_stop():
@@ -451,8 +445,6 @@ while (epoch < num_epochs):
             if train_batch_value['num'].shape[0]==0:
                 continue
             
-
-
             if isParametric:
                 train_inputs = [train_batch_value['gen'][:, 0],
                                 train_batch_value['globalvars'],
@@ -521,10 +513,17 @@ while (epoch < num_epochs):
             plot_resampled(outputFolder, "ctau", "$\log{(c {\\tau} / 1mm)}$",
                            ctauArray, binningctau, truthArray)
 
-    print_delimiter()
-    print "class labels:", resampledEventsPerClass.keys()
-    print "predicted class balance after resampling", [x / min(resampledEventsPerClass.values()) for x in resampledEventsPerClass.values()]
-    print "actual class balance after training:", labelsTraining*1./np.min(labelsTraining)
+    print "{:<100} | {:<15} | {:<15} | {:<15} | {:<10}".format('Class','Before re-w', 'After re-w', 'Dropout factor' , 'Real numbers')
+    i = 0
+    for k, v in eventsPerClass.iteritems():
+            beforeResample = v
+            afterResample = resampledEventsPerClass[k]
+            dropout = dropoutPerClass[k]
+            actualAfterResample = labelsTraining[dictToTF[str(i)]]
+            i += 1
+            print "{:<100} | {:<15} | {:<15} | {:<15} | {:<10}".format(k, beforeResample, afterResample, dropout, actualAfterResample)
+
+
     print_delimiter()
     
     epoch_path = os.path.join(outputFolder, "epoch_" + str(epoch))

@@ -28,6 +28,11 @@ for i in range(NRGBs):
     blue[i]=min(1,blue[i]*1.1+0.25)
 
 colWheel = ROOT.TColor.CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont)
+def find_nearest(sigArray, bgArray, value):
+    sigArray = np.asarray(sigArray)
+    bgArray = np.asarray(bgArray)
+    idx = (np.abs(bgArray - value)).argmin()
+    return sigArray[idx], bgArray[idx]
 
 colors=[]
 def hex2rgb(value):
@@ -307,6 +312,8 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         rocs = []
         name = []
         aucs = []
+        tight_wps_sig = []
+        tight_wps_bg = []
 
         for prob_label in range(dimension):
             if truth_label==prob_label:
@@ -317,6 +324,17 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             length = len(sigEff)
             sigEff = np.array(sigEff)
             bgEff = np.array(bgEff)
+
+            sig_loose, bg_loose = find_nearest(sigEff, bgEff, 1e-1)
+            sig_medium, bg_medium = find_nearest(sigEff, bgEff, 1e-2)
+            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-3)
+            tight_wps_sig.append(sig_tight)
+            tight_wps_bg.append(bg_tight)
+
+            #print sig_loose, bg_loose
+            #print sig_medium, bg_medium
+            #print sig_tight, bg_tight
+
             auc2 = np.trapz(sigEff,bgEff)
             all_aucs[prob_label,truth_label] = auc2
             aucs.append(auc2)
@@ -347,9 +365,18 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         legend.SetFillStyle(0)
         
         for prob_label,roc in enumerate(rocs):
+
+            tight_line_x = ROOT.TLine(tight_wps_sig[prob_label], 0, tight_wps_sig[prob_label], tight_wps_bg[prob_label])
+            tight_line_x.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
+            tight_line_y = ROOT.TLine(0, tight_wps_bg[prob_label], tight_wps_sig[prob_label], tight_wps_bg[prob_label])
+            tight_line_y.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
+     
+            tight_line_x.Draw("SAME")
+            tight_line_y.Draw("SAME")
+
             roc.Draw("SameL")
             legend.AddEntry(roc,name[prob_label],"L")
-            legend.AddEntry("","AUC %.1f%%"%(aucs[prob_label]*100.),"")
+            legend.AddEntry("","tight WP eff: %.1f%%"%(tight_wps_sig[prob_label]*100.),"")
         legend.Draw("Same")
         
         cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "roc_"+names[truth_label]+".pdf"))

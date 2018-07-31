@@ -282,7 +282,7 @@ def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array)
 
         fig = plt.figure()
         plt.hist([var_0, var_1, var_2, var_3, var_4], 
-                bins=var_binning, label=['b', 'c', 'ud', 'g', 'llp'], alpha=0.5)
+                bins=var_binning, label=['b', 'c', 'uds', 'g', 'llp'], alpha=0.5)
         plt.legend(loc='upper right')
         plt.xlabel(xlabel)
         plt.ylabel("# entries/ bin")

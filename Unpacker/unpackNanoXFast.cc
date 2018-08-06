@@ -18,6 +18,7 @@
 class UnpackedTree
 {
     public:
+        const bool addTruth_;
         TFile* outputFile_;
         TTree* tree_;
         
@@ -106,33 +107,37 @@ class UnpackedTree
         float sv_enratio[maxEntries];
         
     public:
-        UnpackedTree(const std::string& fileName):
+        UnpackedTree(const std::string& fileName, bool addTruth=true):
+            addTruth_(addTruth),
             outputFile_(new TFile(fileName.c_str(),"RECREATE")),
             tree_(new TTree("jets","jets"))
         {
 
             tree_->SetDirectory(outputFile_);
             tree_->SetAutoSave(200); //save after 200 fills
-            tree_->Branch("jetorigin_isPU",&jetorigin_isPU,"jetorigin_isPU/I",bufferSize);
-            tree_->Branch("jetorigin_isUndefined",&jetorigin_isUndefined,"jetorigin_isUndefined/I",bufferSize);
             
-            tree_->Branch("jetorigin_displacement",&jetorigin_displacement,"jetorigin_displacement/F",bufferSize);
-            tree_->Branch("jetorigin_ctau",&jetorigin_ctau,"jetorigin_ctau/F",bufferSize);
-            tree_->Branch("jetorigin_decay_angle",&jetorigin_decay_angle,"jetorigin_decay_angle/F",bufferSize);
-            
-            tree_->Branch("jetorigin_isB",&jetorigin_isB,"jetorigin_isB/I",bufferSize);
-            tree_->Branch("jetorigin_isBB",&jetorigin_isBB,"jetorigin_isBB/I",bufferSize);
-            tree_->Branch("jetorigin_isGBB",&jetorigin_isGBB,"jetorigin_isGBB/I",bufferSize);
-            tree_->Branch("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B,"jetorigin_isLeptonic_B/I",bufferSize);
-            tree_->Branch("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C,"jetorigin_isLeptonic_C/I",bufferSize);
-            tree_->Branch("jetorigin_isC",&jetorigin_isC,"jetorigin_isC/I",bufferSize);
-            tree_->Branch("jetorigin_isCC",&jetorigin_isCC,"jetorigin_isCC/I",bufferSize);
-            tree_->Branch("jetorigin_isGCC",&jetorigin_isGCC,"jetorigin_isGCC/I",bufferSize);
-            tree_->Branch("jetorigin_isS",&jetorigin_isS,"jetorigin_isS/I",bufferSize);
-            tree_->Branch("jetorigin_isUD",&jetorigin_isUD,"jetorigin_isUD/I",bufferSize);
-            tree_->Branch("jetorigin_isG",&jetorigin_isG,"jetorigin_isG/I",bufferSize);
-            tree_->Branch("jetorigin_fromLLP",&jetorigin_fromLLP,"jetorigin_fromLLP/I",bufferSize);
-            
+            if (addTruth)
+            {
+                tree_->Branch("jetorigin_isPU",&jetorigin_isPU,"jetorigin_isPU/I",bufferSize);
+                tree_->Branch("jetorigin_isUndefined",&jetorigin_isUndefined,"jetorigin_isUndefined/I",bufferSize);
+                
+                tree_->Branch("jetorigin_displacement",&jetorigin_displacement,"jetorigin_displacement/F",bufferSize);
+                tree_->Branch("jetorigin_ctau",&jetorigin_ctau,"jetorigin_ctau/F",bufferSize);
+                tree_->Branch("jetorigin_decay_angle",&jetorigin_decay_angle,"jetorigin_decay_angle/F",bufferSize);
+                
+                tree_->Branch("jetorigin_isB",&jetorigin_isB,"jetorigin_isB/I",bufferSize);
+                tree_->Branch("jetorigin_isBB",&jetorigin_isBB,"jetorigin_isBB/I",bufferSize);
+                tree_->Branch("jetorigin_isGBB",&jetorigin_isGBB,"jetorigin_isGBB/I",bufferSize);
+                tree_->Branch("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B,"jetorigin_isLeptonic_B/I",bufferSize);
+                tree_->Branch("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C,"jetorigin_isLeptonic_C/I",bufferSize);
+                tree_->Branch("jetorigin_isC",&jetorigin_isC,"jetorigin_isC/I",bufferSize);
+                tree_->Branch("jetorigin_isCC",&jetorigin_isCC,"jetorigin_isCC/I",bufferSize);
+                tree_->Branch("jetorigin_isGCC",&jetorigin_isGCC,"jetorigin_isGCC/I",bufferSize);
+                tree_->Branch("jetorigin_isS",&jetorigin_isS,"jetorigin_isS/I",bufferSize);
+                tree_->Branch("jetorigin_isUD",&jetorigin_isUD,"jetorigin_isUD/I",bufferSize);
+                tree_->Branch("jetorigin_isG",&jetorigin_isG,"jetorigin_isG/I",bufferSize);
+                tree_->Branch("jetorigin_fromLLP",&jetorigin_fromLLP,"jetorigin_fromLLP/I",bufferSize);
+            }
             tree_->Branch("global_pt",&global_pt,"global_pt/F",bufferSize);
             tree_->Branch("global_eta",&global_eta,"global_eta/F",bufferSize);
             tree_->Branch("global_rho",&global_rho,"global_rho/F",bufferSize);
@@ -231,6 +236,7 @@ class NanoXTree
     public:
         //std::shared_ptr<TFile> file_;
         TTree* tree_;
+        const bool addTruth_;
         
         unsigned int ientry_;
         
@@ -366,8 +372,9 @@ class NanoXTree
         std::vector<Expression> selections_;
         
     public:
-        NanoXTree(TTree* tree, const std::vector<std::string>& selectors={}):
+        NanoXTree(TTree* tree, const std::vector<std::string>& selectors={}, bool addTruth=true):
             tree_(tree),
+            addTruth_(addTruth),
             randomGenerator_(12345),
             uniform_dist_(0,1.)
         {
@@ -378,27 +385,29 @@ class NanoXTree
             tree_->SetBranchAddress("Jet_cleanmask",&Jet_cleanmask);
             tree_->SetBranchAddress("Jet_nConstituents",&Jet_nConstituents);
         
-            tree_->SetBranchAddress("njetorigin",&njetorigin);
-            
-            tree_->SetBranchAddress("jetorigin_isPU",&jetorigin_isPU);
-            tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
-            
-            tree_->SetBranchAddress("jetorigin_displacement",&jetorigin_displacement);
-            tree_->SetBranchAddress("jetorigin_decay_angle",&jetorigin_decay_angle);
-            
-            tree_->SetBranchAddress("jetorigin_isB",&jetorigin_isB);
-            tree_->SetBranchAddress("jetorigin_isBB",&jetorigin_isBB);
-            tree_->SetBranchAddress("jetorigin_isGBB",&jetorigin_isGBB);
-            tree_->SetBranchAddress("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B);
-            tree_->SetBranchAddress("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C);
-            tree_->SetBranchAddress("jetorigin_isC",&jetorigin_isC);
-            tree_->SetBranchAddress("jetorigin_isCC",&jetorigin_isCC);
-            tree_->SetBranchAddress("jetorigin_isGCC",&jetorigin_isGCC);
-            tree_->SetBranchAddress("jetorigin_isS",&jetorigin_isS);
-            tree_->SetBranchAddress("jetorigin_isUD",&jetorigin_isUD);
-            tree_->SetBranchAddress("jetorigin_isG",&jetorigin_isG);
-            tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP);
-            
+            if (addTruth)
+            {
+                tree_->SetBranchAddress("njetorigin",&njetorigin);
+                
+                tree_->SetBranchAddress("jetorigin_isPU",&jetorigin_isPU);
+                tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
+                
+                tree_->SetBranchAddress("jetorigin_displacement",&jetorigin_displacement);
+                tree_->SetBranchAddress("jetorigin_decay_angle",&jetorigin_decay_angle);
+                
+                tree_->SetBranchAddress("jetorigin_isB",&jetorigin_isB);
+                tree_->SetBranchAddress("jetorigin_isBB",&jetorigin_isBB);
+                tree_->SetBranchAddress("jetorigin_isGBB",&jetorigin_isGBB);
+                tree_->SetBranchAddress("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B);
+                tree_->SetBranchAddress("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C);
+                tree_->SetBranchAddress("jetorigin_isC",&jetorigin_isC);
+                tree_->SetBranchAddress("jetorigin_isCC",&jetorigin_isCC);
+                tree_->SetBranchAddress("jetorigin_isGCC",&jetorigin_isGCC);
+                tree_->SetBranchAddress("jetorigin_isS",&jetorigin_isS);
+                tree_->SetBranchAddress("jetorigin_isUD",&jetorigin_isUD);
+                tree_->SetBranchAddress("jetorigin_isG",&jetorigin_isG);
+                tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP);
+            }
             //tree_->SetBranchAddress("jetorigin_llpmass_reco",&jetorigin_llpmass_reco);
             
             tree_->SetBranchAddress("nglobal",&nglobal);
@@ -565,7 +574,7 @@ class NanoXTree
                 return false;
             }
             
-            if (njetorigin<jet)
+            if (this->njets()<jet)
             {
                 std::cout<<"Not enough jets to unpack"<<std::endl;
                 return false;
@@ -584,51 +593,55 @@ class NanoXTree
                 return false;
             }
             
-            if (jetorigin_isUndefined[jet]>0.5)
+            if (addTruth_)
             {
-                return false;
-            }
-            
-            if (jetorigin_isPU[jet]>0.5)
-            {
-                return false;
-            }
-            
-            //setup variables for exp evaluation
-            isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isBB = jetorigin_isBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isGBB = jetorigin_isGBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isLeptonic_B = jetorigin_isLeptonic_B[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isLeptonic_C = jetorigin_isLeptonic_C[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            
-            isC = jetorigin_isC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isCC = jetorigin_isCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isGCC = jetorigin_isGCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            
-            isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            
-            fromLLP = jetorigin_fromLLP[jet]>0.5;
-            
-            rand = uniform_dist_(randomGenerator_);
-            ctau = 1e9;
-            int i = 0;
-            
-            for (auto exp: selections_)
-            {
-                if (i==0) ctau = exp.value();
-                if (i==1 && exp.value()<0.5)
+                if (jetorigin_isUndefined[jet]>0.5)
                 {
                     return false;
                 }
-                i++;
+                
+                if (jetorigin_isPU[jet]>0.5)
+                {
+                    return false;
+                }
+                
+                //setup variables for exp evaluation
+                isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isBB = jetorigin_isBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isGBB = jetorigin_isGBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isLeptonic_B = jetorigin_isLeptonic_B[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isLeptonic_C = jetorigin_isLeptonic_C[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                
+                isC = jetorigin_isC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isCC = jetorigin_isCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isGCC = jetorigin_isGCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                
+                isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                
+                fromLLP = jetorigin_fromLLP[jet]>0.5;
+                
+                rand = uniform_dist_(randomGenerator_);
+                ctau = 1e9;
+                int i = 0;
+                
+                for (auto exp: selections_)
+                {
+                    if (i==0) ctau = exp.value();
+                    if (i==1 && exp.value()<0.5)
+                    {
+                        return false;
+                    }
+                    i++;
+                }
             }
             return true;
         }
         
         int getJetClass(unsigned int jet)
         {
+            if (not addTruth_) return 0; //default class
             //if (jetorigin_isPU[jet]>0.5) return 11;
             if (jetorigin_fromLLP[jet]<0.5)
             {
@@ -658,10 +671,10 @@ class NanoXTree
         {
             //tree_->GetEntry(entry);
 
-            if (njetorigin!=nglobal or njetorigin!=ncpflength or njetorigin!=nnpflength or njetorigin!=nsvlength)
+            if (this->njets()!=ncpflength or this->njets()!=nnpflength or this->njets()!=nsvlength or ((not addTruth_) or (this->njets()!=njetorigin)))
             {
                 std::cout<<"Encountered weird event with unclear numbers of jets"<<std::endl;
-                std::cout<<"\tnjetorigin = "<<njetorigin<<std::endl;
+                std::cout<<"\tnjets = "<<this->njets()<<std::endl;
                 std::cout<<"\tnglobal = "<<nglobal<<std::endl;
                 std::cout<<"\tncpflength = "<<ncpflength<<std::endl;
                 std::cout<<"\tnnpflength = "<<nnpflength<<std::endl;

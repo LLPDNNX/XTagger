@@ -28,6 +28,11 @@ for i in range(NRGBs):
     blue[i]=min(1,blue[i]*1.1+0.25)
 
 colWheel = ROOT.TColor.CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont)
+def find_nearest(sigArray, bgArray, value):
+    sigArray = np.asarray(sigArray)
+    bgArray = np.asarray(bgArray)
+    idx = (np.abs(bgArray - value)).argmin()
+    return sigArray[idx], bgArray[idx]
 
 colors=[]
 def hex2rgb(value):
@@ -277,7 +282,7 @@ def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array)
 
         fig = plt.figure()
         plt.hist([var_0, var_1, var_2, var_3, var_4], 
-                bins=var_binning, label=['b', 'c', 'ud', 'g', 'llp'], alpha=0.5)
+                bins=var_binning, label=['b', 'c', 'uds', 'g', 'llp'], alpha=0.5)
         plt.legend(loc='upper right')
         plt.xlabel(xlabel)
         plt.ylabel("# entries/ bin")
@@ -307,6 +312,10 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         rocs = []
         name = []
         aucs = []
+        tight_wps_sig = []
+        tight_wps_bg = []
+        tight_lines_x = []
+        tight_lines_y = []
 
         for prob_label in range(dimension):
             if truth_label==prob_label:
@@ -317,6 +326,27 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             length = len(sigEff)
             sigEff = np.array(sigEff)
             bgEff = np.array(bgEff)
+
+            sig_loose, bg_loose = find_nearest(sigEff, bgEff, 1e-1)
+            sig_medium, bg_medium = find_nearest(sigEff, bgEff, 1e-2)
+            sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-3)
+            tight_wps_sig.append(sig_tight)
+            tight_wps_bg.append(bg_tight)
+
+            tight_line_x = ROOT.TLine(sig_tight, 0, sig_tight, bg_tight)
+            tight_line_x.SetLineColor(int(colWheelDark+250.*prob_label/(len(featureDict["truth"]["branches"])-1)))
+            tight_line_x.SetLineStyle(2)
+            tight_line_x.SetLineWidth(2)
+            tight_lines_x.append(tight_line_x)
+            tight_line_y = ROOT.TLine(0, bg_tight, sig_tight, bg_tight)
+            tight_line_y.SetLineColor(ROOT.kBlack)
+            tight_line_y.SetLineWidth(2)
+            tight_lines_y.append(tight_line_y)
+     
+            #print sig_loose, bg_loose
+            #print sig_medium, bg_medium
+            #print sig_tight, bg_tight
+
             auc2 = np.trapz(sigEff,bgEff)
             all_aucs[prob_label,truth_label] = auc2
             aucs.append(auc2)
@@ -347,9 +377,12 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         legend.SetFillStyle(0)
         
         for prob_label,roc in enumerate(rocs):
+
             roc.Draw("SameL")
+            tight_lines_x[prob_label].Draw("SAMEL")
+            tight_lines_y[prob_label].Draw("SAMEL")
             legend.AddEntry(roc,name[prob_label],"L")
-            legend.AddEntry("","AUC %.1f%%"%(aucs[prob_label]*100.),"")
+            legend.AddEntry("","tight WP eff: %.1f%%"%(tight_wps_sig[prob_label]*100.),"")
         legend.Draw("Same")
         
         cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "roc_"+names[truth_label]+".pdf"))

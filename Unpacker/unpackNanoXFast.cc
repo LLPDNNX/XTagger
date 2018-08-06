@@ -12,6 +12,7 @@
 #include <random>
 #include <algorithm>
 
+#include "cmdParser.hpp"
 #include "exprtk.hpp"
 
 
@@ -671,7 +672,7 @@ class NanoXTree
         {
             //tree_->GetEntry(entry);
 
-            if (this->njets()!=ncpflength or this->njets()!=nnpflength or this->njets()!=nsvlength or ((not addTruth_) or (this->njets()!=njetorigin)))
+            if (this->njets()!=ncpflength or this->njets()!=nnpflength or this->njets()!=nsvlength)
             {
                 std::cout<<"Encountered weird event with unclear numbers of jets"<<std::endl;
                 std::cout<<"\tnjets = "<<this->njets()<<std::endl;
@@ -679,32 +680,38 @@ class NanoXTree
                 std::cout<<"\tncpflength = "<<ncpflength<<std::endl;
                 std::cout<<"\tnnpflength = "<<nnpflength<<std::endl;
                 std::cout<<"\tnsvlength = "<<nsvlength<<std::endl;
+                if (addTruth_)
+                {
+                    std::cout<<"\tnjetorigin = "<<njetorigin<<std::endl;
+                }
 
                 return false;
             }
             
-            unpackedTree.jetorigin_isPU = jetorigin_isPU[jet];
-            unpackedTree.jetorigin_isUndefined = jetorigin_isUndefined[jet];
-            
-            unpackedTree.jetorigin_displacement = jetorigin_displacement[jet];
-            unpackedTree.jetorigin_ctau = ctau;
-            unpackedTree.jetorigin_decay_angle = jetorigin_decay_angle[jet];
-            
-            //make DJ and LLP categories exclusive
-            unpackedTree.jetorigin_isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isBB = jetorigin_isBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isGBB = jetorigin_isGBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isLeptonic_B = jetorigin_isLeptonic_B[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isLeptonic_C = jetorigin_isLeptonic_C[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isC = jetorigin_isC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isCC = jetorigin_isCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isGCC = jetorigin_isGCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-            unpackedTree.jetorigin_fromLLP = jetorigin_fromLLP[jet]>0.5;
-            
-            
+            if (addTruth_)
+            {
+                unpackedTree.jetorigin_isPU = jetorigin_isPU[jet];
+                unpackedTree.jetorigin_isUndefined = jetorigin_isUndefined[jet];
+                
+                unpackedTree.jetorigin_displacement = jetorigin_displacement[jet];
+                unpackedTree.jetorigin_ctau = ctau;
+                unpackedTree.jetorigin_decay_angle = jetorigin_decay_angle[jet];
+                
+                //make DJ and LLP categories exclusive
+                unpackedTree.jetorigin_isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isBB = jetorigin_isBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isGBB = jetorigin_isGBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isLeptonic_B = jetorigin_isLeptonic_B[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isLeptonic_C = jetorigin_isLeptonic_C[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isC = jetorigin_isC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isCC = jetorigin_isCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isGCC = jetorigin_isGCC[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_fromLLP = jetorigin_fromLLP[jet]>0.5;
+            }
+                
             
             
             unpackedTree.global_pt = global_pt[jet];
@@ -876,64 +883,53 @@ inline bool begins_with(std::string const & value, std::string const & start)
 
 int main(int argc, char **argv)
 {
-    if (argc<7)
-    {
-        printSyntax();
-        return 1;
-    }
-    int nOutputs = std::atoi(argv[2]);
-    if (nOutputs==0 and strcmp(argv[2],"0")!=0)
-    {
-        std::cout<<"Error - cannot convert '"<<argv[2]<<"' to integer"<<std::endl;
-        return 1;
-    }
-    else if (nOutputs<=0)
-    {
-        std::cout<<"Error - noutputs need to be positive but got '"<<argv[2]<<"'"<<std::endl;
-        return 1;
-    }
+    cli::Parser parser(argc, argv);
+    parser.set_required<std::string>("o", "output", "Output prefix");
+	parser.set_optional<int>("n", "number", 10, "Number of output files");
+	parser.set_optional<int>("f", "testfraction", 15, "Fraction of events for testing in percent [0-100]");
+	parser.set_optional<int>("s", "split", 1, "Number of splits for batched processing");
+	parser.set_optional<int>("b", "batch", 0, "Current batch number (<number of splits)");
+	parser.set_optional<bool>("t", "truth", true, "Add truth from jetorigin (deactivate for DA)");
+    parser.set_required<std::vector<std::string>>("i", "input", "Input files");
+    parser.run_and_exit_if_error();
     
-    int nTestFrac = std::atoi(argv[3]);
-    if (nTestFrac==0 and strcmp(argv[3],"0")!=0)
-    {
-        std::cout<<"Error - cannot convert '"<<argv[3]<<"' to integer"<<std::endl;
-        return 1;
-    }
-    else if (nTestFrac<=0 or nTestFrac>100)
-    {
-        std::cout<<"Error - testPercentage need to be in [0;100] but got '"<<argv[3]<<"'"<<std::endl;
-        return 1;
-    }
+    std::string outputPrefix = parser.get<std::string>("o");
+    std::cout<<"output file prefix: "<<outputPrefix<<std::endl;
     
-    int nSplit = std::atoi(argv[4]);
-    if (nSplit==0 and strcmp(argv[4],"0")!=0)
-    {
-        std::cout<<"Error - cannot convert '"<<argv[4]<<"' to integer"<<std::endl;
-        return 1;
-    }
-    if (nSplit<1)
-    {
-        std::cout<<"Error - nSplit need to be >0 but got '"<<argv[4]<<"'"<<std::endl;
-        return 1;
-    }
-    
-    int iSplit = std::atoi(argv[5]);
-    if (iSplit==0 and strcmp(argv[5],"0")!=0)
-    {
-        std::cout<<"Error - cannot convert '"<<argv[5]<<"' to integer"<<std::endl;
-        return 1;
-    }
-    if (iSplit<0)
-    {
-        std::cout<<"Error - iSplit need to be >=0 and <nSplit (="<<nSplit<<") but got '"<<argv[5]<<"'"<<std::endl;
-        return 1;
-    }
-    
-    std::cout<<"output file prefix: "<<argv[1]<<std::endl;
+    int nOutputs = parser.get<int>("n");
     std::cout<<"output files: "<<nOutputs<<std::endl;
+    if (nOutputs<=0)
+    {
+        std::cout<<"Error: Number of output files (-n) needs to be >=1"<<std::endl;
+        return 1;
+    }
+    
+    int nTestFrac = parser.get<int>("f");
     std::cout<<"test fraction: "<<nTestFrac<<"%"<<std::endl;
+    if (nTestFrac<0 or nTestFrac>100)
+    {
+        std::cout<<"Error: Test fraction needs to be within [0;100]"<<std::endl;
+        return 1;
+    }
+    
+    int nSplit = parser.get<int>("s");
     std::cout<<"total splits: "<<nSplit<<std::endl;
+    if (nSplit<=0)
+    {
+        std::cout<<"Error: Total split number needs to be >=1!"<<std::endl;
+        return 1;
+    }
+    
+    int iSplit = parser.get<int>("b");
     std::cout<<"current split: "<<iSplit<<std::endl;
+    if (iSplit>=nSplit)
+    {
+        std::cout<<"Error: Current split number (-b) needs to be smaller than total split (-s) number!"<<std::endl;
+        return 1;
+    }
+    
+    bool addTruth = parser.get<bool>("t");
+    std::cout<<"add truth from jetorigin: "<<(addTruth ? "true" : "false")<<std::endl;
     
     std::vector<std::unique_ptr<NanoXTree>> trees;
     std::cout<<"Input files: "<<std::endl;
@@ -943,9 +939,16 @@ int main(int argc, char **argv)
     
     std::vector<std::vector<std::string>> inputFileNames;
     std::vector<std::vector<std::string>> selectors;
-    for (unsigned int iarg = 6; iarg<argc; ++iarg)
+    
+    std::vector<std::string> inputs = parser.get<std::vector<std::string>>("i");
+    if (inputs.size()==0)
     {
-        std::string s(argv[iarg]);
+        std::cout<<"Error: At least one input file (-i) required!"<<std::endl;
+        return 1;
+    }
+    
+    for (const std::string& s: inputs)
+    {
         if (ends_with(s,".root"))
         {
             inputFileNames.push_back(std::vector<std::string>{s});
@@ -975,8 +978,8 @@ int main(int argc, char **argv)
         }
         else
         {
-            std::cout<<"Cannot parse file '"<<s<<"'"<<std::endl;
-            return 0;
+            std::cout<<"Error: Cannot parse file '"<<s<<"'"<<std::endl;
+            return 1;
         }
     }
     
@@ -990,7 +993,7 @@ int main(int argc, char **argv)
             TFile* file = TFile::Open(inputFileName.c_str());
             if (not file)
             {
-                std::cout<<"File '"<<inputFileName<<"' cannot be read"<<std::endl;
+                std::cout<<"Warning: File '"<<inputFileName<<"' cannot be read"<<std::endl;
                 continue;
             }
             
@@ -998,7 +1001,7 @@ int main(int argc, char **argv)
             
             if (not tree)
             {
-                std::cout<<"Tree in file '"<<inputFileName<<"' cannot be read"<<std::endl;
+                std::cout<<"Warning: Tree in file '"<<inputFileName<<"' cannot be read"<<std::endl;
                 continue;
             }
             int nEvents = tree->GetEntries();
@@ -1010,8 +1013,19 @@ int main(int argc, char **argv)
         std::cout<<"Total per chain:  "<<nEvents<<std::endl;
         entries.push_back(nEvents);
         total_entries += nEvents;
-        trees.emplace_back(std::unique_ptr<NanoXTree>(new NanoXTree (chain,selectors[i])));
+        trees.emplace_back(std::unique_ptr<NanoXTree>(new NanoXTree (chain,selectors[i],addTruth)));
     }
+    if (inputFileNames.size()==0)
+    {
+        std::cout<<"Error: No input files readable!"<<std::endl;
+        return 1;
+    }
+    if (total_entries==0)
+    {
+        std::cout<<"Error: Total number of entries=0!"<<std::endl;
+        return 1;
+    }
+    
     std::cout<<"Total number of events: "<<total_entries<<std::endl;
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTrain;
     std::vector<std::vector<int>> eventsPerClassPerFileTrain(12,std::vector<int>(nOutputs,0));
@@ -1022,11 +1036,11 @@ int main(int argc, char **argv)
     for (unsigned int i = 0; i < nOutputs; ++i)
     {
         unpackedTreesTrain.emplace_back(std::unique_ptr<UnpackedTree>(
-            new UnpackedTree(std::string(argv[1])+"_train"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
+            new UnpackedTree(outputPrefix+"_train"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root",addTruth
         )));
 
         unpackedTreesTest.emplace_back(std::unique_ptr<UnpackedTree>(
-            new UnpackedTree(std::string(argv[1])+"_test"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root"
+            new UnpackedTree(outputPrefix+"_test"+std::to_string(iSplit+1)+"_"+std::to_string(i+1)+".root",addTruth
         )));
     }
     
@@ -1134,7 +1148,6 @@ int main(int argc, char **argv)
         }
         std::cout<<std::endl;
     }
-    
     
     for (auto& unpackedTree: unpackedTreesTrain)
     {

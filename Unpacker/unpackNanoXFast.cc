@@ -366,7 +366,7 @@ class NanoXTree
         float fromLLP;
         
         float rand;
-        float pt;
+        float logpt;
         float ctau;
         
         SymbolTable symbolTable_;
@@ -509,7 +509,7 @@ class NanoXTree
             symbolTable_.add_variable("rand",rand);
             symbolTable_.add_variable("ctau",ctau);
             
-            symbolTable_.add_variable("pt",pt);
+            symbolTable_.add_variable("logpt",logpt);
             
             for (auto selectstring: selectors)
             {
@@ -659,7 +659,7 @@ class NanoXTree
             
             rand = uniform_dist_(randomGenerator_);
             ctau = 1e9;
-            pt = Jet_pt[jet];
+            logpt = global_pt[jet];
             
             for (auto setter: setters_)
             {

@@ -1,2 +1,0 @@
-# ctau := 0.
-../test-files/nanoaod/RunIISummer16NanoAODv2_MC.root

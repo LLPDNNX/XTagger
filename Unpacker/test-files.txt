@@ -1,2 +1,3 @@
-# ctau := 0.
+#set ctau := -1
+#select ((isG>0.5)*((0.05+exp(-1.2*logpt))>rand)) + (isG<0.5)
 ../test-files/nanoaod/RunIISummer16NanoAODv2_MC.root

@@ -366,14 +366,20 @@ class NanoXTree
         float fromLLP;
         
         float rand;
-
+        float logpt;
         float ctau;
         
         SymbolTable symbolTable_;
         std::vector<Expression> selections_;
+        std::vector<Expression> setters_;
         
     public:
-        NanoXTree(TTree* tree, const std::vector<std::string>& selectors={}, bool addTruth=true):
+        NanoXTree(
+            TTree* tree, 
+            const std::vector<std::string>& selectors={}, 
+            const std::vector<std::string>& setters={},
+            bool addTruth=true
+        ):
             tree_(tree),
             addTruth_(addTruth),
             randomGenerator_(12345),
@@ -501,17 +507,28 @@ class NanoXTree
             symbolTable_.add_variable("fromLLP",fromLLP);
             
             symbolTable_.add_variable("rand",rand);
-            symbolTable_.add_variable("ctau", ctau);
+            symbolTable_.add_variable("ctau",ctau);
+            
+            symbolTable_.add_variable("logpt",logpt);
             
             for (auto selectstring: selectors)
             {
                 std::cout<<"register selection: "<<selectstring<<std::endl;
-
                 Expression exp;
                 exp.register_symbol_table(symbolTable_);
                 Parser parser;
                 parser.compile(selectstring,exp);
                 selections_.emplace_back(std::move(exp));
+            }
+            
+            for (auto setstring: setters)
+            {
+                std::cout<<"register setter: "<<setstring<<std::endl;
+                Expression exp;
+                exp.register_symbol_table(symbolTable_);
+                Parser parser;
+                parser.compile(setstring,exp);
+                setters_.emplace_back(std::move(exp));
             }
         }
         
@@ -622,21 +639,43 @@ class NanoXTree
                 isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 
                 fromLLP = jetorigin_fromLLP[jet]>0.5;
-                
-                rand = uniform_dist_(randomGenerator_);
-                ctau = 1e9;
-                int i = 0;
-                
-                for (auto exp: selections_)
+            }
+            else
+            {
+                isB = 0;
+                isBB = 0;
+                isGBB = 0;
+                isLeptonic_B = 0;
+                isLeptonic_C = 0;
+                isC = 0;
+                isCC = 0;
+                isGCC = 0;
+                isS = 0;
+                isUD = 0;
+                isG = 0;
+                fromLLP = 0;
+            }
+            
+            
+            rand = uniform_dist_(randomGenerator_);
+            ctau = 1e9;
+            logpt = global_pt[jet];
+            
+            for (auto setter: setters_)
+            {
+                //std::cout<<ctau;
+                setter.value();
+                //std::cout<<" -> "<<ctau<<std::endl;
+            }
+            
+            for (auto exp: selections_)
+            {
+                if (exp.value()<0.5)
                 {
-                    if (i==0) ctau = exp.value();
-                    if (i==1 && exp.value()<0.5)
-                    {
-                        return false;
-                    }
-                    i++;
+                    return false;
                 }
             }
+
             return true;
         }
         
@@ -939,6 +978,7 @@ int main(int argc, char **argv)
     
     std::vector<std::vector<std::string>> inputFileNames;
     std::vector<std::vector<std::string>> selectors;
+    std::vector<std::vector<std::string>> setters;
     
     std::vector<std::string> inputs = parser.get<std::vector<std::string>>("i");
     if (inputs.size()==0)
@@ -959,13 +999,22 @@ int main(int argc, char **argv)
             std::ifstream input(s);
             std::vector<std::string> files;
             std::vector<std::string> select;
+            std::vector<std::string> setter;
             for( std::string line; getline( input, line ); )
             {
                 if (line.size()>0)
                 {
-                    if (begins_with(line,"#"))
+                    if (begins_with(line,"#select"))
                     {
-                        select.emplace_back(line.begin()+1,line.end());
+                        select.emplace_back(line.begin()+7,line.end());
+                    }
+                    else if (begins_with(line,"#set"))
+                    {
+                        setter.emplace_back(line.begin()+4,line.end());
+                    }
+                    else if (begins_with(line,"#"))
+                    {
+                        std::cout<<"Ignore unknown instruction: "<<line<<std::endl;
                     }
                     else
                     {
@@ -974,6 +1023,7 @@ int main(int argc, char **argv)
                 }
             }
             selectors.push_back(select);
+            setters.push_back(setter);
             inputFileNames.push_back(files);
         }
         else
@@ -1013,7 +1063,7 @@ int main(int argc, char **argv)
         std::cout<<"Total per chain:  "<<nEvents<<std::endl;
         entries.push_back(nEvents);
         total_entries += nEvents;
-        trees.emplace_back(std::unique_ptr<NanoXTree>(new NanoXTree (chain,selectors[i],addTruth)));
+        trees.emplace_back(std::unique_ptr<NanoXTree>(new NanoXTree (chain,selectors[i],setters[i],addTruth)));
     }
     if (inputFileNames.size()==0)
     {

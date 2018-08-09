@@ -23,6 +23,7 @@ message(STATUS "Module name: ${MODULENAME}")
 set(SITEPACKDIR ${CMAKE_INSTALL_PREFIX}/lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages/${MODULENAME})
 message(STATUS "Install dir: ${SITEPACKDIR}")
 
+add_definitions(${ROOT_DEFINITIONS})
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11)
 
 include_directories(${TensorFlow_INCLUDE_DIRS} ${ROOT_INCLUDE_DIR})

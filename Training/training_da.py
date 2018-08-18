@@ -374,14 +374,8 @@ def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
     if isParametric:
         inputsClass.append(genClass)
         inputsDomain.append(genDomain)
-    inputsClass.append(globalvarsClass)
-    inputsDomain.append(globalvarsDomain)
-    inputsClass.append(cpfClass)
-    inputsDomain.append(cpfDomain)
-    inputsClass.append(npfClass)
-    inputsDomain.append(npfDomain)
-    inputsClass.append(svClass)
-    inputsDomain.append(svDomain)
+    inputsClass+=[globalvarsClass,cpfClass,npfClass,svClass]
+    inputsDomain+=[globalvarsDomain,cpfDomain,npfDomain,svDomain]
     
     inputs = inputsClass+inputsDomain
     return {
@@ -496,6 +490,13 @@ while (epoch < num_epochs):
                        
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     
+    classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
+    #print modelClassDiscriminator.inputs
+    inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
+    print modelClassDiscriminator.inputs
+    
+    #sys.exit(1)
+    
     #alternatively: kullback_leibler_divergence, binary_crossentropy
     def wasserstein_loss(x,y):
         return K.mean(x*y)
@@ -569,7 +570,7 @@ while (epoch < num_epochs):
             
 
             if isParametric:
-                train_inputs = [train_batch_value['gen'][:, 0],
+                train_inputs = [train_batch_value['gen'][:, 0:1],
                                 train_batch_value['globalvars'],
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
@@ -579,6 +580,21 @@ while (epoch < num_epochs):
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
+                 
+            for _ in range(5):   
+                feedDict = {
+                    K.learning_phase(): 0,
+                    modelClassDiscriminator.targets[0]:train_batch_value["truth"],
+                    modelClassDiscriminator.sample_weights[0]:np.ones(train_batch_value["truth"].shape[0])
+                }
+                for i in range(len(modelClassDiscriminator.inputs)):
+                    feedDict[modelClassDiscriminator.inputs[i]] = train_inputs[i]
+
+                classLossVal,inputGradientsVal = sess.run([classLossFct,inputGradients],feed_dict=feedDict)         
+                                    
+                direction = np.abs(np.random.normal(0,1))
+                for igrad in range(len(inputGradientsVal)):
+                    train_inputs[igrad]+=direction*inputGradientsVal[igrad]
 
             if not noDA:
                 train_batch_value_domain = sess.run(train_batch_da)
@@ -599,22 +615,7 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['sv']]
 
             if not noDA:
-                '''
-                train_daprediction_class = modelClassDiscriminator.predict_on_batch(
-                    train_inputs_domain
-                )
-                #train_daprediction_class_data = np.extract(train_batch_value_domain["isData"]>0.5,train_daprediction_class)
-                #train_daprediction_class_mc = np.extract(train_batch_value_domain["isData"]<0.5,train_daprediction_class)
-                train_daprediction_mean = np.mean(train_daprediction_class,axis=0)
-                train_daprediction_std = np.std(train_daprediction_class,axis=0)+1e-3
-                
-                #calculate deviations per class
-                train_da_weight = 0.1+abs(train_daprediction_class-train_daprediction_mean)/(2*train_daprediction_std)
-                #merge deviations into weight
-                train_da_weight = np.mean(train_da_weight,axis=1)
-                train_da_weight = train_da_weight*len(train_da_weight)/np.sum(train_da_weight)
-                '''
-                
+
                 #multiply by xsecweight
                 train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)
@@ -627,29 +628,7 @@ while (epoch < num_epochs):
                 )
                 train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                 train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
-                '''
-                for _ in range(2):
-                    train_batch_value_domain = sess.run(train_batch_da)
-                    train_da_weight=train_batch_value_domain["xsecweight"][:,0]
-                    if train_batch_value_domain['num'].shape[0]==0:
-                        continue
-                    if isParametric:
-                        train_inputs_domain = [np.zeros((train_batch_value_domain['num'].shape[0],1)),
-                                        train_batch_value_domain['globalvars'],
-                                        train_batch_value_domain['cpf'],
-                                        train_batch_value_domain['npf'],
-                                        train_batch_value_domain['sv']]
-                    else:
-                        train_inputs_domain = [train_batch_value_domain['globalvars'],
-                                        train_batch_value_domain['cpf'],
-                                        train_batch_value_domain['npf'],
-                                        train_batch_value_domain['sv']]
-                    modelDomainDiscriminator.train_on_batch(
-                        train_inputs_domain, 
-                        train_batch_value_domain["isData"],
-                        sample_weight=train_da_weight
-                    )
-                '''
+                
                 
             else:
                 

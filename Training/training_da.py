@@ -214,61 +214,72 @@ print "class balance before resampling", \
         [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
 print_delimiter()
 
+weightsPt = {}
+weightsEta = {}
+
 for label in branchNameList:
     hist = histsPerClass[label]
     weight = targetShape.Clone(label)
     factor = 0.
-    the_sum = 0
+    the_sum = 0.
+    
+    weightsPt[label] = targetShape.ProjectionX().Clone(label+"pt")
+    weightsEta[label] = targetShape.ProjectionY().Clone(label+"eta")
 
     if (hist.Integral() > 0):
         weight.Divide(hist)
-      
+        weightsPt[label].Divide(hist.ProjectionX())
+        weightsEta[label].Divide(hist.ProjectionY())
+        
         if weight.GetMaximum() > 1:
             factor = weight.GetMaximum()
             print "rescale ", label, 1./factor
         else:
             factor = 1.
+        weight.Scale(1./factor)
+        weightsPt[label].Scale(1./factor)
+        weightsEta[label].Scale(1./factor)
         
-        for ibin in range(hist.GetNbinsX()+1):
-            for jbin in range(hist.GetNbinsY()+1):
-                if weight.GetBinContent(ibin, jbin) > 0:
-                    weight.SetBinContent(ibin, jbin,
-                                         weight.GetBinContent(ibin, jbin)
+        for ibin in range(hist.GetNbinsX()):
+            for jbin in range(hist.GetNbinsY()):
+                '''
+                if weight.GetBinContent(ibin+1, jbin+1) > 0:
+                    weight.SetBinContent(ibin+1, jbin+1,
+                                         weight.GetBinContent(ibin+1, jbin+1)
                                          / factor)
-                    the_sum += hist.GetBinContent(ibin, jbin) * \
-                        weight.GetBinContent(ibin, jbin)
-                    hist.SetBinContent(ibin, jbin,
-                                       targetShape.GetBinContent(ibin, jbin) /
-                                       weight.GetBinContent(ibin, jbin))
-                else:
-                    hist.SetBinContent(ibin, jbin, 0)
-
+                '''
+                the_sum += hist.GetBinContent(ibin+1, jbin+1) * \
+                    weight.GetBinContent(ibin+1, jbin+1)
+        
     else:
         weight.Scale(0)
+        weightsPt[label].Scale(0)
+        weightsEta[label].Scale(0)
 
     resampledEventsPerClass[label] = the_sum
     weightsPerClass[label] = weight
 
 print_delimiter()
-print "class labels:", resampledEventsPerClass.keys()
-print "class balance after resampling", \
-    [x / min(resampledEventsPerClass.values())
-        for x in resampledEventsPerClass.values()]
-print_delimiter()
 
-dropoutPerClass = {k: min(resampledEventsPerClass.values())/v
+print resampledEventsPerClass
+
+min_sum = min(resampledEventsPerClass.values())
+print "min: ",min_sum
+dropoutPerClass = {k: min_sum/resampledEventsPerClass[k]
                    for k, v in resampledEventsPerClass.iteritems()}
 
-print dropoutPerClass
-print_delimiter()
-
 weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
-for label, hist in weightsPerClass.items():
+for label in weightsPerClass.keys():
+    
     if classBalance:
-        print "performing class balance rescaling"
-        hist.Scale(dropoutPerClass[label])
-    hist.Write()
+        classWeight = dropoutPerClass[label]
+        print "performing class balance rescaling: ",label,classWeight
+        weightsPerClass[label].Scale(classWeight)
+        weightsPt[label].Scale(classWeight)
+        weightsEta[label].Scale(classWeight)
+    weightsPerClass[label].Write()
 weightFile.Close()
+
 
 # Plot histograms of pt, eta and their weights
 
@@ -281,18 +292,6 @@ makePlot(outputFolder, histsPt, branchNameList, binningPt,
 makePlot(outputFolder, histsEta, branchNameList, binningEta,
          ";Jet #eta;Normalized events", "eta",
          target=targetShape.ProjectionY())
-
-
-def divide(n, d):
-    r = n.Clone(d.GetName())
-    r.Divide(d)
-    return r
-
-
-weightsPt = {l: divide(targetShape.ProjectionX(),
-             h.ProjectionX()) for l, h in histsPerClass.items()}
-weightsEta = {l: divide(targetShape.ProjectionY(),
-              h.ProjectionY()) for l, h in histsPerClass.items()}
 
 makePlot(outputFolder, weightsPt, branchNameList, binningPt,
          ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
@@ -586,7 +585,9 @@ while (epoch < num_epochs):
                 if train_batch_value_domain['num'].shape[0]==0:
                     continue
                 if isParametric:
-                    train_inputs_domain = [np.zeros((train_batch_value_domain['num'].shape[0],1)),
+                    train_inputs_domain = [
+                                    #np.zeros((train_batch_value_domain['num'].shape[0],1)),
+                                    np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],

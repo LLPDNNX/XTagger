@@ -51,6 +51,9 @@ class UnpackedTree
         float global_eta;
         float global_rho;
         
+        float isData;
+        float xsecweight;
+        
         unsigned int ncpf;
         float cpf_trackEtaRel[maxEntries];
         float cpf_trackPtRel[maxEntries];
@@ -139,6 +142,12 @@ class UnpackedTree
                 tree_->Branch("jetorigin_isG",&jetorigin_isG,"jetorigin_isG/I",bufferSize);
                 tree_->Branch("jetorigin_fromLLP",&jetorigin_fromLLP,"jetorigin_fromLLP/I",bufferSize);
             }
+            else
+            {
+                tree_->Branch("xsecweight",&xsecweight,"xsecweight/F",bufferSize);
+                tree_->Branch("isData",&isData,"isData/F",bufferSize);
+            }
+            
             tree_->Branch("global_pt",&global_pt,"global_pt/F",bufferSize);
             tree_->Branch("global_eta",&global_eta,"global_eta/F",bufferSize);
             tree_->Branch("global_rho",&global_rho,"global_rho/F",bufferSize);
@@ -249,6 +258,7 @@ class NanoXTree
         unsigned int Jet_jetId[maxEntries];
         unsigned int Jet_nConstituents[maxEntries];
         unsigned int Jet_cleanmask[maxEntries];
+        unsigned int Jet_forDA[maxEntries];
         
         unsigned int njetorigin;
         float jetorigin_isPU[maxEntries];
@@ -276,6 +286,8 @@ class NanoXTree
         float global_pt[maxEntries];
         float global_eta[maxEntries];
         float global_rho;
+        float xsecweight;
+        float isData;
         
         unsigned int ncpflength;
         float cpflength_length[maxEntries];
@@ -414,6 +426,12 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_isUD",&jetorigin_isUD);
                 tree_->SetBranchAddress("jetorigin_isG",&jetorigin_isG);
                 tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP);
+            }
+            else
+            {
+                tree_->SetBranchAddress("Jet_forDA",&Jet_forDA);
+                tree_->SetBranchAddress("xsecweight",&xsecweight);
+                tree_->SetBranchAddress("isData",&isData);
             }
             //tree_->SetBranchAddress("jetorigin_llpmass_reco",&jetorigin_llpmass_reco);
             
@@ -642,6 +660,10 @@ class NanoXTree
             }
             else
             {
+                if (Jet_forDA[jet]<0.5)
+                {
+                    return false;
+                }
                 isB = 0;
                 isBB = 0;
                 isGBB = 0;
@@ -750,7 +772,11 @@ class NanoXTree
                 unpackedTree.jetorigin_isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 unpackedTree.jetorigin_fromLLP = jetorigin_fromLLP[jet]>0.5;
             }
-                
+            else
+            {
+                unpackedTree.isData = isData;
+                unpackedTree.xsecweight = xsecweight;
+            }
             
             
             unpackedTree.global_pt = global_pt[jet];

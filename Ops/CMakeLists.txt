@@ -34,12 +34,13 @@ add_library(RootReader
 target_link_libraries(RootReader ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES} -lTreePlayer)
 install(TARGETS RootReader LIBRARY DESTINATION ${SITEPACKDIR})
 
-add_library(RootWriter
-    MODULE
-    RootWriter.cc
-)
-target_link_libraries(RootWriter ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
-install(TARGETS RootWriter LIBRARY DESTINATION ${SITEPACKDIR})
+#add_library(RootWriter
+    #MODULE
+    #RootWriter.cc
+    #)
+#target_link_libraries(RootWriter ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
+#install(TARGETS RootWriter LIBRARY DESTINATION ${SITEPACKDIR})
+
 
 add_library(ClassificationWeights
     MODULE
@@ -66,7 +67,7 @@ install(TARGETS Resampler LIBRARY DESTINATION ${SITEPACKDIR})
 set(pythonfiles
     __init__.py
     root_reader.py
-    root_writer.py
+    #root_writer.py
     resampler.py
     fake_background.py
     classification_weights.py

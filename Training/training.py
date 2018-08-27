@@ -60,6 +60,8 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 
+pt_bins = [[20, 1000],[30, 300], [300, 1000]]
+
 modelPath = arguments.model
 import importlib
 
@@ -78,8 +80,6 @@ if os.environ.has_key('OMP_NUM_THREADS'):
         OMP_NUM_THREADS = int(os.environ["OMP_NUM_THREADS"])
     except Exception:
         pass
-
-
 
 print_delimiter()
 
@@ -170,15 +170,15 @@ nEntries = chain.GetEntries()
 print "total entries", nEntries
 
 # Calculate weights for resampling in pt and eta
-binningPt = np.linspace(1.3, 3.0, num=30)
-binningEta = np.linspace(-2.4, 2.4, num=10)
+binningPt = np.linspace(1.3, 3.0, num=40)
+binningEta = np.linspace(-2.4, 2.4, num=40)
 binningctau = -.5 + np.linspace(-3., 6., num=10)
 targetShape = ROOT.TH2F("ptetaTarget", "", len(binningPt)-1, binningPt,
                         len(binningEta)-1, binningEta)
 
 targetEvents = 0
 
-print "-"*100
+print_delimiter
 
 for label in featureDict["truth"]["branches"]:
     branchName = label.split("/")[0]
@@ -443,6 +443,7 @@ while (epoch < num_epochs):
     labelsTraining = np.array([5])
 
     # Very bad...
+    # Fix urgently
     dictToTF = {
         '0':0,
         '4':1,
@@ -519,12 +520,12 @@ while (epoch < num_epochs):
 
     if epoch == 0:
 
-        plot_resampled(outputFolder, "pt", "$\log{(pT/1 GeV)}$",
+        plot_resampled(outputFolder, "train_pt", "$\log{(pT/1 GeV)}$",
                        ptArray, binningPt, truthArray)
-        plot_resampled(outputFolder, "eta", "$\eta$",
+        plot_resampled(outputFolder, "train_eta", "$\eta$",
                        etaArray, binningEta, truthArray)
         if isParametric:
-            plot_resampled(outputFolder, "ctau", "$\log{(c {\\tau} / 1mm)}$",
+            plot_resampled(outputFolder, "train_ctau", "$\log{(c {\\tau} / 1mm)}$",
                            ctauArray, binningctau, truthArray)
 
     print "{:<100} | {:<15} | {:<15} | {:<15} | {:<10}".format('Class','Before re-w', 'After re-w', 'Dropout factor' , 'Real numbers')
@@ -548,19 +549,37 @@ while (epoch < num_epochs):
                             "model_epoch.hdf5"))
     modelTest.set_weights(modelTrain.get_weights())
 
-    hists = []
-    scores = []
-    truths = []
+    hists = {}
+    scores = {}
+    truths = {}
+    ptArrays = {}
+    etaArrays = {}
+    ctauArrays = {}
 
-    for branches1 in featureDict["truth"]["branches"]:
-        disName = branches1.replace("||", "_").replace("is", "").replace("from", "")
-        histsPerDis = []
-        for branches2 in featureDict["truth"]["branches"]:
-            probName = branches2.replace("||", "_").replace("is", "").replace("from", "")
-            h = ROOT.TH1F(disName+probName, probName, 10000, 0, 1)
-            h.SetDirectory(0)
-            histsPerDis.append(h)
-        hists.append(histsPerDis)
+    for pt_bin in pt_bins:
+
+        pt_lower = pt_bin[0]
+        
+        # Initialize dict entry for each pt bin
+
+        hists[pt_lower] = []
+        scores[pt_lower] = []
+        truths[pt_lower] = []
+        ptArrays[pt_lower] = []
+        etaArrays[pt_lower] = []
+        ctauArrays[pt_lower] = []
+
+
+        for branches1 in featureDict["truth"]["branches"]:
+            disName = branches1.replace("||", "_").replace("is", "").replace("from", "")
+            histsPerDis = []
+            for branches2 in featureDict["truth"]["branches"]:
+                probName = branches2.replace("||", "_").replace("is", "").replace("from", "")
+                h = ROOT.TH1F(disName+probName+str(epoch)+str(pt_lower), probName, 10000, 0, 1)
+                h.AddDirectory(0)
+                histsPerDis.append(h)
+            hists[pt_lower].append(histsPerDis)
+            
 
     try:
         step = 0
@@ -584,33 +603,35 @@ while (epoch < num_epochs):
 
             test_outputs = modelTest.test_on_batch(test_inputs, test_batch_value["truth"])
             test_prediction = modelTest.predict_on_batch(test_inputs)
-
-            if step == 0:
-                ptArray = test_batch_value["globalvars"][:, 0]
-                etaArray = test_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(test_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = test_batch_value["gen"][:, 0]
-
-            else:
-                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
-
             
             nTestBatch = test_batch_value["truth"].shape[0]
 
-            for ibatch in range(test_batch_value["truth"].shape[0]):
-                truthclass = np.argmax(test_batch_value["truth"][ibatch])
-                predictedclass = np.argmax(test_prediction[ibatch])
+            for pt_bin in pt_bins:
+                
+                pt_lower = pt_bin[0]
+                pt_upper = pt_bin[1]
 
-                truths.append(truthclass)
-                scores.append(predictedclass)
+                for ibatch in range(test_batch_value["truth"].shape[0]):
+                    pt = test_batch_value["globalvars"][:, 0][ibatch]
+                    eta = test_batch_value["globalvars"][:, 1][ibatch]
+                    
+                    truthclass = np.argmax(test_batch_value["truth"][ibatch])
+                    predictedclass = np.argmax(test_prediction[ibatch])
+                        
+                    if pt > math.log10(pt_lower) and pt < math.log10(pt_upper):
 
-                for idis in range(len(featureDict["truth"]["branches"])):
-                    hists[idis][truthclass].Fill(test_prediction[ibatch][idis])
+                        ptArrays[pt_lower].append(pt)
+                        etaArrays[pt_lower].append(eta)
+
+                        if isParametric:
+                            ctau = test_batch_value["gen"][:, 0][ibatch]
+                            ctauArrays[pt_lower].append(ctau)
+
+                        truths[pt_lower].append(truthclass)
+                        scores[pt_lower].append(predictedclass)
+
+                        for idis in range(len(featureDict["truth"]["branches"])):
+                            hists[pt_lower][idis][truthclass].Fill(test_prediction[ibatch][idis])
 
             nTest += nTestBatch
 
@@ -620,7 +641,6 @@ while (epoch < num_epochs):
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
                 print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
-
                 start_time = time.time()
 
     except tf.errors.OutOfRangeError:
@@ -629,19 +649,38 @@ while (epoch < num_epochs):
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
 
-    if epoch == 0:
+    for pt_bin in pt_bins:
 
-        plot_resampled(outputFolder, "testing_pt", "$\log{(p_{T} /1 GeV)}$", ptArray, binningPt, truthArray)
-        plot_resampled(outputFolder, "testing_eta", "$\eta$", etaArray, binningEta, truthArray)
+        pt_lower = pt_bin[0]
+        pt_upper = pt_bin[1]
+        #print hists
+        truth = np.asarray(truths[pt_lower])
+        ptArray = np.asarray(ptArrays[pt_lower])
+        etaArray = np.asarray(etaArrays[pt_lower])
+
         if isParametric:
-            plot_resampled(outputFolder, "testing_ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truthArray)
+            ctauArray = np.asarray(ctauArrays[pt_lower])
+            
+        print_delimiter
+        print "Plotting pt bins:", pt_lower, pt_upper
+        print_delimiter
+        
+
+        if epoch == 0:
+
+            plot_resampled(outputFolder, "test_pt", "$\log{(p_{T} /1 GeV)}$", ptArray, binningPt, truth, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
+            plot_resampled(outputFolder, "test_eta", "$\eta$", etaArray, binningEta, truth, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
+            if isParametric:
+                plot_resampled(outputFolder, "test_ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truth, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
+
+        M_score = make_plots(outputFolder, epoch, hists[pt_lower], truths[pt_lower], scores[pt_lower], featureDict, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
+
 
     print "Epoch duration = (%.1f min)" % ((time.time() - epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%" % (nTrain, nTest, 100. * nTest/(nTrain+nTest))
     print "Average loss = %.4f (%.4f)" % (avgLoss_train, avgLoss_test)
     print "Learning rate = %.4e" % (learning_rate_val)
 
-    M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
     f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(M_score)+"\n")
     f.close()

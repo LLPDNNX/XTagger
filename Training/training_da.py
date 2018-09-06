@@ -456,7 +456,7 @@ while (epoch < num_epochs):
     test_batch = input_pipeline(fileListTest,featureDict, batchSize)
     
     train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
-    test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize,resample=False,repeat=None)
+    test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize,resample=False,repeat=1) #break test loop on exception
 
     modelDA = modelModule.ModelDA(
         len(featureDict["truth"]["branches"]),
@@ -468,6 +468,17 @@ while (epoch < num_epochs):
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
+    
+    modelDAAlt = modelModule.ModelDA(
+        len(featureDict["truth"]["branches"]),
+        isParametric=isParametric,
+        useLSTM=False
+    )
+    
+    modelDiscriminatorsAlt = setupDiscriminatorsFused(modelDAAlt)
+    modelClassDiscriminatorAlt = modelDiscriminators["class"]
+    modelDomainDiscriminatorAlt = modelDiscriminators["domain"]
+    modelFusedDiscriminatorAlt = modelDiscriminators["fused"]
     
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
@@ -488,12 +499,9 @@ while (epoch < num_epochs):
                        loss='categorical_crossentropy', metrics=['accuracy'],
                        loss_weights=[classLossWeight*1.])
                        
-    optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
-    
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
-    #print modelClassDiscriminator.inputs
     inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
-    print modelClassDiscriminator.inputs
+
     
     #sys.exit(1)
     
@@ -502,16 +510,17 @@ while (epoch < num_epochs):
         return K.mean(x*y)
         
         
+        
+    optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
                        loss='binary_crossentropy', metrics=['accuracy'],
                        loss_weights=[domainLossWeight*0.01])
-    
-    
+
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
                        loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
-    
+                       
     if epoch == 0:
         modelClassDiscriminator.summary()
         modelDomainDiscriminator.summary()
@@ -580,7 +589,7 @@ while (epoch < num_epochs):
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
-                 
+            '''
             for _ in range(5):   
                 feedDict = {
                     K.learning_phase(): 0,
@@ -592,18 +601,31 @@ while (epoch < num_epochs):
 
                 classLossVal,inputGradientsVal = sess.run([classLossFct,inputGradients],feed_dict=feedDict)         
                                     
-                direction = np.abs(np.random.normal(0,1))
+                direction = np.abs(np.random.normal(0,1))+0.2
                 for igrad in range(len(inputGradientsVal)):
                     train_inputs[igrad]+=direction*inputGradientsVal[igrad]
-
+            '''
             if not noDA:
-                train_batch_value_domain = sess.run(train_batch_da)
-                if train_batch_value_domain['num'].shape[0]==0:
+                '''
+                train_batch_value_domain_1 = sess.run(train_batch_da)
+                train_batch_value_domain_2 = sess.run(train_batch_da)
+                if train_batch_value_domain_1['num'].shape[0]==0 or train_batch_value_domain_2['num'].shape[0]==0:
                     continue
+                train_batch_value_domain = {}
+                
+                iterda = np.random.uniform(0,0.5)+random.normal(0,0.5)
+                for k in train_batch_value_domain_1.keys():
+                    train_batch_value_domain[k] = 0.5*(train_batch_value_domain_1+train_batch_value_domain_2)+iterda*(train_batch_value_domain_1-train_batch_value_domain_2)
+                '''
+                train_batch_value_domain = sess.run(train_batch_da)
+                #np.random.uniform(-3,5)
+                
+                
                 if isParametric:
+                    ctau = 0.
                     train_inputs_domain = [
-                                    #np.zeros((train_batch_value_domain['num'].shape[0],1)),
-                                    np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
+                                    np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
+                                    #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
@@ -619,7 +641,7 @@ while (epoch < num_epochs):
                 #multiply by xsecweight
                 train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)
-            
+                
                 #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                 train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                     train_inputs+train_inputs_domain, 
@@ -747,8 +769,7 @@ while (epoch < num_epochs):
         while not coord.should_stop():
             step += 1
             test_batch_value = sess.run(test_batch)
-            test_batch_value_domain = sess.run(test_batch_da)
-            if test_batch_value['num'].shape[0]==0 or test_batch_value_domain['num'].shape[0]==0:
+            if test_batch_value['num'].shape[0]==0:
                 continue
 
             if isParametric:
@@ -769,9 +790,67 @@ while (epoch < num_epochs):
             
             #print train_batch_value_domain["isData"][:10]
             #print train_batch_value_domain["xsecweight"][:10]
-                          
+                      
+            
+            
+            for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
+
+                for idis in range(len(featureDict["truth"]["branches"])):
+                    daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+
+            if step == 0:
+                ptArray = test_batch_value["globalvars"][:, 0]
+                etaArray = test_batch_value["globalvars"][:, 1]
+                truthArray = np.argmax(test_batch_value["truth"], axis=1)
+                if isParametric:
+                    ctauArray = test_batch_value["gen"][:, 0]
+
+            else:
+                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
+                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
+                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
+                if isParametric:
+                    ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
+
+            
+            nTestBatch = test_batch_value["truth"].shape[0]
+
+            for ibatch in range(test_batch_value["truth"].shape[0]):
+                truthclass = np.argmax(test_batch_value["truth"][ibatch])
+                predictedclass = np.argmax(test_prediction[ibatch])
+
+                truths.append(truthclass)
+                scores.append(predictedclass)
+
+                for idis in range(len(featureDict["truth"]["branches"])):
+                    hists[idis][truthclass].Fill(test_prediction[ibatch][idis])
+
+            nTest += nTestBatch
+
+            if step % 10 == 0:
+                duration = (time.time() - start_time)/10.
+                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
+
+                start_time = time.time()
+
+    except tf.errors.OutOfRangeError:
+        print('Done testing for %d steps.' % (step))
+        
+        
+    try:
+        step = 0
+        while not coord.should_stop():
+            step += 1
+            test_batch_value_domain = sess.run(test_batch_da)
+            if test_batch_value_domain['num'].shape[0]==0:
+                continue
+
+            
             if isParametric:
-                test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
+                ctau = 0.
+                test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*ctau,
                                 test_batch_value_domain['globalvars'],
                                 test_batch_value_domain['cpf'],
                                 test_batch_value_domain['npf'],
@@ -798,39 +877,12 @@ while (epoch < num_epochs):
                 for idis in range(len(featureDict["truth"]["branches"])):
                     daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
 
-            if step == 0:
-                ptArray = test_batch_value["globalvars"][:, 0]
-                etaArray = test_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(test_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = test_batch_value["gen"][:, 0]
-
-            else:
-                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
-
             
-            nTestBatch = test_batch_value["truth"].shape[0]
             nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
 
-            for ibatch in range(test_batch_value["truth"].shape[0]):
-                truthclass = np.argmax(test_batch_value["truth"][ibatch])
-                predictedclass = np.argmax(test_prediction[ibatch])
-
-                truths.append(truthclass)
-                scores.append(predictedclass)
-
-                for idis in range(len(featureDict["truth"]["branches"])):
-                    hists[idis][truthclass].Fill(test_prediction[ibatch][idis])
-
-            nTest += nTestBatch
             nTestDomain += nTestBatchDomain
 
-            if nTestBatch > 0 and nTestBatchDomain>0:
-                total_loss_test += test_outputs[0] * nTestBatch
+            if nTestBatchDomain>0:
                 total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain
 
             if step % 10 == 0:
@@ -841,6 +893,7 @@ while (epoch < num_epochs):
 
     except tf.errors.OutOfRangeError:
         print('Done testing for %d steps.' % (step))
+        
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest

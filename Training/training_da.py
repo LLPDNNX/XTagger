@@ -445,6 +445,13 @@ learning_rate_val = 0.005
 epoch = 0
 previous_train_loss = 1000
 
+def random_ctau(start,end,v):
+    #use pseudo random hash
+    h = ((v >> 16) ^ v) * 0x45d9f3b
+    h = ((h >> 16) ^ h) * 0x45d9f3b
+    h = (h >> 16) ^ h
+    return start+((17+h+h/100+h/10000)%(end-start))
+
 while (epoch < num_epochs):
 
     epoch_duration = time.time()
@@ -579,7 +586,7 @@ while (epoch < num_epochs):
             
 
             if isParametric:
-                train_inputs = [train_batch_value['gen'][:, 0:1],
+                train_inputs_class = [train_batch_value['gen'][:, 0:1],
                                 train_batch_value['globalvars'],
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
@@ -622,7 +629,9 @@ while (epoch < num_epochs):
                 
                 
                 if isParametric:
-                    ctau = 0.
+                    #change ctau every 4 step
+                    ctau = ((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
+                    print step,ctau
                     train_inputs_domain = [
                                     np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
                                     #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
@@ -642,20 +651,46 @@ while (epoch < num_epochs):
                 train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)
                 
-                #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
-                train_outputs_fused = modelFusedDiscriminator.train_on_batch(
-                    train_inputs+train_inputs_domain, 
-                    [train_batch_value["truth"],train_batch_value_domain["isData"]],
-                    sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]#train_batch_value_domain["xsecweight"][:,0]]
-                )
-                train_outputs = train_outputs_fused[1],train_outputs_fused[3]
-                train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+                if step<20:
+                    #train first class discriminator only
+                    train_outputs= modelClassDiscriminator.train_on_batch(
+                        train_inputs_class, 
+                        train_batch_value["truth"]
+                    )
+                    train_outputs_domain = [0.,0.]
+                elif step>=20 and step<40:
+                    #train class and domain discriminator alternating 
+                    #(NB: discrimator weights are NOT reloaded per epoch so pretraining is good for stability)
+                    if step%2==0:
+                        train_outputs= modelClassDiscriminator.train_on_batch(
+                            train_inputs_class, 
+                            train_batch_value["truth"]
+                        )
+                        train_outputs_domain = [0.,0.]
+                    else:
+                        train_outputs = [0.,0.]
+                        train_outputs_domain = modelDomainDiscriminator.train_on_batch(
+                            train_inputs_domain, 
+                            train_batch_value_domain["isData"],
+                            sample_weight=train_da_weight
+                        )
+                else:
+                    #finally train both discriminators together
                 
-                
+                    #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
+                    train_outputs_fused = modelFusedDiscriminator.train_on_batch(
+                        train_inputs_class+train_inputs_domain, 
+                        [train_batch_value["truth"],train_batch_value_domain["isData"]],
+                        sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]
+                    )
+                    train_outputs = train_outputs_fused[1],train_outputs_fused[3]
+                    train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+                    
+                    
             else:
                 
                 train_outputs = modelClassDiscriminator.train_on_batch(
-                    train_inputs,
+                    train_inputs_class,
                     train_batch_value["truth"]
                 )
                 train_outputs_domain = [0,0]
@@ -791,14 +826,6 @@ while (epoch < num_epochs):
             #print train_batch_value_domain["isData"][:10]
             #print train_batch_value_domain["xsecweight"][:10]
                       
-            
-            
-            for ibatch in range(test_batch_value_domain["isData"].shape[0]):
-                isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
-                sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
-
-                for idis in range(len(featureDict["truth"]["branches"])):
-                    daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
 
             if step == 0:
                 ptArray = test_batch_value["globalvars"][:, 0]
@@ -849,7 +876,7 @@ while (epoch < num_epochs):
 
             
             if isParametric:
-                ctau = 0.
+                ctau = np.random.randint(-3, 5)
                 test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*ctau,
                                 test_batch_value_domain['globalvars'],
                                 test_batch_value_domain['cpf'],
@@ -887,7 +914,7 @@ while (epoch < num_epochs):
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Testing step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
+                print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
 
                 start_time = time.time()
 

@@ -630,8 +630,7 @@ while (epoch < num_epochs):
                 
                 if isParametric:
                     #change ctau every 4 step
-                    ctau = ((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
-                    print step,ctau
+                    ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
                     train_inputs_domain = [
                                     np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
                                     #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),

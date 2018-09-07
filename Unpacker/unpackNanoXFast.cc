@@ -53,6 +53,7 @@ class UnpackedTree
         
         float isData;
         float xsecweight;
+        float processId;
         
         unsigned int ncpf;
         float cpf_trackEtaRel[maxEntries];
@@ -146,6 +147,7 @@ class UnpackedTree
             {
                 tree_->Branch("xsecweight",&xsecweight,"xsecweight/F",bufferSize);
                 tree_->Branch("isData",&isData,"isData/F",bufferSize);
+                tree_->Branch("processId",&processId,"processId/F",bufferSize);
             }
             
             tree_->Branch("global_pt",&global_pt,"global_pt/F",bufferSize);
@@ -287,6 +289,7 @@ class NanoXTree
         float global_eta[maxEntries];
         float global_rho;
         float xsecweight;
+        float processId;
         float isData;
         
         unsigned int ncpflength;
@@ -432,6 +435,7 @@ class NanoXTree
                 tree_->SetBranchAddress("Jet_forDA",&Jet_forDA);
                 tree_->SetBranchAddress("xsecweight",&xsecweight);
                 tree_->SetBranchAddress("isData",&isData);
+                tree_->SetBranchAddress("processId",&processId);
             }
             //tree_->SetBranchAddress("jetorigin_llpmass_reco",&jetorigin_llpmass_reco);
             
@@ -776,6 +780,7 @@ class NanoXTree
             {
                 unpackedTree.isData = isData;
                 unpackedTree.xsecweight = xsecweight;
+                unpackedTree.processId = processId;
             }
             
             

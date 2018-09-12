@@ -875,7 +875,7 @@ while (epoch < num_epochs):
 
             
             if isParametric:
-                ctau = np.random.randint(-3, 5)
+                ctau = 0.#np.random.randint(-3, 5)
                 test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*ctau,
                                 test_batch_value_domain['globalvars'],
                                 test_batch_value_domain['cpf'],

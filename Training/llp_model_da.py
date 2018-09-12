@@ -150,8 +150,8 @@ class ModelDA(object):
         self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
         self.domain_prediction.add(Dense(1,kernel_reg=0.1,bias_reg=0.01,activation=None,options=options))
         '''
-        self.domain_prediction.add(Dense(100,options=options))
-        self.domain_prediction.add(Dense(100,options=options))
+        self.domain_prediction.add(Dense(50,options=options))
+        self.domain_prediction.add(Dense(50,options=options))
         self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):

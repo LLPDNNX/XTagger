@@ -250,7 +250,7 @@ class NanoXTree
         TTree* tree_;
         const bool addTruth_;
         
-        unsigned int ientry_;
+        int ientry_;
         
         static constexpr int maxEntries = 250; //25*10 -> allows for a maximum of 10 jets per event
         
@@ -260,7 +260,7 @@ class NanoXTree
         unsigned int Jet_jetId[maxEntries];
         unsigned int Jet_nConstituents[maxEntries];
         unsigned int Jet_cleanmask[maxEntries];
-        unsigned int Jet_forDA[maxEntries];
+        float Jet_forDA[maxEntries];
         
         unsigned int njetorigin;
         float jetorigin_isPU[maxEntries];
@@ -397,6 +397,7 @@ class NanoXTree
         ):
             tree_(tree),
             addTruth_(addTruth),
+            ientry_(-1),
             randomGenerator_(12345),
             uniform_dist_(0,1.)
         {
@@ -510,7 +511,7 @@ class NanoXTree
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
             
-            getEvent(0,true);
+            //getEvent(0,true);
 
             symbolTable_.add_variable("isB",isB);
             symbolTable_.add_variable("isBB",isBB);
@@ -568,12 +569,12 @@ class NanoXTree
             return tree_->GetEntries();
         }
         
-        inline unsigned int entry() const
+        inline int entry() const
         {
             return ientry_;
         }
         
-        bool getEvent(unsigned int entry, bool force=false)
+        bool getEvent(int entry, bool force=false)
         {
             if (force or entry!=ientry_)
             {
@@ -590,6 +591,7 @@ class NanoXTree
         
         bool nextEvent()
         {
+            std::cout<<std::endl;
             return getEvent(ientry_+1);
         }
        
@@ -600,13 +602,16 @@ class NanoXTree
         
         bool isSelected(unsigned int jet)
         {
-            
+            if (Jet_forDA[jet]<0.5) return false;
+            std::cout<<"event="<<ientry_<<", jet="<<jet<<"/"<<njets()<<": pt="<<Jet_pt[jet]<<", eta="<<Jet_eta[jet]<<", da="<<Jet_forDA[jet]<<std::endl;
+
             //nJet should be lower than e.g. njetorigin since pT selection on Jet's are applied
             if (jet>=nJet)
             {
                 return false;
             }
             
+                        
             //just a sanity check
             if (std::fabs(Jet_eta[jet]/global_eta[jet]-1)>0.01)
             {
@@ -991,7 +996,7 @@ int main(int argc, char **argv)
     }
     
     int iSplit = parser.get<int>("b");
-    std::cout<<"current split: "<<iSplit<<std::endl;
+    std::cout<<"current split: "<<iSplit<<"/"<<nSplit<<std::endl;
     if (iSplit>=nSplit)
     {
         std::cout<<"Error: Current split number (-b) needs to be smaller than total split (-s) number!"<<std::endl;
@@ -1004,8 +1009,8 @@ int main(int argc, char **argv)
     std::vector<std::unique_ptr<NanoXTree>> trees;
     std::cout<<"Input files: "<<std::endl;
     
-    std::vector<unsigned int> entries;
-    unsigned int total_entries = 0;
+    std::vector<int> entries;
+    int total_entries = 0;
     
     std::vector<std::vector<std::string>> inputFileNames;
     std::vector<std::vector<std::string>> selectors;
@@ -1126,8 +1131,8 @@ int main(int argc, char **argv)
     }
     
     
-    std::vector<unsigned int> readEvents(entries.size(),0);
-    for (unsigned int ientry = 0; ientry<total_entries; ++ientry)
+    std::vector<int> readEvents(entries.size(),0);
+    for (int ientry = 0; ientry<total_entries; ++ientry)
     {
         if (ientry%10000==0)
         {
@@ -1145,8 +1150,8 @@ int main(int argc, char **argv)
         hash = (hash >> 16) ^ hash;
         hash = (hash+hash/total_entries)%total_entries;
         
-        unsigned int sum_entries = 0;
-        unsigned int ifile = 0;
+        int sum_entries = 0;
+        int ifile = 0;
         for (;ifile<entries.size(); ++ifile)
         {
             sum_entries += entries[ifile];

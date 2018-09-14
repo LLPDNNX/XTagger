@@ -591,7 +591,6 @@ class NanoXTree
         
         bool nextEvent()
         {
-            std::cout<<std::endl;
             return getEvent(ientry_+1);
         }
        
@@ -602,9 +601,7 @@ class NanoXTree
         
         bool isSelected(unsigned int jet)
         {
-            if (Jet_forDA[jet]<0.5) return false;
-            std::cout<<"event="<<ientry_<<", jet="<<jet<<"/"<<njets()<<": pt="<<Jet_pt[jet]<<", eta="<<Jet_eta[jet]<<", da="<<Jet_forDA[jet]<<std::endl;
-
+            
             //nJet should be lower than e.g. njetorigin since pT selection on Jet's are applied
             if (jet>=nJet)
             {
@@ -1138,24 +1135,19 @@ int main(int argc, char **argv)
         {
             std::cout<<"Processing ... "<<100.*ientry/total_entries<<std::endl;
         }
-        //use entry number for global splitting; but hash value to split test/train
-        if ((ientry%nSplit)!=iSplit)
-        {
-            continue;
-        }
-    
+        
         //choose input file pseudo-randomly
         unsigned int hash = ((ientry >> 16) ^ ientry) * 0x45d9f3b;
         hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
         hash = (hash >> 16) ^ hash;
-        hash = (hash+hash/total_entries)%total_entries;
-        
+        long hashEntries = (hash+hash/total_entries)%total_entries;
+        long hashTest = (hash+hash>>8+hash>>15)%100;
         int sum_entries = 0;
         int ifile = 0;
         for (;ifile<entries.size(); ++ifile)
         {
             sum_entries += entries[ifile];
-            if (hash<sum_entries) break;
+            if (hashEntries<sum_entries) break;
         }
     
         //ensure that file is not yet at last event; otherwise move to next input file
@@ -1164,17 +1156,23 @@ int main(int argc, char **argv)
             ifile=(ifile+1)%trees.size();
         }
         
-        //std::cout<<ifile<<": "<<trees[ifile]->entry()<<"/"<<entries[ifile]<<std::endl;
-        trees[ifile]->nextEvent();
+        trees[ifile]->nextEvent(); 
+        
+        //use entry number for global splitting; but hash value to split test/train
+        if ((ientry%nSplit)!=iSplit)
+        {
+            continue;
+        }
+        
         readEvents[ifile]+=1;
         
-        for (size_t j = 0; j < std::min<int>(8,trees[ifile]->njets()); ++j)
+        for (size_t j = 0; j < std::min<int>(20,trees[ifile]->njets()); ++j)
         {
             if (trees[ifile]->isSelected(j))
             {
                 int jet_class = trees[ifile]->getJetClass(j);
                 
-                if (hash%100<nTestFrac)
+                if (hashTest<nTestFrac)
                 {
                     if (jet_class>=0 and jet_class<eventsPerClassPerFileTest.size())
                     {

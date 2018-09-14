@@ -158,9 +158,68 @@ print_delimiter()
 fileListTestDA = getListOfInputFiles(filePathTestDA)
 
 # select only a fraction of files
-if nFiles is not None:
+if (nFiles is not None) and (nFiles>len(fileListTrain)):
     fileListTrain = fileListTrain[:nFiles]
     fileListTest = fileListTest[:nFiles]
+    
+chainDA = ROOT.TChain("jets")
+for f in fileListTrainDA:
+    chainDA.AddFile(f)
+for globalFeature in [
+    ["global_pt",1.,3.2,"y"],
+    ["global_eta",-3,3],
+]:
+    #print globalFeature, chainDA.FindLeaf(globalFeature).GetMaximum(), chainDA.FindLeaf(globalFeature).GetMinimum()
+    histData = ROOT.TH1F("histData"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+    histData.Sumw2()
+    #histData.SetDirectory(0)
+    histData.SetMarkerStyle(20)
+    histData.SetMarkerSize(1.2)
+    chainDA.Project(histData.GetName(),globalFeature[0],"(isData>0.5)*(xsecweight)")
+    histMC = ROOT.TH1F("histMC"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+    histMC.Sumw2()
+    #histMC.SetDirectory(0)
+    histMC.SetLineWidth(2)
+    histMC.SetLineColor(ROOT.kAzure-4)
+    chainDA.Project(histMC.GetName(),globalFeature[0],"(isData<0.5)*(xsecweight)")
+    
+    cv = ROOT.TCanvas("cvDA"+globalFeature[0]+str(random.random()),"",800,700)
+    
+    if len(globalFeature)>=4:
+        if globalFeature[3].find('y')>=0 and globalFeature[3].find('x')>=0:
+            cv.SetLogx(1)
+            cv.SetLogy(1)
+            axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
+                50,numpy.linspace(0.5,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum()))),num=51)
+            )
+        else:
+            if globalFeature[3].find('y')>=0:
+                cv.SetLogy(1)
+                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                    50,globalFeature[1],globalFeature[2],50,0.8,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum())))
+                )
+            elif globalFeature[3].find('x')>=0:
+                cv.SetLogx(1)
+                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                    50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
+                    50,numpy.linspace(0.5,1.1*max(histData.GetMaximum(),histMC.GetMaximum()),num=51)
+                )
+            else:
+                print "unknown option"
+                sys.exit(1)
+    else:
+        axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+            50,globalFeature[1],globalFeature[2],50,0,1.1*max(histData.GetMaximum(),histMC.GetMaximum())
+        )
+
+    axis.Draw("AXIS")
+    histMC.Draw("HISTSAME")
+    histData.Draw("SAMEPE")
+    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
+    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
+    
+sys.exit(1)
 
 # define the feature dictionary for training
 # Count the number of entries in total
@@ -297,6 +356,9 @@ makePlot(outputFolder, weightsPt, branchNameList, binningPt,
          ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
 makePlot(outputFolder, weightsEta, branchNameList, binningEta,
          ";Jet #eta;Weight", "weight_eta", logy=0)
+         
+         
+         
 
    
 def setupDiscriminators(modelDA,add_summary=False, options={}):

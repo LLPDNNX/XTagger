@@ -53,6 +53,9 @@ modelDA = llp_model_da.ModelDA(
     useLSTM=False
 )
 
+
+print "learning phase: ",sess.run(keras.backend.learning_phase())
+
 class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen)
 prediction = tf.identity(class_prediction,name="prediction")
 

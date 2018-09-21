@@ -94,11 +94,20 @@ print_delimiter()
 #limit CUDA_VISIBLE_DEVICES to a free GPU if unset by e.g. batch system; fails if no GPU available
 try:
     if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
+        print "Env 'CUDA_VISIBLE_DEVICES' not set! Trying manually setup ..."
         imp.find_module('setGPU')
         import setGPU
-        print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']," (manually set by 'setGPU')"
+        print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
     else:
-        print "Using GPU: ", os.environ['CUDA_VISIBLE_DEVICES']," (taken from env)"
+        try:
+            igpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
+            print "Using GPU: '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (taken from env)"
+        except Exception,e:
+            print "WARNING: GPU from env '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' not properly set!"
+            imp.find_module('setGPU')
+            import setGPU
+            print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
+        
 except ImportError:
     pass
         
@@ -158,7 +167,7 @@ print_delimiter()
 fileListTestDA = getListOfInputFiles(filePathTestDA)
 
 # select only a fraction of files
-if (nFiles is not None) and (nFiles>len(fileListTrain)):
+if (nFiles is not None) and (nFiles<len(fileListTrain)):
     fileListTrain = fileListTrain[:nFiles]
     fileListTest = fileListTest[:nFiles]
     
@@ -219,7 +228,7 @@ for globalFeature in [
     cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
     cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
     
-sys.exit(1)
+
 
 # define the feature dictionary for training
 # Count the number of entries in total
@@ -538,16 +547,7 @@ while (epoch < num_epochs):
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
     
-    modelDAAlt = modelModule.ModelDA(
-        len(featureDict["truth"]["branches"]),
-        isParametric=isParametric,
-        useLSTM=False
-    )
     
-    modelDiscriminatorsAlt = setupDiscriminatorsFused(modelDAAlt)
-    modelClassDiscriminatorAlt = modelDiscriminators["class"]
-    modelDomainDiscriminatorAlt = modelDiscriminators["domain"]
-    modelFusedDiscriminatorAlt = modelDiscriminators["fused"]
     
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
@@ -572,27 +572,39 @@ while (epoch < num_epochs):
     inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
 
     
-    #sys.exit(1)
-    
-    #alternatively: kullback_leibler_divergence, binary_crossentropy
     def wasserstein_loss(x,y):
         return K.mean(x*y)
-        
-        
         
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
                        loss='binary_crossentropy', metrics=['accuracy'],
-                       loss_weights=[domainLossWeight*0.01])
+                       loss_weights=[domainLossWeight])
 
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
                        loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
                        
+                       
+    modelDomainDiscriminatorFrozen = setupDiscriminatorsFused(modelDA)["domain"]
+    for l in modelDomainDiscriminatorFrozen.layers:
+        if max(map(lambda x: l.name.find(x),["cpf_conv","npf_conv","sv_conv","lstm","features"]))>=0:
+            l.trainable=False
+    optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
+    modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
+                       loss='binary_crossentropy', metrics=['accuracy'],
+                       loss_weights=[1.0])
+    '''
+    for l in modelDomainDiscriminatorFrozen.layers:
+        l.trainable=True
+    '''  
     if epoch == 0:
+        print "class network"
         modelClassDiscriminator.summary()
+        print "domain network"
         modelDomainDiscriminator.summary()
+        print "domain network with frozen features"
+        modelDomainDiscriminatorFrozen.summary()
     
     init_op = tf.group(
         tf.global_variables_initializer(),
@@ -682,9 +694,9 @@ while (epoch < num_epochs):
                     continue
                 train_batch_value_domain = {}
                 
-                iterda = np.random.uniform(0,0.5)+random.normal(0,0.5)
+                iterda = np.random.normal(0,0.1)
                 for k in train_batch_value_domain_1.keys():
-                    train_batch_value_domain[k] = 0.5*(train_batch_value_domain_1+train_batch_value_domain_2)+iterda*(train_batch_value_domain_1-train_batch_value_domain_2)
+                    train_batch_value_domain[k] = train_batch_value_domain_1[k]+iterda*(train_batch_value_domain_2[k]-train_batch_value_domain_1[k])
                 '''
                 train_batch_value_domain = sess.run(train_batch_da)
                 #np.random.uniform(-3,5)
@@ -694,7 +706,7 @@ while (epoch < num_epochs):
                     #change ctau every 4 step
                     ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
                     train_inputs_domain = [
-                                    np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
+                                    np.zeros((train_batch_value_domain['num'].shape[0],1)),
                                     #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
@@ -708,36 +720,36 @@ while (epoch < num_epochs):
 
             if not noDA:
 
+                
                 #multiply by xsecweight
                 train_da_weight=train_batch_value_domain["xsecweight"][:,0]
                 #print train_da_weight[:10],np.sum(train_da_weight)
                 
-                if step<20:
+                if epoch==0 and step<10:
                     #train first class discriminator only
                     train_outputs= modelClassDiscriminator.train_on_batch(
                         train_inputs_class, 
                         train_batch_value["truth"]
                     )
                     train_outputs_domain = [0.,0.]
-                elif step>=20 and step<40:
-                    #train class and domain discriminator alternating 
-                    #(NB: discrimator weights are NOT reloaded per epoch so pretraining is good for stability)
-                    if step%2==0:
-                        train_outputs= modelClassDiscriminator.train_on_batch(
-                            train_inputs_class, 
-                            train_batch_value["truth"]
-                        )
-                        train_outputs_domain = [0.,0.]
-                    else:
-                        train_outputs = [0.,0.]
-                        train_outputs_domain = modelDomainDiscriminator.train_on_batch(
-                            train_inputs_domain, 
-                            train_batch_value_domain["isData"],
-                            sample_weight=train_da_weight
-                        )
+                elif (epoch==0 and (step>=10 and step<20)) or (epoch>0 and (step>=0 and step<10)):
+                    #train domain discriminator only while keeping features frozen 
+                    train_outputs_domain = modelDomainDiscriminatorFrozen.train_on_batch(
+                        train_inputs_domain, 
+                        train_batch_value_domain["isData"],
+                        sample_weight=train_da_weight
+                    )
                 else:
                     #finally train both discriminators together
-                
+                    '''
+                    train_domain_outputs = modelClassDiscriminator.predict_on_batch(
+                        train_inputs_domain
+                    )
+                    
+                    #increase weight for high classifier outputs
+                    for b in range(train_domain_outputs.shape[0]):
+                        train_da_weight[b]*=1./(1.001-math.sqrt(max(train_domain_outputs[b])))
+                    '''
                     #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                         train_inputs_class+train_inputs_domain, 
@@ -746,7 +758,7 @@ while (epoch < num_epochs):
                     )
                     train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                     train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
-                    
+                        
                     
             else:
                 
@@ -938,7 +950,7 @@ while (epoch < num_epochs):
             
             if isParametric:
                 ctau = 0.#np.random.randint(-3, 5)
-                test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*ctau,
+                test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
                                 test_batch_value_domain['globalvars'],
                                 test_batch_value_domain['cpf'],
                                 test_batch_value_domain['npf'],

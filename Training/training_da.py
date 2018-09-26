@@ -46,6 +46,9 @@ parser.add_argument('-o', '--overwrite', action='store_true',
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
                     help='train a parametric model', default=False)
+parser.add_argument('--opt', action='store_true',default=False,
+                    dest='opt',
+                    help='optimize training through back stepping')
 parser.add_argument('--noda', action='store_true',
                     dest='noda',
                     help='deactivate DA', default=False)
@@ -67,6 +70,7 @@ num_epochs = arguments.epoch
 overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 noDA = arguments.noda
+doOptimization = arguments.opt
 
 modelPath = arguments.model
 import importlib
@@ -563,8 +567,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.3+0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
-    domainLossWeight = 0.7-0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 0.2+0.6*math.exp(-0.03*max(0,epoch-2)**1.5)
+    domainLossWeight = 0.8-0.6*math.exp(-0.03*max(0,epoch-2)**1.5)
     
     
     if noDA:
@@ -577,19 +581,19 @@ while (epoch < num_epochs):
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
                        loss=keras.losses.categorical_crossentropy, metrics=['accuracy'],
-                       loss_weights=[classLossWeight])
+                       loss_weights=[1.])
                        
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
     inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
 
     
     def wasserstein_loss(x,y):
-        return K.mean(x*y)/(K.mean(K.abs(y))+10**-12)
+        return K.mean(x*y)
         
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
                        loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
-                       loss_weights=[domainLossWeight])
+                       loss_weights=[1.])
 
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
@@ -604,11 +608,8 @@ while (epoch < num_epochs):
     optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
                        loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
-                       loss_weights=[domainLossWeight])
-    '''
-    for l in modelDomainDiscriminatorFrozen.layers:
-        l.trainable=True
-    '''  
+                       loss_weights=[1.])
+ 
     if epoch == 0:
         print "class network"
         modelClassDiscriminator.summary()
@@ -681,22 +682,24 @@ while (epoch < num_epochs):
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
-            '''
-            for _ in range(5):   
-                feedDict = {
-                    K.learning_phase(): 0,
-                    modelClassDiscriminator.targets[0]:train_batch_value["truth"],
-                    modelClassDiscriminator.sample_weights[0]:np.ones(train_batch_value["truth"].shape[0])
-                }
-                for i in range(len(modelClassDiscriminator.inputs)):
-                    feedDict[modelClassDiscriminator.inputs[i]] = train_inputs[i]
+            
+            
+            if (epoch>0) and doOptimization:
+                for _ in range(5):
+                    feedDict = {
+                        K.learning_phase(): 0,
+                        modelClassDiscriminator.targets[0]:train_batch_value["truth"],
+                        modelClassDiscriminator.sample_weights[0]:np.ones(train_batch_value["truth"].shape[0])
+                    }
+                    for i in range(len(modelClassDiscriminator.inputs)):
+                        feedDict[modelClassDiscriminator.inputs[i]] = train_inputs[i]
 
-                classLossVal,inputGradientsVal = sess.run([classLossFct,inputGradients],feed_dict=feedDict)         
-                                    
-                direction = np.abs(np.random.normal(0,1))+0.2
-                for igrad in range(len(inputGradientsVal)):
-                    train_inputs[igrad]+=direction*inputGradientsVal[igrad]
-            '''
+                    classLossVal,inputGradientsVal = sess.run([classLossFct,inputGradients],feed_dict=feedDict)         
+                                        
+                    direction = np.abs(np.random.normal(0,1))+0.5
+                    for igrad in range(len(inputGradientsVal)):
+                        train_inputs[igrad]+=direction*inputGradientsVal[igrad]
+            
             if not noDA:
                 '''
                 train_batch_value_domain_1 = sess.run(train_batch_da)
@@ -752,15 +755,17 @@ while (epoch < num_epochs):
                     )
                 else:
                     #finally train both discriminators together
-                    '''
+                    
                     train_domain_outputs = modelClassDiscriminator.predict_on_batch(
                         train_inputs_domain
                     )
                     
-                    #increase weight for high classifier outputs
-                    for b in range(train_domain_outputs.shape[0]):
-                        train_da_weight[b]*=1./(1.001-math.sqrt(max(train_domain_outputs[b])))
-                    '''
+                    #randomly drop classes
+                    classToKeep = np.random.uniform(0,1,train_batch_value["truth"].shape[1])>0.4
+                    classToKeep[np.random.randint(0,train_batch_value["truth"].shape[1]-1)]=True #keep at least one class
+                    predictedClass = np.argmax(train_domain_outputs,axis=1)
+                    #train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
+                    
                     #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                         train_inputs_class+train_inputs_domain, 

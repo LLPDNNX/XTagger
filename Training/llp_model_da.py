@@ -121,7 +121,9 @@ class ModelDA(object):
         with tf.variable_scope("features"):
             self.full_features = Sequence(scope='features')
             self.full_features.add(keras.layers.Concatenate())
-            self.full_features.add(Dense(200,activation=keras.layers.Activation('tanh',name="features"),options=options,name="features2"))
+            self.full_features.add(Dense(200,activation=None,options=options,name="features1"))
+            #self.full_features.add(keras.layers.BatchNormalization(name="feature2",center=True, scale=True))
+            self.full_features.add(keras.layers.Activation('tanh',name="features3"))
             #self.full_features.add(keras.layers.GaussianNoise(0.1))
         '''
         self.conv_class_prediction = Sequence(scope='class_prediction')
@@ -143,10 +145,11 @@ class ModelDA(object):
             self.full_class_prediction.add(Dense(100,options=options))
             self.full_class_prediction.add(Dense(100,options=options))
             self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
-            
+
         with tf.variable_scope("domain_prediction"):
             def gradientReverse(x):
                 #backward = tf.negative(x)
+                
                 backward = tf.negative(x*tf.exp(tf.abs(x)))
                 #backward = tf.negative(x*tf.exp(tf.square(x)))
                 forward = tf.identity(x)
@@ -159,10 +162,10 @@ class ModelDA(object):
             self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
             self.domain_prediction.add(Dense(1,kernel_reg=0.1,bias_reg=0.01,activation=None,options=options))
             '''
-            self.domain_prediction.add(Dense(100,options=options))
-            self.domain_prediction.add(Dense(100,options=options))
-            self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options))
-                
+            self.domain_prediction.add(Dense(100,options=options,dropout=0))
+            self.domain_prediction.add(Dense(100,options=options,dropout=0))
+            self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
+            
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)
         npf_conv = self.npf_conv(npf)

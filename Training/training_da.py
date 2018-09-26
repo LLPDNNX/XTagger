@@ -282,6 +282,16 @@ print "class balance before resampling", \
         [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
 print_delimiter()
 
+#make flat in pt
+for ieta in range(targetShape.GetNbinsY()):
+    ptSum = 0.
+    for ipt in range(targetShape.GetNbinsX()):
+        ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
+    ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
+    for ipt in range(targetShape.GetNbinsX()):
+        if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
+            targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+
 weightsPt = {}
 weightsEta = {}
 
@@ -531,10 +541,10 @@ while (epoch < num_epochs):
     print_delimiter()
 
     train_batch = input_pipeline(fileListTrain,featureDict, batchSize)
-    test_batch = input_pipeline(fileListTest,featureDict, batchSize)
+    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5)
     
     train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
-    test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize,resample=False,repeat=1) #break test loop on exception
+    test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
 
     modelDA = modelModule.ModelDA(
         len(featureDict["truth"]["branches"]),
@@ -553,8 +563,9 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.2+0.75*math.exp(-0.03*max(0,epoch-2)**1.5)
-    domainLossWeight = 0.8-0.75*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 0.3+0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
+    domainLossWeight = 0.7-0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
+    
     
     if noDA:
         classLossWeight = 1
@@ -565,24 +576,24 @@ while (epoch < num_epochs):
     
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
-                       loss='categorical_crossentropy', metrics=['accuracy'],
-                       loss_weights=[classLossWeight*1.])
+                       loss=keras.losses.categorical_crossentropy, metrics=['accuracy'],
+                       loss_weights=[classLossWeight])
                        
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
     inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
 
     
     def wasserstein_loss(x,y):
-        return K.mean(x*y)
+        return K.mean(x*y)/(K.mean(K.abs(y))+10**-12)
         
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
-                       loss='binary_crossentropy', metrics=['accuracy'],
+                       loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
                        loss_weights=[domainLossWeight])
 
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
-                       loss=['categorical_crossentropy','binary_crossentropy'], metrics=['accuracy'],
+                       loss=[keras.losses.categorical_crossentropy,keras.losses.binary_crossentropy], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
                        
                        
@@ -592,8 +603,8 @@ while (epoch < num_epochs):
             l.trainable=False
     optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
-                       loss='binary_crossentropy', metrics=['accuracy'],
-                       loss_weights=[1.0])
+                       loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
+                       loss_weights=[domainLossWeight])
     '''
     for l in modelDomainDiscriminatorFrozen.layers:
         l.trainable=True
@@ -704,9 +715,9 @@ while (epoch < num_epochs):
                 
                 if isParametric:
                     #change ctau every 4 step
-                    ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
+                    #ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
                     train_inputs_domain = [
-                                    np.zeros((train_batch_value_domain['num'].shape[0],1)),
+                                    np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
@@ -732,7 +743,7 @@ while (epoch < num_epochs):
                         train_batch_value["truth"]
                     )
                     train_outputs_domain = [0.,0.]
-                elif (epoch==0 and (step>=10 and step<20)) or (epoch>0 and (step>=0 and step<10)):
+                elif (epoch==0 and (step>=10 and step<30)) or (epoch>0 and (step>=0 and step<20)):
                     #train domain discriminator only while keeping features frozen 
                     train_outputs_domain = modelDomainDiscriminatorFrozen.train_on_batch(
                         train_inputs_domain, 
@@ -798,9 +809,9 @@ while (epoch < num_epochs):
                 nTrainDomain += nTrainBatchDomain
 
             if nTrainBatch > 0:
-                total_loss_train += train_outputs[0] * nTrainBatch
+                total_loss_train += train_outputs[0] * nTrainBatch#/classLossWeight
                 if not noDA:
-                    total_loss_train_domain += train_outputs_domain[0] * nTrainBatchDomain
+                    total_loss_train_domain += train_outputs_domain[0] * nTrainBatchDomain#/domainLossWeight
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
@@ -928,6 +939,9 @@ while (epoch < num_epochs):
                     hists[idis][truthclass].Fill(test_prediction[ibatch][idis])
 
             nTest += nTestBatch
+            
+            if nTestBatch>0:
+                total_loss_test += test_outputs[0]*nTestBatch#/classLossWeight
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
@@ -949,7 +963,7 @@ while (epoch < num_epochs):
 
             
             if isParametric:
-                ctau = 0.#np.random.randint(-3, 5)
+                #ctau = 0.#np.random.randint(-3, 5)
                 test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
                                 test_batch_value_domain['globalvars'],
                                 test_batch_value_domain['cpf'],
@@ -983,11 +997,11 @@ while (epoch < num_epochs):
             nTestDomain += nTestBatchDomain
 
             if nTestBatchDomain>0:
-                total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain
+                total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain#/domainLossWeight
 
             if step % 10 == 0:
                 duration = (time.time() - start_time)/10.
-                print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs[0], test_outputs[1]*100., duration)
+                print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs_domain[0], test_outputs_domain[1]*100., duration)
 
                 start_time = time.time()
 

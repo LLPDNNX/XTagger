@@ -953,6 +953,14 @@ inline bool begins_with(std::string const & value, std::string const & start)
     return std::equal(start.begin(), start.end(), value.begin());
 }
 
+unsigned int calcHash(unsigned int value)
+{
+    unsigned int hash = ((value >> 16) ^ value) * 0x45d9f3b;
+    hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
+    hash = (hash >> 16) ^ hash;
+    return hash;
+}
+
 int main(int argc, char **argv)
 {
     cli::Parser parser(argc, argv);
@@ -1137,11 +1145,10 @@ int main(int argc, char **argv)
         }
         
         //choose input file pseudo-randomly
-        unsigned int hash = ((ientry >> 16) ^ ientry) * 0x45d9f3b;
-        hash = ((hash >> 16) ^ hash) * 0x45d9f3b;
-        hash = (hash >> 16) ^ hash;
+        long hash = calcHash(ientry);
         long hashEntries = (hash+hash/total_entries)%total_entries;
-        long hashTest = (hash+hash>>8+hash>>15)%100;
+        
+        long hashTest = calcHash(47*hash+23*ientry)%100;
         int sum_entries = 0;
         int ifile = 0;
         for (;ifile<entries.size(); ++ifile)

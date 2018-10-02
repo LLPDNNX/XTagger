@@ -588,7 +588,7 @@ while (epoch < num_epochs):
 
     
     def wasserstein_loss(x,y):
-        return K.mean(x*y)
+        return K.mean((2*x-1)*y)
         
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
@@ -718,9 +718,9 @@ while (epoch < num_epochs):
                 
                 if isParametric:
                     #change ctau every 4 step
-                    #ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
+                    ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
                     train_inputs_domain = [
-                                    np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
+                                    np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
                                     #np.random.uniform(-3,5,(train_batch_value_domain['num'].shape[0],1)),
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
@@ -764,7 +764,8 @@ while (epoch < num_epochs):
                     classToKeep = np.random.uniform(0,1,train_batch_value["truth"].shape[1])>0.4
                     classToKeep[np.random.randint(0,train_batch_value["truth"].shape[1]-1)]=True #keep at least one class
                     predictedClass = np.argmax(train_domain_outputs,axis=1)
-                    #train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
+                    train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
+                    np.nan_to_num(train_da_weight,copy=False)
                     
                     #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(

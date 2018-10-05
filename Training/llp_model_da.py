@@ -148,9 +148,9 @@ class ModelDA(object):
 
         with tf.variable_scope("domain_prediction"):
             def gradientReverse(x):
-                backward = tf.negative(x)
+                #backward = tf.negative(x)
                 
-                #backward = tf.negative(x*tf.exp(tf.abs(x)))
+                backward = tf.negative(x*tf.exp(tf.abs(x)))
                 #backward = tf.negative(x*tf.exp(tf.square(x)))
                 forward = tf.identity(x)
                 return backward + tf.stop_gradient(forward - backward)
@@ -162,8 +162,8 @@ class ModelDA(object):
             self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
             self.domain_prediction.add(Dense(1,kernel_reg=0.1,bias_reg=0.01,activation=None,options=options))
             '''
-            self.domain_prediction.add(Dense(50,options=options,dropout=0))
-            self.domain_prediction.add(Dense(50,options=options,dropout=0))
+            self.domain_prediction.add(Dense(100,options=options,dropout=0))
+            self.domain_prediction.add(Dense(100,options=options,dropout=0))
             self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):

@@ -54,6 +54,8 @@ parser.add_argument('--noda', action='store_true',
                     help='deactivate DA', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='llp_model_da')
+parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
+                    default=-1,dest='resume')
 
 arguments = parser.parse_args()
 
@@ -71,6 +73,7 @@ overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 noDA = arguments.noda
 doOptimization = arguments.opt
+resumeTraining = arguments.resume
 
 modelPath = arguments.model
 import importlib
@@ -141,7 +144,7 @@ now = datetime.datetime.now()
 date = str(now.year) + str(now.month) + str(now.day)
 outputFolder = "output/" + jobName
 
-if (os.path.exists(outputFolder) & overwriteFlag):
+if (os.path.exists(outputFolder) and (overwriteFlag or resumeTraining>0)):
     print "Overwriting output folder!"
 else:
     print "Creating output folder '%s'!" % outputFolder
@@ -175,212 +178,217 @@ if (nFiles is not None) and (nFiles<len(fileListTrain)):
     fileListTrain = fileListTrain[:nFiles]
     fileListTest = fileListTest[:nFiles]
     
-chainDA = ROOT.TChain("jets")
-for f in fileListTrainDA:
-    chainDA.AddFile(f)
-for globalFeature in [
-    ["global_pt",1.,3.2,"y"],
-    ["global_eta",-3,3],
-]:
-    #print globalFeature, chainDA.FindLeaf(globalFeature).GetMaximum(), chainDA.FindLeaf(globalFeature).GetMinimum()
-    histData = ROOT.TH1F("histData"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
-    histData.Sumw2()
-    #histData.SetDirectory(0)
-    histData.SetMarkerStyle(20)
-    histData.SetMarkerSize(1.2)
-    chainDA.Project(histData.GetName(),globalFeature[0],"(isData>0.5)*(xsecweight)")
-    histMC = ROOT.TH1F("histMC"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
-    histMC.Sumw2()
-    #histMC.SetDirectory(0)
-    histMC.SetLineWidth(2)
-    histMC.SetLineColor(ROOT.kAzure-4)
-    chainDA.Project(histMC.GetName(),globalFeature[0],"(isData<0.5)*(xsecweight)")
-    
-    cv = ROOT.TCanvas("cvDA"+globalFeature[0]+str(random.random()),"",800,700)
-    
-    if len(globalFeature)>=4:
-        if globalFeature[3].find('y')>=0 and globalFeature[3].find('x')>=0:
-            cv.SetLogx(1)
-            cv.SetLogy(1)
-            axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-                50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
-                50,numpy.linspace(0.5,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum()))),num=51)
-            )
-        else:
-            if globalFeature[3].find('y')>=0:
-                cv.SetLogy(1)
-                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-                    50,globalFeature[1],globalFeature[2],50,0.8,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum())))
-                )
-            elif globalFeature[3].find('x')>=0:
-                cv.SetLogx(1)
-                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-                    50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
-                    50,numpy.linspace(0.5,1.1*max(histData.GetMaximum(),histMC.GetMaximum()),num=51)
-                )
-            else:
-                print "unknown option"
-                sys.exit(1)
-    else:
-        axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-            50,globalFeature[1],globalFeature[2],50,0,1.1*max(histData.GetMaximum(),histMC.GetMaximum())
-        )
-
-    axis.Draw("AXIS")
-    histMC.Draw("HISTSAME")
-    histData.Draw("SAMEPE")
-    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
-    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
-    
-
-
-# define the feature dictionary for training
-# Count the number of entries in total
-histsPerClass = {}
-weightsPerClass = {}
 branchNameList = []
-eventsPerClass = {}
-dropoutPerClass = {}
-resampledEventsPerClass = {}
-
-chain = ROOT.TChain("jets")
-for f in fileListTrain:
-    chain.AddFile(f)
-nEntries = chain.GetEntries()
-print "total entries", nEntries
-
-# Calculate weights for resampling in pt and eta
-binningPt = np.linspace(1.3, 3.0, num=30)
-binningEta = np.linspace(-2.4, 2.4, num=10)
-binningctau = -.5 + np.linspace(-3., 6., num=10)
-targetShape = ROOT.TH2F("ptetaTarget", "", len(binningPt)-1, binningPt,
-                        len(binningEta)-1, binningEta)
-
-targetEvents = 0
-
-print "-"*100
-
 for label in featureDict["truth"]["branches"]:
     branchName = label.split("/")[0]
     branchNameList.append(branchName)
-    print "projecting ... ", branchName
-    hist = ROOT.TH2F("pteta"+branchName, "", len(binningPt)-1, binningPt,
-                     len(binningEta)-1, binningEta)
-    hist.Sumw2()
-    chain.Project(hist.GetName(), "global_eta:global_pt",
-                  "("+branchName+"==1)")
-    # scale w.r.t. LLP
-    if label.find("fromLLP") >= 0:
-        targetShape.Add(hist)
-        targetEvents += hist.GetEntries()
-    if hist.Integral() > 0:
-        print " -> entries ", hist.GetEntries()
-        eventsPerClass[branchName] = hist.GetEntries()
-    else:
-        print " -> no entries found for class: ", branchName
-    histsPerClass[branchName] = hist
-
-print_delimiter()
-print "class labels:", eventsPerClass.keys()
-print "class balance before resampling", \
-        [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
-print_delimiter()
-
-#make flat in pt
-for ieta in range(targetShape.GetNbinsY()):
-    ptSum = 0.
-    for ipt in range(targetShape.GetNbinsX()):
-        ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
-    ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
-    for ipt in range(targetShape.GetNbinsX()):
-        if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
-            targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
-
-weightsPt = {}
-weightsEta = {}
-
-for label in branchNameList:
-    hist = histsPerClass[label]
-    weight = targetShape.Clone(label)
-    factor = 0.
-    the_sum = 0.
     
-    weightsPt[label] = targetShape.ProjectionX().Clone(label+"pt")
-    weightsEta[label] = targetShape.ProjectionY().Clone(label+"eta")
-
-    if (hist.Integral() > 0):
-        weight.Divide(hist)
-        weightsPt[label].Divide(hist.ProjectionX())
-        weightsEta[label].Divide(hist.ProjectionY())
+if resumeTraining<=0:
+    chainDA = ROOT.TChain("jets")
+    for f in fileListTrainDA:
+        chainDA.AddFile(f)
+    for globalFeature in [
+        ["global_pt",1.,3.2,"y"],
+        ["global_eta",-3,3],
+    ]:
+        #print globalFeature, chainDA.FindLeaf(globalFeature).GetMaximum(), chainDA.FindLeaf(globalFeature).GetMinimum()
+        histData = ROOT.TH1F("histData"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+        histData.Sumw2()
+        #histData.SetDirectory(0)
+        histData.SetMarkerStyle(20)
+        histData.SetMarkerSize(1.2)
+        chainDA.Project(histData.GetName(),globalFeature[0],"(isData>0.5)*(xsecweight)")
+        histMC = ROOT.TH1F("histMC"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+        histMC.Sumw2()
+        #histMC.SetDirectory(0)
+        histMC.SetLineWidth(2)
+        histMC.SetLineColor(ROOT.kAzure-4)
+        chainDA.Project(histMC.GetName(),globalFeature[0],"(isData<0.5)*(xsecweight)")
         
-        if weight.GetMaximum() > 1:
-            factor = weight.GetMaximum()
-            print "rescale ", label, 1./factor
+        cv = ROOT.TCanvas("cvDA"+globalFeature[0]+str(random.random()),"",800,700)
+        
+        if len(globalFeature)>=4:
+            if globalFeature[3].find('y')>=0 and globalFeature[3].find('x')>=0:
+                cv.SetLogx(1)
+                cv.SetLogy(1)
+                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                    50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
+                    50,numpy.linspace(0.5,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum()))),num=51)
+                )
+            else:
+                if globalFeature[3].find('y')>=0:
+                    cv.SetLogy(1)
+                    axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                        50,globalFeature[1],globalFeature[2],50,0.8,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum())))
+                    )
+                elif globalFeature[3].find('x')>=0:
+                    cv.SetLogx(1)
+                    axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                        50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
+                        50,numpy.linspace(0.5,1.1*max(histData.GetMaximum(),histMC.GetMaximum()),num=51)
+                    )
+                else:
+                    print "unknown option"
+                    sys.exit(1)
         else:
-            factor = 1.
-        weight.Scale(1./factor)
-        weightsPt[label].Scale(1./factor)
-        weightsEta[label].Scale(1./factor)
+            axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                50,globalFeature[1],globalFeature[2],50,0,1.1*max(histData.GetMaximum(),histMC.GetMaximum())
+            )
+
+        axis.Draw("AXIS")
+        histMC.Draw("HISTSAME")
+        histData.Draw("SAMEPE")
+        cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
+        cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
         
-        for ibin in range(hist.GetNbinsX()):
-            for jbin in range(hist.GetNbinsY()):
-                '''
-                if weight.GetBinContent(ibin+1, jbin+1) > 0:
-                    weight.SetBinContent(ibin+1, jbin+1,
-                                         weight.GetBinContent(ibin+1, jbin+1)
-                                         / factor)
-                '''
-                the_sum += hist.GetBinContent(ibin+1, jbin+1) * \
-                    weight.GetBinContent(ibin+1, jbin+1)
+
+
+    # define the feature dictionary for training
+    # Count the number of entries in total
+    histsPerClass = {}
+    weightsPerClass = {}
+    branchNameList = []
+    eventsPerClass = {}
+    dropoutPerClass = {}
+    resampledEventsPerClass = {}
+
+    chain = ROOT.TChain("jets")
+    for f in fileListTrain:
+        chain.AddFile(f)
+    nEntries = chain.GetEntries()
+    print "total entries", nEntries
+
+    # Calculate weights for resampling in pt and eta
+    binningPt = np.linspace(1.3, 3.0, num=30)
+    binningEta = np.linspace(-2.4, 2.4, num=10)
+    binningctau = -.5 + np.linspace(-3., 6., num=10)
+    targetShape = ROOT.TH2F("ptetaTarget", "", len(binningPt)-1, binningPt,
+                            len(binningEta)-1, binningEta)
+
+    targetEvents = 0
+
+    print "-"*100
+
+    for label in featureDict["truth"]["branches"]:
+        branchName = label.split("/")[0]
+        print "projecting ... ", branchName
+        hist = ROOT.TH2F("pteta"+branchName, "", len(binningPt)-1, binningPt,
+                         len(binningEta)-1, binningEta)
+        hist.Sumw2()
+        chain.Project(hist.GetName(), "global_eta:global_pt",
+                      "("+branchName+"==1)")
+        # scale w.r.t. LLP
+        if label.find("fromLLP") >= 0:
+            targetShape.Add(hist)
+            targetEvents += hist.GetEntries()
+        if hist.Integral() > 0:
+            print " -> entries ", hist.GetEntries()
+            eventsPerClass[branchName] = hist.GetEntries()
+        else:
+            print " -> no entries found for class: ", branchName
+        histsPerClass[branchName] = hist
+
+    print_delimiter()
+    print "class labels:", eventsPerClass.keys()
+    print "class balance before resampling", \
+            [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
+    print_delimiter()
+
+    #make flat in pt
+    for ieta in range(targetShape.GetNbinsY()):
+        ptSum = 0.
+        for ipt in range(targetShape.GetNbinsX()):
+            ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
+        ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
+        for ipt in range(targetShape.GetNbinsX()):
+            if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
+                targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+
+    weightsPt = {}
+    weightsEta = {}
+
+    for label in branchNameList:
+        hist = histsPerClass[label]
+        weight = targetShape.Clone(label)
+        factor = 0.
+        the_sum = 0.
         
-    else:
-        weight.Scale(0)
-        weightsPt[label].Scale(0)
-        weightsEta[label].Scale(0)
+        weightsPt[label] = targetShape.ProjectionX().Clone(label+"pt")
+        weightsEta[label] = targetShape.ProjectionY().Clone(label+"eta")
 
-    resampledEventsPerClass[label] = the_sum
-    weightsPerClass[label] = weight
+        if (hist.Integral() > 0):
+            weight.Divide(hist)
+            weightsPt[label].Divide(hist.ProjectionX())
+            weightsEta[label].Divide(hist.ProjectionY())
+            
+            if weight.GetMaximum() > 1:
+                factor = weight.GetMaximum()
+                print "rescale ", label, 1./factor
+            else:
+                factor = 1.
+            weight.Scale(1./factor)
+            weightsPt[label].Scale(1./factor)
+            weightsEta[label].Scale(1./factor)
+            
+            for ibin in range(hist.GetNbinsX()):
+                for jbin in range(hist.GetNbinsY()):
+                    '''
+                    if weight.GetBinContent(ibin+1, jbin+1) > 0:
+                        weight.SetBinContent(ibin+1, jbin+1,
+                                             weight.GetBinContent(ibin+1, jbin+1)
+                                             / factor)
+                    '''
+                    the_sum += hist.GetBinContent(ibin+1, jbin+1) * \
+                        weight.GetBinContent(ibin+1, jbin+1)
+            
+        else:
+            weight.Scale(0)
+            weightsPt[label].Scale(0)
+            weightsEta[label].Scale(0)
 
-print_delimiter()
+        resampledEventsPerClass[label] = the_sum
+        weightsPerClass[label] = weight
 
-print resampledEventsPerClass
+    print_delimiter()
 
-min_sum = min(resampledEventsPerClass.values())
-print "min: ",min_sum
-dropoutPerClass = {k: min_sum/resampledEventsPerClass[k]
-                   for k, v in resampledEventsPerClass.iteritems()}
+    print resampledEventsPerClass
 
-weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
-for label in weightsPerClass.keys():
-    
-    if classBalance:
-        classWeight = dropoutPerClass[label]
-        print "performing class balance rescaling: ",label,classWeight
-        weightsPerClass[label].Scale(classWeight)
-        weightsPt[label].Scale(classWeight)
-        weightsEta[label].Scale(classWeight)
-    weightsPerClass[label].Write()
-weightFile.Close()
+    min_sum = min(resampledEventsPerClass.values())
+    print "min: ",min_sum
+    dropoutPerClass = {k: min_sum/resampledEventsPerClass[k]
+                       for k, v in resampledEventsPerClass.iteritems()}
+
+    weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
+    for label in weightsPerClass.keys():
+        
+        if classBalance:
+            classWeight = dropoutPerClass[label]
+            print "performing class balance rescaling: ",label,classWeight
+            weightsPerClass[label].Scale(classWeight)
+            weightsPt[label].Scale(classWeight)
+            weightsEta[label].Scale(classWeight)
+        weightsPerClass[label].Write()
+    weightFile.Close()
 
 
-# Plot histograms of pt, eta and their weights
+    # Plot histograms of pt, eta and their weights
 
-histsPt = {l: h.ProjectionX() for l, h in histsPerClass.items()}
-histsEta = {l: h.ProjectionY() for l, h in histsPerClass.items()}
+    histsPt = {l: h.ProjectionX() for l, h in histsPerClass.items()}
+    histsEta = {l: h.ProjectionY() for l, h in histsPerClass.items()}
 
-makePlot(outputFolder, histsPt, branchNameList, binningPt,
-         ";Jet log(pT/1 GeV);Normalized events", "pt",
-         target=targetShape.ProjectionX())
-makePlot(outputFolder, histsEta, branchNameList, binningEta,
-         ";Jet #eta;Normalized events", "eta",
-         target=targetShape.ProjectionY())
+    makePlot(outputFolder, histsPt, branchNameList, binningPt,
+             ";Jet log(pT/1 GeV);Normalized events", "pt",
+             target=targetShape.ProjectionX())
+    makePlot(outputFolder, histsEta, branchNameList, binningEta,
+             ";Jet #eta;Normalized events", "eta",
+             target=targetShape.ProjectionY())
 
-makePlot(outputFolder, weightsPt, branchNameList, binningPt,
-         ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
-makePlot(outputFolder, weightsEta, branchNameList, binningEta,
-         ";Jet #eta;Weight", "weight_eta", logy=0)
-         
-         
+    makePlot(outputFolder, weightsPt, branchNameList, binningPt,
+             ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
+    makePlot(outputFolder, weightsEta, branchNameList, binningEta,
+             ";Jet #eta;Weight", "weight_eta", logy=0)
+             
+             
          
 
    
@@ -527,7 +535,18 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1):
 
 
 learning_rate_val = 0.005
-epoch = 0
+
+if resumeTraining>0:
+    f = open(os.path.join(outputFolder, "model_epoch.stat"), "r")
+    i = 0
+    for l in f:
+        i+=1
+        lsplit = l.split(';')
+        if int(lsplit[0])==(resumeTraining-1):
+            print "Extracting learning rate from previous training: ",lsplit[1]
+            learning_rate_val = float(lsplit[1])
+
+epoch = 0 if resumeTraining<=0 else resumeTraining
 previous_train_loss = 1000
 
 def random_ctau(start,end,v):
@@ -567,8 +586,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.2+0.6*math.exp(-0.03*max(0,epoch-2)**1.5)
-    domainLossWeight = 0.8-0.6*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 0.3+0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
+    domainLossWeight = 0.7-0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
     
     
     if noDA:
@@ -753,6 +772,7 @@ while (epoch < num_epochs):
                         train_batch_value_domain["isData"],
                         sample_weight=train_da_weight
                     )
+                    train_outputs = [0.,0.]
                 else:
                     #finally train both discriminators together
                     

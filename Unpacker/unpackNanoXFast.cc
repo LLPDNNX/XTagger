@@ -591,7 +591,7 @@ class NanoXTree
         
         bool nextEvent()
         {
-            return getEvent(ientry_+1);
+            return getEvent((ientry_+1)%entries());
         }
        
         inline int njets()
@@ -1078,6 +1078,7 @@ int main(int argc, char **argv)
     {
         auto inputFileNameList = inputFileNames[i];
         TChain* chain = new TChain("Events","Events");
+        //int nfiles = 0;
         for (const auto& inputFileName: inputFileNameList)
         {
             //std::cout<<"   "<<argv[iarg]<<", nEvents="<<;
@@ -1099,7 +1100,10 @@ int main(int argc, char **argv)
             std::cout<<"   "<<inputFileName<<", nEvents="<<nEvents<<std::endl;
             file->Close();
             chain->AddFile(inputFileName.c_str());
+            //nfiles+=1;
+            //if (nfiles>1) break;
         }
+        
         int nEvents = chain->GetEntries();
         std::cout<<"Total per chain:  "<<nEvents<<std::endl;
         entries.push_back(nEvents);
@@ -1117,6 +1121,7 @@ int main(int argc, char **argv)
         return 1;
     }
     
+    std::cout<<"Number of independent inputs: "<<trees.size()<<std::endl;
     std::cout<<"Total number of events: "<<total_entries<<std::endl;
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTrain;
     std::vector<std::vector<int>> eventsPerClassPerFileTrain(12,std::vector<int>(nOutputs,0));
@@ -1135,41 +1140,41 @@ int main(int argc, char **argv)
         )));
     }
     
+    int eventsInBatch = int(1.*total_entries/nSplit);
+    
+    std::cout<<"Batch number of events: "<<eventsInBatch<<std::endl;
+    
+    //offset reading for each input tree
+    for (size_t itree = 0; itree < trees.size(); ++itree)
+    {
+        trees[itree]->getEvent(int(1.*iSplit*trees[itree]->entries()/nSplit),true);
+    }
     
     std::vector<int> readEvents(entries.size(),0);
-    for (int ientry = 0; ientry<total_entries; ++ientry)
+    for (int ientry = 0; ientry<eventsInBatch; ++ientry)
     {
         if (ientry%10000==0)
         {
-            std::cout<<"Processing ... "<<100.*ientry/total_entries<<std::endl;
+            std::cout<<"Processing ... "<<100.*ientry/eventsInBatch<<std::endl;
         }
         
-        //choose input file pseudo-randomly
-        long hash = calcHash(ientry);
-        long hashEntries = (hash+hash/total_entries)%total_entries;
         
-        long hashTest = calcHash(47*hash+23*ientry)%100;
+         
+        //choose input file pseudo-randomly
+        long hash = calcHash(47*ientry+iSplit*23);
+        long hashEntries = (hash+hash/eventsInBatch)%eventsInBatch;
+        
+        
         int sum_entries = 0;
         int ifile = 0;
-        for (;ifile<entries.size(); ++ifile)
+        
+        for (;ifile<(entries.size()-1); ++ifile)
         {
-            sum_entries += entries[ifile];
+            sum_entries += int(1.*entries[ifile]/nSplit);
             if (hashEntries<sum_entries) break;
         }
-    
-        //ensure that file is not yet at last event; otherwise move to next input file
-        while (trees[ifile]->entry()>=entries[ifile])
-        {
-            ifile=(ifile+1)%trees.size();
-        }
-        
-        trees[ifile]->nextEvent(); 
-        
-        //use entry number for global splitting; but hash value to split test/train
-        if ((ientry%nSplit)!=iSplit)
-        {
-            continue;
-        }
+       
+        trees[ifile]->nextEvent(); //this loops back to 0 in case it was the last event
         
         readEvents[ifile]+=1;
         
@@ -1178,7 +1183,7 @@ int main(int argc, char **argv)
             if (trees[ifile]->isSelected(j))
             {
                 int jet_class = trees[ifile]->getJetClass(j);
-                
+                long hashTest = calcHash(11*trees[ifile]->entry()+23*j)%100;
                 if (hashTest<nTestFrac)
                 {
                     if (jet_class>=0 and jet_class<eventsPerClassPerFileTest.size())
@@ -1217,7 +1222,7 @@ int main(int argc, char **argv)
     
     for (size_t i = 0; i < entries.size(); ++i)
     {
-        std::cout<<"infile "<<i<<": found = "<<entries[i]<<", read = "<<readEvents[i]<<std::endl;
+        std::cout<<"infile "<<i<<": found = "<<entries[i]<<", read = "<<readEvents[i]<<"/"<<int(1.*entries[i]/nSplit)<<std::endl;
     }
     std::cout<<"----- Train ----- "<<std::endl;
     for (size_t c = 0; c < eventsPerClassPerFileTrain.size(); ++c)

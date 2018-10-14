@@ -54,6 +54,8 @@ parser.add_argument('--noda', action='store_true',
                     help='deactivate DA', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='llp_model_da')
+parser.add_argument('--bagging', action='store', type=float, help='bagging fraction (default: 1. = no bagging)',
+                    default=1., dest='bagging')
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
 
@@ -74,6 +76,7 @@ isParametric = arguments.parametric
 noDA = arguments.noda
 doOptimization = arguments.opt
 resumeTraining = arguments.resume
+bagging = arguments.bagging
 
 modelPath = arguments.model
 import importlib
@@ -487,17 +490,21 @@ def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
         
         
 
-def input_pipeline(files, features, batchSize, resample=True,repeat=1):
+def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.):
     with tf.device('/cpu:0'):
+        if bagging>0. and bagging<1.:
+            inputFileList = random.sample(files,int(round(len(files)*bagging)))
+        else:
+            inputFileList = files
         fileListQueue = tf.train.string_input_producer(
-                files, num_epochs=repeat, shuffle=True)
+                inputFileList, num_epochs=repeat, shuffle=True)
 
         rootreader_op = []
         resamplers = []
         maxThreads = 6
         if OMP_NUM_THREADS>0 and OMP_NUM_THREADS<maxThreads:
             maxThreads = OMP_NUM_THREADS
-        for _ in range(min(1+int(len(fileListTrain)/2.), maxThreads)):
+        for _ in range(min(1+int(len(inputFileList)/2.), maxThreads)):
             reader_batch = max(10,int(batchSize/20.))
             reader = root_reader(fileListQueue, features, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
@@ -561,8 +568,8 @@ while (epoch < num_epochs):
     print "epoch", epoch+1
     print_delimiter()
 
-    train_batch = input_pipeline(fileListTrain,featureDict, batchSize)
-    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5)
+    train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
+    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
     
     train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
     test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
@@ -584,8 +591,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     
-    classLossWeight = 0.3+0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
-    domainLossWeight = 0.7-0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 0.3+0.5*math.exp(-0.05*max(0,epoch-2)**1.5)
+    domainLossWeight = 0.7-0.5*math.exp(-0.05*max(0,epoch-2)**1.5)
     
     
     if noDA:
@@ -675,6 +682,12 @@ while (epoch < num_epochs):
     start_time = time.time()
 
     labelsTraining = np.array([5])
+    
+    ptArray = []
+    etaArray = []
+    truthArray = []
+    if isParametric:
+        ctauArray = []
 
     try:
         step = 0
@@ -777,14 +790,14 @@ while (epoch < num_epochs):
                     train_domain_outputs = modelClassDiscriminator.predict_on_batch(
                         train_inputs_domain
                     )
-                    
+                    '''
                     #randomly drop classes
                     classToKeep = np.random.uniform(0,1,train_batch_value["truth"].shape[1])>0.4
                     classToKeep[np.random.randint(0,train_batch_value["truth"].shape[1]-1)]=True #keep at least one class
                     predictedClass = np.argmax(train_domain_outputs,axis=1)
                     train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
                     np.nan_to_num(train_da_weight,copy=False)
-                    
+                    '''
                     #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                         train_inputs_class+train_inputs_domain, 
@@ -804,25 +817,17 @@ while (epoch < num_epochs):
                 train_outputs_domain = [0,0]
             
             
-            
-            if step == 1:
-                ptArray = train_batch_value["globalvars"][:, 0]
-                etaArray = train_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(train_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = train_batch_value["gen"][:, 0]
 
-            else:
-                ptArray = np.hstack(
-                        (ptArray, train_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack(
-                        (etaArray, train_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack(
-                        (truthArray,
-                            np.argmax(train_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack(
-                            (ctauArray, train_batch_value["gen"][:, 0]))
+            ptArray = np.hstack(
+                    (ptArray, train_batch_value["globalvars"][:, 0]))
+            etaArray = np.hstack(
+                    (etaArray, train_batch_value["globalvars"][:, 1]))
+            truthArray = np.hstack(
+                    (truthArray,
+                        np.argmax(train_batch_value["truth"], axis=1)))
+            if isParametric:
+                ctauArray = np.hstack(
+                        (ctauArray, train_batch_value["gen"][:, 0]))
 
             nTrainBatch = train_batch_value["truth"].shape[0]
             if not noDA:
@@ -907,6 +912,12 @@ while (epoch < num_epochs):
         daHists.append([daMC,daData])
     
 
+    ptArray = []
+    etaArray = []
+    truthArray = []
+    if isParametric:
+        ctauArray = []
+
     try:
         step = 0
         while not coord.should_stop():
@@ -935,19 +946,11 @@ while (epoch < num_epochs):
             #print train_batch_value_domain["xsecweight"][:10]
                       
 
-            if step == 0:
-                ptArray = test_batch_value["globalvars"][:, 0]
-                etaArray = test_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(test_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = test_batch_value["gen"][:, 0]
-
-            else:
-                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
+            ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
+            etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
+            truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
+            if isParametric:
+                ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
 
             
             nTestBatch = test_batch_value["truth"].shape[0]

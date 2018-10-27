@@ -63,13 +63,15 @@ class LSTM(object):
         return self.dropout(self.lstm(x))
     
 class Dense(object):
-    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.1),kernel_reg=10**(-7),bias_reg=0,options={},name=None):
+    def __init__(self,nodes,dropout=0.1,activation=keras.layers.LeakyReLU(alpha=0.1),kernel_reg=10**(-7),bias_reg=0,kernel_constraint=None,bias_constraint=None,options={},name=None):
         self.dense = keras.layers.Dense(
             nodes,
             kernel_initializer='glorot_uniform',
             bias_initializer='zeros',
             kernel_regularizer=keras.regularizers.l2(kernel_reg),
             bias_regularizer=keras.regularizers.l1(bias_reg),
+            kernel_constraint=kernel_constraint,
+            bias_constraint=bias_constraint,
             name=name
         )
         self.dropout = keras.layers.Dropout(dropout)
@@ -84,9 +86,10 @@ class Dense(object):
     
     
 class ModelDA(object):
-    def __init__(self,nclasses,isParametric=False,useLSTM=True,options={}):
+    def __init__(self,nclasses,isParametric=False,useLSTM=True,useWasserstein=False,options={}):
         self.nclasses = nclasses
         self.isParametric = isParametric
+        self.useWasserstein = useWasserstein
         with tf.variable_scope("cpf_conv"):
             self.cpf_conv = Sequence(scope='cpf_conv')
             self.cpf_conv.add(Conv(64,1,1,options=options,name="cpf_conv1"))
@@ -121,9 +124,8 @@ class ModelDA(object):
         with tf.variable_scope("features"):
             self.full_features = Sequence(scope='features')
             self.full_features.add(keras.layers.Concatenate())
-            self.full_features.add(Dense(200,activation=None,options=options,name="features1"))
-            #self.full_features.add(keras.layers.BatchNormalization(name="feature2",center=True, scale=True))
-            self.full_features.add(keras.layers.Activation('tanh',name="features3"))
+            self.full_features.add(Dense(200,options=options,name="features1"))
+            self.full_features.add(keras.layers.Activation('tanh',name="features2"))
             #self.full_features.add(keras.layers.GaussianNoise(0.1))
         '''
         self.conv_class_prediction = Sequence(scope='class_prediction')
@@ -143,28 +145,28 @@ class ModelDA(object):
             self.full_class_prediction = Sequence(scope='class_prediction')
             self.full_class_prediction.add(Dense(100,options=options))
             self.full_class_prediction.add(Dense(100,options=options))
-            self.full_class_prediction.add(Dense(100,options=options))
-            self.full_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(name="prediction"),options=options))
+            self.full_class_prediction.add(Dense(nclasses,dropout=0,activation=keras.layers.Softmax(name="prediction"),options=options))
 
         with tf.variable_scope("domain_prediction"):
             def gradientReverse(x):
-                #backward = tf.negative(x)
-                
-                backward = tf.negative(x*tf.exp(tf.abs(x)))
-                #backward = tf.negative(x*tf.exp(tf.square(x)))
+                if useWasserstein:
+                    backward = tf.negative(x)
+                else:
+                    backward = tf.negative(x*tf.exp(tf.abs(x)))
                 forward = tf.identity(x)
                 return backward + tf.stop_gradient(forward - backward)
                 
             self.domain_prediction = Sequence(scope='domain_prediction')
             self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
-            '''
-            self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
-            self.domain_prediction.add(Dense(100,kernel_reg=0.1,bias_reg=0.01,options=options))
-            self.domain_prediction.add(Dense(1,kernel_reg=0.1,bias_reg=0.01,activation=None,options=options))
-            '''
-            self.domain_prediction.add(Dense(100,options=options,dropout=0))
-            self.domain_prediction.add(Dense(100,options=options,dropout=0))
-            self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
+            
+            if useWasserstein:
+                self.domain_prediction.add(Dense(50,dropout=0.1,kernel_reg=0.01,bias_reg=0.01,kernel_constraint=keras.constraints.max_norm(0.01),bias_constraint=keras.constraints.max_norm(0.01),options=options))
+                self.domain_prediction.add(Dense(50,dropout=0.1,kernel_reg=0.01,bias_reg=0.01,kernel_constraint=keras.constraints.max_norm(0.01),bias_constraint=keras.constraints.max_norm(0.01),options=options))
+                self.domain_prediction.add(Dense(1,dropout=0,kernel_reg=0.01,bias_reg=0.01,kernel_constraint=keras.constraints.max_norm(0.01),bias_constraint=keras.constraints.max_norm(0.01),activation=keras.layers.Activation('relu'),options=options))
+            else:
+                self.domain_prediction.add(Dense(50,options=options,dropout=0.1))
+                self.domain_prediction.add(Dense(50,options=options,dropout=0.1))
+                self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)

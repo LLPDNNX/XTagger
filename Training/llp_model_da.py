@@ -167,6 +167,7 @@ class ModelDA(object):
                 self.domain_prediction.add(Dense(50,options=options,dropout=0.1))
                 self.domain_prediction.add(Dense(50,options=options,dropout=0.1))
                 self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
+
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)

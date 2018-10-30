@@ -48,10 +48,14 @@ parser.add_argument('-p', '--parametric', action='store_true',
                     help='train a parametric model', default=False)
 parser.add_argument('--opt', action='store_true',default=False,
                     dest='opt',
+<<<<<<< HEAD
                     help='optimize training through back stepping on class loss')
 parser.add_argument('--optDomain', action='store_true',default=False,
                     dest='optDomain',
                     help='optimize training through forward stepping on domain loss')
+=======
+                    help='optimize training through back stepping')
+>>>>>>> ddf09880e518a9037bb4a479ed3e4a0764c84a0e
 parser.add_argument('--noda', action='store_true',
                     dest='noda',
                     help='deactivate DA', default=False)
@@ -60,8 +64,11 @@ parser.add_argument('--wasserstein', action='store_true',
                     help='uses wasserstein distance instead', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='llp_model_da')
+<<<<<<< HEAD
 parser.add_argument('--bagging', action='store', type=float, help='bagging fraction (default: 1. = no bagging)',
                     default=1., dest='bagging')
+=======
+>>>>>>> ddf09880e518a9037bb4a479ed3e4a0764c84a0e
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
 
@@ -81,10 +88,14 @@ overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 noDA = arguments.noda
 doOptimization = arguments.opt
+<<<<<<< HEAD
 doOptimizationDomain = arguments.optDomain
 useWasserstein = arguments.wasserstein
 resumeTraining = arguments.resume
 bagging = arguments.bagging
+=======
+resumeTraining = arguments.resume
+>>>>>>> ddf09880e518a9037bb4a479ed3e4a0764c84a0e
 
 modelPath = arguments.model
 import importlib
@@ -576,8 +587,13 @@ while (epoch < num_epochs):
     print "epoch", epoch+1
     print_delimiter()
 
+<<<<<<< HEAD
     train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
     test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
+=======
+    train_batch = input_pipeline(fileListTrain,featureDict, batchSize)
+    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5)
+>>>>>>> ddf09880e518a9037bb4a479ed3e4a0764c84a0e
     
     train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
     test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
@@ -598,7 +614,6 @@ while (epoch < num_epochs):
     
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
-    
     
     classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
     domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
@@ -824,6 +839,7 @@ while (epoch < num_epochs):
                     )
                     train_outputs = [0.,0.]
                 else:
+
                     
                     '''
                     train_domain_outputs = modelClassDiscriminator.predict_on_batch(

@@ -1034,6 +1034,7 @@ int main(int argc, char **argv)
         {
             inputFileNames.push_back(std::vector<std::string>{s});
             selectors.push_back(std::vector<std::string>{});
+            setters.push_back(std::vector<std::string>{});
         }
         else if(ends_with(s,".txt"))
         {

@@ -48,12 +48,20 @@ parser.add_argument('-p', '--parametric', action='store_true',
                     help='train a parametric model', default=False)
 parser.add_argument('--opt', action='store_true',default=False,
                     dest='opt',
-                    help='optimize training through back stepping')
+                    help='optimize training through back stepping on class loss')
+parser.add_argument('--optDomain', action='store_true',default=False,
+                    dest='optDomain',
+                    help='optimize training through forward stepping on domain loss')
 parser.add_argument('--noda', action='store_true',
                     dest='noda',
                     help='deactivate DA', default=False)
+parser.add_argument('--wasserstein', action='store_true',
+                    dest='wasserstein',
+                    help='uses wasserstein distance instead', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='llp_model_da')
+parser.add_argument('--bagging', action='store', type=float, help='bagging fraction (default: 1. = no bagging)',
+                    default=1., dest='bagging')
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
 
@@ -73,7 +81,10 @@ overwriteFlag = arguments.overwriteFlag
 isParametric = arguments.parametric
 noDA = arguments.noda
 doOptimization = arguments.opt
+doOptimizationDomain = arguments.optDomain
+useWasserstein = arguments.wasserstein
 resumeTraining = arguments.resume
+bagging = arguments.bagging
 
 modelPath = arguments.model
 import importlib
@@ -487,17 +498,21 @@ def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
         
         
 
-def input_pipeline(files, features, batchSize, resample=True,repeat=1):
+def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.):
     with tf.device('/cpu:0'):
+        if bagging>0. and bagging<1.:
+            inputFileList = random.sample(files,int(max(1,round(len(files)*bagging))))
+        else:
+            inputFileList = files
         fileListQueue = tf.train.string_input_producer(
-                files, num_epochs=repeat, shuffle=True)
+                inputFileList, num_epochs=repeat, shuffle=True)
 
         rootreader_op = []
         resamplers = []
         maxThreads = 6
         if OMP_NUM_THREADS>0 and OMP_NUM_THREADS<maxThreads:
             maxThreads = OMP_NUM_THREADS
-        for _ in range(min(1+int(len(fileListTrain)/2.), maxThreads)):
+        for _ in range(min(1+int(len(inputFileList)/2.), maxThreads)):
             reader_batch = max(10,int(batchSize/20.))
             reader = root_reader(fileListQueue, features, "jets", batch=reader_batch).batch()
             rootreader_op.append(reader)
@@ -561,8 +576,8 @@ while (epoch < num_epochs):
     print "epoch", epoch+1
     print_delimiter()
 
-    train_batch = input_pipeline(fileListTrain,featureDict, batchSize)
-    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5)
+    train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
+    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
     
     train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
     test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
@@ -570,7 +585,8 @@ while (epoch < num_epochs):
     modelDA = modelModule.ModelDA(
         len(featureDict["truth"]["branches"]),
         isParametric=isParametric,
-        useLSTM=False
+        useLSTM=False,
+        useWasserstein=useWasserstein
     )
     
     modelDiscriminators = setupDiscriminatorsFused(modelDA)
@@ -578,43 +594,51 @@ while (epoch < num_epochs):
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
     
-    
-    
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    
-    classLossWeight = 0.3+0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
-    domainLossWeight = 0.7-0.5*math.exp(-0.03*max(0,epoch-2)**1.5)
-    
+    classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
+    #since learning rate is decreased increase DA weight at higher epochs
+    domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
     
     if noDA:
         classLossWeight = 1
         domainLossWeight = 0
-
+        
+    def wasserstein_loss(x,y):
+        return K.mean(x*y)
+        
+    classLossFctType = keras.losses.categorical_crossentropy
+     
+    if useWasserstein:
+        domainLossFctType = wasserstein_loss
+    else:
+        domainLossFctType = keras.losses.binary_crossentropy
+    
     print "Loss weights: ",classLossWeight,"/",domainLossWeight,"class/domain"
     print_delimiter()
     
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
-                       loss=keras.losses.categorical_crossentropy, metrics=['accuracy'],
+                       loss=classLossFctType, metrics=['accuracy'],
                        loss_weights=[1.])
                        
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
-    inputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
+    classInputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
 
-    
-    def wasserstein_loss(x,y):
-        return K.mean((2*x-1)*y)
-        
+
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
-                       loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
+                       loss=domainLossFctType, metrics=['accuracy'],
                        loss_weights=[1.])
+                       
+    domainLossFct = modelDomainDiscriminator.total_loss #includes also regularization loss
+    domainInputGradients = tf.gradients(domainLossFct,modelDomainDiscriminator.inputs)
+
 
     optFused = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelFusedDiscriminator.compile(optFused,
-                       loss=[keras.losses.categorical_crossentropy,keras.losses.binary_crossentropy], metrics=['accuracy'],
+                       loss=[classLossFctType,domainLossFctType], metrics=['accuracy'],
                        loss_weights=[classLossWeight, domainLossWeight])
                        
                        
@@ -624,7 +648,7 @@ while (epoch < num_epochs):
             l.trainable=False
     optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
-                       loss=keras.losses.binary_crossentropy, metrics=['accuracy'],
+                       loss=domainLossFctType, metrics=['accuracy'],
                        loss_weights=[1.])
  
     if epoch == 0:
@@ -675,6 +699,12 @@ while (epoch < num_epochs):
     start_time = time.time()
 
     labelsTraining = np.array([5])
+    
+    ptArray = []
+    etaArray = []
+    truthArray = []
+    if isParametric:
+        ctauArray = []
 
     try:
         step = 0
@@ -686,8 +716,6 @@ while (epoch < num_epochs):
             if train_batch_value['num'].shape[0]==0:
                 continue
                 
-            
-
             if isParametric:
                 train_inputs_class = [train_batch_value['gen'][:, 0:1],
                                 train_batch_value['globalvars'],
@@ -695,27 +723,32 @@ while (epoch < num_epochs):
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
             else:
-                train_inputs = [train_batch_value['globalvars'],
+                train_inputs_class = [train_batch_value['globalvars'],
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
                                 train_batch_value['sv']]
             
             
             if (epoch>0) and doOptimization:
-                for _ in range(5):
+                for _ in range(3):
                     feedDict = {
                         K.learning_phase(): 0,
                         modelClassDiscriminator.targets[0]:train_batch_value["truth"],
                         modelClassDiscriminator.sample_weights[0]:np.ones(train_batch_value["truth"].shape[0])
                     }
                     for i in range(len(modelClassDiscriminator.inputs)):
-                        feedDict[modelClassDiscriminator.inputs[i]] = train_inputs[i]
+                        feedDict[modelClassDiscriminator.inputs[i]] = train_inputs_class[i]
 
-                    classLossVal,inputGradientsVal = sess.run([classLossFct,inputGradients],feed_dict=feedDict)         
-                                        
-                    direction = np.abs(np.random.normal(0,1))+0.5
-                    for igrad in range(len(inputGradientsVal)):
-                        train_inputs[igrad]+=direction*inputGradientsVal[igrad]
+                    classLossVal,classInputGradientsVal = sess.run([classLossFct,classInputGradients],feed_dict=feedDict)         
+                              
+                    #move to higher loss          
+                    direction = np.fabs(np.random.normal(0,1),dtype=np.float32)+0.5
+                    if isParametric:
+                        for igrad in range(1,len(classInputGradientsVal)):
+                            train_inputs_class[igrad]+=direction*classInputGradientsVal[igrad]
+                    else:
+                        for igrad in range(len(classInputGradientsVal)):
+                            train_inputs_class[igrad]+=direction*classInputGradientsVal[igrad]
             
             if not noDA:
                 '''
@@ -731,14 +764,10 @@ while (epoch < num_epochs):
                 '''
                 train_batch_value_domain = sess.run(train_batch_da)
                 #np.random.uniform(-3,5)
-                
-                
+
                 if isParametric:
-                    #change ctau every 4 step
-                    ctau = 0.#((step/4)%3)*3-3 #random_ctau(-3,5,(26+step/4)*1301-epoch*317+(13+step/4)*7)
                     train_inputs_domain = [
-                                    #np.ones((train_batch_value_domain['num'].shape[0],1))*ctau,
-                                    np.random.randint(-3,5,(train_batch_value_domain['num'].shape[0],1)),
+                                    train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
@@ -748,32 +777,51 @@ while (epoch < num_epochs):
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
                                     train_batch_value_domain['sv']]
+                                    
+                train_da_weight=train_batch_value_domain["xsecweight"][:,0]
+                                    
+                if (epoch>0) and doOptimizationDomain:
+                    for _ in range(3):
+                        feedDict = {
+                            K.learning_phase(): 0,
+                            modelDomainDiscriminator.targets[0]:train_batch_value_domain["isData"],
+                            modelDomainDiscriminator.sample_weights[0]:train_da_weight
+                        }
+                        for i in range(len(modelDomainDiscriminator.inputs)):
+                            feedDict[modelDomainDiscriminator.inputs[i]] = train_inputs_domain[i]
+
+                        domainLossVal,domainInputGradientsVal = sess.run([domainLossFct,domainInputGradients],feed_dict=feedDict)         
+                                          
+                        #move to lower loss  
+                        direction = np.fabs(np.random.normal(0,1),dtype=np.float32)+0.5
+                        if isParametric:
+                            for igrad in range(1,len(domainInputGradientsVal)):
+                                train_inputs_domain[igrad]-=direction*domainInputGradientsVal[igrad]
+                        else:
+                            for igrad in range(len(domainInputGradientsVal)):
+                                train_inputs_domain[igrad]-=direction*domainInputGradientsVal[igrad]
+                                    
 
             if not noDA:
-
-                
-                #multiply by xsecweight
-                train_da_weight=train_batch_value_domain["xsecweight"][:,0]
-                #print train_da_weight[:10],np.sum(train_da_weight)
-                
-                if epoch==0 and step<10:
+                if epoch==0 and step<20:
                     #train first class discriminator only
                     train_outputs= modelClassDiscriminator.train_on_batch(
                         train_inputs_class, 
                         train_batch_value["truth"]
                     )
                     train_outputs_domain = [0.,0.]
-                elif (epoch==0 and (step>=10 and step<30)) or (epoch>0 and (step>=0 and step<20)):
+                elif (epoch==0 and (step>=20 and step<40)) or (epoch>0 and (step>=0 and step<20)):
                     #train domain discriminator only while keeping features frozen 
                     train_outputs_domain = modelDomainDiscriminatorFrozen.train_on_batch(
                         train_inputs_domain, 
-                        train_batch_value_domain["isData"],
+                        (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
                         sample_weight=train_da_weight
                     )
                     train_outputs = [0.,0.]
                 else:
-                    #finally train both discriminators together
+
                     
+                    '''
                     train_domain_outputs = modelClassDiscriminator.predict_on_batch(
                         train_inputs_domain
                     )
@@ -784,17 +832,27 @@ while (epoch < num_epochs):
                     predictedClass = np.argmax(train_domain_outputs,axis=1)
                     train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
                     np.nan_to_num(train_da_weight,copy=False)
+                    '''
+                    if epoch>2:
+                        #train first domain only
+                        train_outputs_domain = modelDomainDiscriminator.train_on_batch(
+                            train_inputs_domain, 
+                            (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
+                            sample_weight=train_da_weight
+                        )
                     
-                    #returns:['loss', 'prediction_loss', 'domain_loss', 'prediction_acc', 'domain_acc']
+                    #finally train both discriminators together
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                         train_inputs_class+train_inputs_domain, 
-                        [train_batch_value["truth"],train_batch_value_domain["isData"]],
+                        [
+                            train_batch_value["truth"],
+                            (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
+                        ],
                         sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]
                     )
                     train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                     train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
                         
-                    
             else:
                 
                 train_outputs = modelClassDiscriminator.train_on_batch(
@@ -804,25 +862,17 @@ while (epoch < num_epochs):
                 train_outputs_domain = [0,0]
             
             
-            
-            if step == 1:
-                ptArray = train_batch_value["globalvars"][:, 0]
-                etaArray = train_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(train_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = train_batch_value["gen"][:, 0]
 
-            else:
-                ptArray = np.hstack(
-                        (ptArray, train_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack(
-                        (etaArray, train_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack(
-                        (truthArray,
-                            np.argmax(train_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack(
-                            (ctauArray, train_batch_value["gen"][:, 0]))
+            ptArray = np.hstack(
+                    (ptArray, train_batch_value["globalvars"][:, 0]))
+            etaArray = np.hstack(
+                    (etaArray, train_batch_value["globalvars"][:, 1]))
+            truthArray = np.hstack(
+                    (truthArray,
+                        np.argmax(train_batch_value["truth"], axis=1)))
+            if isParametric:
+                ctauArray = np.hstack(
+                        (ctauArray, train_batch_value["gen"][:, 0]))
 
             nTrainBatch = train_batch_value["truth"].shape[0]
             if not noDA:
@@ -907,6 +957,12 @@ while (epoch < num_epochs):
         daHists.append([daMC,daData])
     
 
+    ptArray = []
+    etaArray = []
+    truthArray = []
+    if isParametric:
+        ctauArray = []
+
     try:
         step = 0
         while not coord.should_stop():
@@ -935,19 +991,11 @@ while (epoch < num_epochs):
             #print train_batch_value_domain["xsecweight"][:10]
                       
 
-            if step == 0:
-                ptArray = test_batch_value["globalvars"][:, 0]
-                etaArray = test_batch_value["globalvars"][:, 1]
-                truthArray = np.argmax(test_batch_value["truth"], axis=1)
-                if isParametric:
-                    ctauArray = test_batch_value["gen"][:, 0]
-
-            else:
-                ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
-                etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
-                truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
-                if isParametric:
-                    ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
+            ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
+            etaArray = np.hstack((etaArray, test_batch_value["globalvars"][:, 1]))
+            truthArray = np.hstack((truthArray, np.argmax(test_batch_value["truth"], axis=1)))
+            if isParametric:
+                ctauArray = np.hstack((ctauArray, test_batch_value["gen"][:, 0]))
 
             
             nTestBatch = test_batch_value["truth"].shape[0]
@@ -985,7 +1033,6 @@ while (epoch < num_epochs):
             if test_batch_value_domain['num'].shape[0]==0:
                 continue
 
-            
             if isParametric:
                 #ctau = 0.#np.random.randint(-3, 5)
                 test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
@@ -1000,7 +1047,8 @@ while (epoch < num_epochs):
                                 test_batch_value_domain['sv']]
 
             test_outputs_domain = modelDomainDiscriminator.test_on_batch(
-                    test_inputs_domain,test_batch_value_domain["isData"],
+                    test_inputs_domain,
+                    (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
                     sample_weight=test_batch_value_domain["xsecweight"][:,0]
             )
             test_daprediction_class = modelClassDiscriminator.predict_on_batch(
@@ -1069,32 +1117,35 @@ while (epoch < num_epochs):
         cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
         cv.GetPad(1).SetLogy(1)
         cv.cd(1)
-        daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
         
-        eventsAboveWp = {
-            50: [0.,0.],
-            80: [0.,0.],
-            95: [0.,0.],
-        }
-        sumMC = 0.
-        for ibin in range(daHists[idis][0].GetNbinsX()):
-            cMC = daHists[idis][0].GetBinContent(ibin+1)
-            sumMC += cMC
-            cData = daHists[idis][1].GetBinContent(ibin+1)
-            for wp in eventsAboveWp.keys():
-                if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
-                    eventsAboveWp[wp][0]+=cMC
-                    eventsAboveWp[wp][1]+=cData
         statictics = ""
-        for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
-            statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
-                wp,
-                100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
-            )
-            if iwp<(len(eventsAboveWp.keys())-1):
-                statictics+=","
-            statictics+="  "
+        if daHists[idis][0].Integral()>0.:
+            daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
         
+            eventsAboveWp = {
+                50: [0.,0.],
+                80: [0.,0.],
+                95: [0.,0.],
+            }
+            sumMC = 0.
+            for ibin in range(daHists[idis][0].GetNbinsX()):
+                cMC = daHists[idis][0].GetBinContent(ibin+1)
+                sumMC += cMC
+                cData = daHists[idis][1].GetBinContent(ibin+1)
+                for wp in eventsAboveWp.keys():
+                    if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
+                        eventsAboveWp[wp][0]+=cMC
+                        eventsAboveWp[wp][1]+=cData
+            
+            for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
+                statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
+                    wp,
+                    100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
+                )
+                if iwp<(len(eventsAboveWp.keys())-1):
+                    statictics+=","
+                statictics+="  "
+            
         
         daHists[idis][0].Rebin(200)
         daHists[idis][1].Rebin(200)
@@ -1156,3 +1207,4 @@ while (epoch < num_epochs):
     coord.join(threads)
     K.clear_session()
     epoch += 1
+    

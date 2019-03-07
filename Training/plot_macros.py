@@ -144,7 +144,7 @@ def makePlot(outputFolder, histDict, branchNameList, binning, title, output,
 
     cv.Update()
     cv.Print(os.path.join(outputFolder,output+".pdf"))
-    cv.Print(os.path.join(outputFolder,output+".svg"))
+    cv.Print(os.path.join(outputFolder,output+".png"))
     cv.Print(os.path.join(outputFolder,output+".root"))
 
 # Get ROC curve for given signal and background distributions
@@ -186,7 +186,7 @@ def getAUC(sigEff, bgRej):
     return math.fabs(integral)
 
 # fn for plotting arrays produced when training
-def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array, pt_lower=None, pt_upper=None):
+def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array):
 
         var_0 = var_array[truth_array == 0]
         var_1 = var_array[truth_array == 1]
@@ -200,18 +200,16 @@ def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array,
         plt.legend(loc='upper right')
         plt.xlabel(xlabel)
         plt.ylabel("# entries/ bin")
-        if pt_lower and pt_upper:
-            plt.savefig(os.path.join(outputFolder, pt_lower+"_"+pt_upper+"_"+x+".svg"))
-            plt.savefig(os.path.join(outputFolder, pt_lower+"_"+pt_upper+"_"+x+".pdf"))
-        else:
-            plt.savefig(os.path.join(outputFolder, x+".svg"))
-            plt.savefig(os.path.join(outputFolder, x+".pdf"))
+        plt.savefig(os.path.join(outputFolder, x+".pdf"))
+        plt.savefig(os.path.join(outputFolder, x+".png"))
         plt.close(fig)
 
-def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower=None, pt_upper=None):
+def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, mode="root", cut_text=None):
     set_root_style()
 
     epoch_path = os.path.join(outputFolder, "epoch_" + str(epoch))
+
+        
     if not os.path.exists(epoch_path):
         os.makedirs(epoch_path)
 
@@ -223,6 +221,16 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower
         "LLP jet"
     ]
     
+    if mode=="tf":
+
+        names = [
+            "b jet", 
+            "g jet",
+            "c jet",
+            "uds jet",
+            "LLP jet"
+            ]
+    print names
     M_score = 0
     dimension = len(featureDict["truth"]["branches"])
     all_aucs = np.zeros([dimension,dimension])
@@ -274,7 +282,7 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower
             rocs.append(graph)
             name.append(names[prob_label])
 
-        cv = ROOT.TCanvas("cv_roc"+str(epoch)+str(truth_label)+pt_lower+pt_upper,"",800,600)
+        cv = ROOT.TCanvas("cv_roc"+str(epoch)+str(truth_label),"",800,600)
         cv.SetBottomMargin(0.18)
         cv.SetLeftMargin(0.16)
         cv.SetLogy(1)
@@ -312,22 +320,26 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower
         pCMS.AddText("CMS Simulation")
         pCMS.Draw("Same")
 
-        if pt_lower and pt_upper:
-            pPT=ROOT.TPaveText(cv.GetLeftMargin()+0.3,0.94,cv.GetLeftMargin()+0.3,0.94,"NDC")
-            pPT.SetFillColor(ROOT.kWhite)
-            pPT.SetBorderSize(0)
-            pPT.SetTextFont(53)
-            pPT.SetTextSize(24*cvscale*fontScale)
-            pPT.SetTextAlign(11)
-            pPT.AddText("p_{T} #in ["+pt_lower+", "+pt_upper+"] GeV")
-            pPT.Draw("Same")
+        pPT=ROOT.TPaveText(cv.GetLeftMargin()+0.3,0.94,cv.GetLeftMargin()+0.3,0.94,"NDC")
+        pPT.SetFillColor(ROOT.kWhite)
+        pPT.SetBorderSize(0)
+        pPT.SetTextFont(53)
+        pPT.SetTextSize(24*cvscale*fontScale)
+        pPT.SetTextAlign(11)
+        pPT.AddText(cut_text)
+        pPT.Draw("Same")
 
-        output_path = os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper)
+        output_path = os.path.join(outputFolder, "epoch_"+str(epoch))
+        
+        if cut_text is not None:
+            output_path += "/"+cut_text+"/"
+            
+        print "Output path is", output_path
   
         if not os.path.exists(output_path):
            os.makedirs(output_path)
         cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".pdf"))
-        cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".svg"))
+        cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".png"))
         cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".root"))
 
         for prob_label in range(truth_label):
@@ -378,9 +390,9 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower
 
         pPT.Draw("Same")
 
-        cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper,disName+".pdf"))
-        cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper,disName+".svg"))
-        cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper,disName+".root"))
+        cv.Print(os.path.join(output_path,  disName+".pdf"))
+        cv.Print(os.path.join(output_path,  disName+".png"))
+        cv.Print(os.path.join(output_path,  disName+".root"))
         
     conf_matrix = confusion_matrix(
         y_true=np.array(truths,dtype=int), 
@@ -418,12 +430,12 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, pt_lower
     cv.SetLeftMargin(0.25)
     hist_conf.Draw("colztext")
     
-    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper, "confusion.pdf"))
-    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), pt_lower+"_"+pt_upper, "confusion.svg"))
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.pdf"))
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.root"))
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.png"))
 
     #rootOutput.Write()
     #rootOutput.Close()
 
     return M_score
-
 

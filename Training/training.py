@@ -8,6 +8,7 @@ import imp
 import argparse
 import datetime
 import numpy as np
+import array
 
 import tensorflow as tf
 import ROOT
@@ -556,6 +557,7 @@ while (epoch < num_epochs):
     etaArrays = {}
     ctauArrays = {}
 
+
     for pt_bin in pt_bins:
 
         pt_lower = pt_bin[0]
@@ -674,7 +676,15 @@ while (epoch < num_epochs):
                 plot_resampled(outputFolder, "test_ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truth, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
 
         M_score = make_plots(outputFolder, epoch, hists[pt_lower], truths[pt_lower], scores[pt_lower], featureDict, pt_lower=str(pt_lower), pt_upper=str(pt_upper))
+    
+    truth = array.array('i', truths[30] )
+    f = ROOT.TFile( 'test.root', 'recreate' )
+    test_tree = ROOT.TTree("test_tree", "test tree")
+    test_tree.Branch('truth', truth, 'truth/F')
+    test_tree.Fill()
 
+    f.Write()
+    f.Close()
 
     print "Epoch duration = (%.1f min)" % ((time.time() - epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%" % (nTrain, nTest, 100. * nTest/(nTrain+nTest))

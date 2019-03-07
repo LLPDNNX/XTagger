@@ -74,6 +74,8 @@ REGISTER_OP("RootReader")
 #include <chrono>
 #include <thread>
 
+
+
 class RootReaderOp:
     public OpKernel
 {
@@ -154,7 +156,9 @@ class RootReaderOp:
                     unsigned int leafSize = formula_->GetNdata(); //needs to be called; otherwise elements >0 are set to 0
                     for (unsigned int i = 0; i < std::min<unsigned int>(leafSize,size_); ++i)
                     {
-                        flatTensor(index+i)=Base::resetNanOrInf(formula_->EvalInstance(i),reset);
+                        //std::cout<<TensorFiller<OUT>::expr()<<std::endl;
+                        double result = formula_->EvalInstance(i);
+                        flatTensor(index+i)=Base::resetNanOrInf(result,reset);
                     }
                     for (unsigned int i = std::min(leafSize,size_); i < size_; ++i)
                     {
@@ -187,7 +191,7 @@ class RootReaderOp:
             nBatch_(1),
             nEvents_(0)
         {
-        
+            //gROOT->gErrorIgenoreLevel = 5000;
             RootMutex::Lock lock = RootMutex::lock();
             
             std::vector<string> branchNames;
@@ -280,7 +284,15 @@ class RootReaderOp:
                 //creating TFile/setting branch adresses is not thread safe
                 RootMutex::Lock lock = RootMutex::lock();
                 //TODO: use TF logging and set loglevel
-                inputFile_.reset(new TFile(fileName.c_str()));
+                //std::cout<<"opening file "<<fileName<<std::endl;
+                TFile* f = TFile::Open(fileName.c_str());
+                if (not (f and f->IsOpen()))
+                {
+                    throw std::runtime_error("Cannot read file '"+fileName+"'");
+                }
+                //std::cout<<"-> sucessfully open file "<<fileName<<std::endl;
+                inputFile_.reset(f);
+                
                 currentEntry_ = 0;
                 tree_ = dynamic_cast<TTree*>(inputFile_->Get(treename_.c_str()));
                 if (not tree_)
@@ -363,6 +375,8 @@ class RootReaderOp:
             return work;
         }   
 };
+
+//mutex RootReaderOp::localMutex_;
 
 
 REGISTER_KERNEL_BUILDER(Name("RootReader").Device(DEVICE_CPU),RootReaderOp);

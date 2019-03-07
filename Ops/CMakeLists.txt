@@ -23,6 +23,7 @@ message(STATUS "Module name: ${MODULENAME}")
 set(SITEPACKDIR ${CMAKE_INSTALL_PREFIX}/lib/python${PYTHON_VERSION_MAJOR}.${PYTHON_VERSION_MINOR}/site-packages/${MODULENAME})
 message(STATUS "Install dir: ${SITEPACKDIR}")
 
+add_definitions(${ROOT_DEFINITIONS})
 add_definitions(-D_GLIBCXX_USE_CXX11_ABI=0 -std=c++11)
 
 include_directories(${TensorFlow_INCLUDE_DIRS} ${ROOT_INCLUDE_DIR})
@@ -33,12 +34,13 @@ add_library(RootReader
 target_link_libraries(RootReader ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES} -lTreePlayer)
 install(TARGETS RootReader LIBRARY DESTINATION ${SITEPACKDIR})
 
-add_library(RootWriter
-    MODULE
-    RootWriter.cc
-)
-target_link_libraries(RootWriter ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
-install(TARGETS RootWriter LIBRARY DESTINATION ${SITEPACKDIR})
+#add_library(RootWriter
+    #MODULE
+    #RootWriter.cc
+    #)
+#target_link_libraries(RootWriter ${TensorFlow_LIBRARY} ${ROOT_LIBRARIES})
+#install(TARGETS RootWriter LIBRARY DESTINATION ${SITEPACKDIR})
+
 
 add_library(ClassificationWeights
     MODULE
@@ -65,7 +67,7 @@ install(TARGETS Resampler LIBRARY DESTINATION ${SITEPACKDIR})
 set(pythonfiles
     __init__.py
     root_reader.py
-    root_writer.py
+    #root_writer.py
     resampler.py
     fake_background.py
     classification_weights.py

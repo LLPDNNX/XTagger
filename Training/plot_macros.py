@@ -122,6 +122,7 @@ def makePlot(outputFolder, histDict, branchNameList, binning, title, output,
     cv.SetLogx(logx)
     cv.SetLogy(logy)
     cv.SetRightMargin(0.36)
+    cv.Draw()
 
     ymax = max(map(lambda h: h.GetMaximum(),histDict.values()))
     axis = ROOT.TH2F("axis", title, 50, binning[0], binning[-1], 50, 0, ymax*1.1)
@@ -143,6 +144,7 @@ def makePlot(outputFolder, histDict, branchNameList, binning, title, output,
 
     cv.Update()
     cv.Print(os.path.join(outputFolder,output+".pdf"))
+    cv.Print(os.path.join(outputFolder,output+".png"))
     cv.Print(os.path.join(outputFolder,output+".root"))
 
 # Get ROC curve for given signal and background distributions
@@ -183,94 +185,6 @@ def getAUC(sigEff, bgRej):
         integral +=w * math.fabs(h - (1-x))
     return math.fabs(integral)
 
-def drawROC(name,sigEff,bgEff,signalName="Signal",backgroundName="Background",auc=None,style=1):
-
-    cv = ROOT.TCanvas("cv_roc"+str(random.random()),"",800,600)
-    cv.SetPad(0.0, 0.0, 1.0, 1.0)
-    cv.SetFillStyle(4000)
-
-    cv.SetBorderMode(0)
-    #cv.SetGridx(True)
-    #cv.SetGridy(True)
-
-    #For the frame:
-    cv.SetFrameBorderMode(0)
-    cv.SetFrameBorderSize(1)
-    cv.SetFrameFillColor(0)
-    cv.SetFrameFillStyle(0)
-    cv.SetFrameLineColor(1)
-    cv.SetFrameLineStyle(1)
-    cv.SetFrameLineWidth(1)
-
-    # Margins:
-    cv.SetLeftMargin(0.163)
-    cv.SetRightMargin(0.03)
-    cv.SetTopMargin(0.08)
-    cv.SetBottomMargin(0.175)
-
-    # For the Global title:
-    cv.SetTitle("")
-
-    # For the axis:
-    cv.SetTickx(1)  # To get tick marks on the opposite side of the frame
-    cv.SetTicky(1)
-
-    cv.SetLogy(1)
-
-    axis=ROOT.TH2F("axis" + str(random.random()),";" + signalName + " efficiency;" + backgroundName + " efficiency", 50, 0, 1.0, 50, 0.0008, 1.0)
-    axis.GetYaxis().SetNdivisions(508)
-    axis.GetXaxis().SetNdivisions(508)
-    axis.GetXaxis().SetTickLength(0.015/(1-cv.GetLeftMargin()-cv.GetRightMargin()))
-    axis.GetYaxis().SetTickLength(0.015/(1-cv.GetTopMargin()-cv.GetBottomMargin()))
-    #axis.GetYaxis().SetNoExponent(True)
-    axis.Draw("AXIS")
-
-    #### draw here
-    graphF = ROOT.TGraph(len(sigEff),np.array(sigEff),np.array(bgEff))
-    graphF.SetLineWidth(0)
-    graphF.SetFillColor(ROOT.kOrange+10)
-    #graphF.Draw("SameF")
-
-    graphL = ROOT.TGraph(len(sigEff),np.array(sigEff),np.array(bgEff))
-    graphL.SetLineColor(ROOT.kOrange+7)
-    graphL.SetLineWidth(3)
-    graphL.SetLineStyle(style)
-    graphL.Draw("SameL")
-
-    ROOT.gPad.RedrawAxis()
-
-    pCMS=ROOT.TPaveText(cv.GetLeftMargin(),0.94,cv.GetLeftMargin(),0.94,"NDC")
-    pCMS.SetFillColor(ROOT.kWhite)
-    pCMS.SetBorderSize(0)
-    pCMS.SetTextFont(63)
-    pCMS.SetTextSize(30*cvscale*fontScale)
-    pCMS.SetTextAlign(11)
-    pCMS.AddText("CMS")
-    pCMS.Draw("Same")
-
-    pPreliminary=ROOT.TPaveText(cv.GetLeftMargin()+0.095,0.94,cv.GetLeftMargin()+0.095,0.94,"NDC")
-    pPreliminary.SetFillColor(ROOT.kWhite)
-    pPreliminary.SetBorderSize(0)
-    pPreliminary.SetTextFont(53)
-    pPreliminary.SetTextSize(30*cvscale*fontScale)
-    pPreliminary.SetTextAlign(11)
-    pPreliminary.AddText("Simulation")
-    pPreliminary.Draw("Same")
-
-    if auc:
-        pAUC=ROOT.TPaveText(1-cv.GetRightMargin(),0.94,1-cv.GetRightMargin(),0.94,"NDC")
-        pAUC.SetFillColor(ROOT.kWhite)
-        pAUC.SetBorderSize(0)
-        pAUC.SetTextFont(43)
-        pAUC.SetTextSize(32*cvscale*fontScale)
-        pAUC.SetTextAlign(31)
-        pAUC.AddText("AUC: % 4.1f %%" % (auc*100.0))
-        pAUC.Draw("Same")
-
-    cv.Update()
-    cv.Print(name+".pdf")
-    cv.Print(name+".root")
-
 # fn for plotting arrays produced when training
 def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array):
 
@@ -286,13 +200,16 @@ def plot_resampled(outputFolder, x, xlabel, var_array, var_binning, truth_array)
         plt.legend(loc='upper right')
         plt.xlabel(xlabel)
         plt.ylabel("# entries/ bin")
-        plt.savefig(os.path.join(outputFolder, "reweighted_"+x+".pdf"))
+        plt.savefig(os.path.join(outputFolder, x+".pdf"))
+        plt.savefig(os.path.join(outputFolder, x+".png"))
         plt.close(fig)
 
-def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
+def make_plots(outputFolder, epoch, hists, truths, scores, featureDict, mode="root", cut_text=None):
     set_root_style()
 
     epoch_path = os.path.join(outputFolder, "epoch_" + str(epoch))
+
+        
     if not os.path.exists(epoch_path):
         os.makedirs(epoch_path)
 
@@ -304,6 +221,16 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         "LLP jet"
     ]
     
+    if mode=="tf":
+
+        names = [
+            "b jet", 
+            "g jet",
+            "c jet",
+            "uds jet",
+            "LLP jet"
+            ]
+    print names
     M_score = 0
     dimension = len(featureDict["truth"]["branches"])
     all_aucs = np.zeros([dimension,dimension])
@@ -343,14 +270,10 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             tight_line_y.SetLineWidth(2)
             tight_lines_y.append(tight_line_y)
      
-            #print sig_loose, bg_loose
-            #print sig_medium, bg_medium
-            #print sig_tight, bg_tight
-
             auc2 = np.trapz(sigEff,bgEff)
             all_aucs[prob_label,truth_label] = auc2
             aucs.append(auc2)
-            print "truth: (signal) ", names[truth_label], "prob: (background) ", names[prob_label], "auc: ", auc , "auc2: ", auc2
+            #print "truth: (signal) ", names[truth_label], "prob: (background) ", names[prob_label], "auc: ", auc , "auc2: ", auc2
             
             graph = ROOT.TGraph(len(sigEff), sigEff, bgEff)
             graph.SetLineWidth(3)
@@ -359,11 +282,14 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             rocs.append(graph)
             name.append(names[prob_label])
 
-        cv = ROOT.TCanvas("cv_roc"+str(prob_label),"",800,600)
-        cv.SetRightMargin(0.25)
+        cv = ROOT.TCanvas("cv_roc"+str(epoch)+str(truth_label),"",800,600)
         cv.SetBottomMargin(0.18)
         cv.SetLeftMargin(0.16)
         cv.SetLogy(1)
+        cv.SetRightMargin(0.25)
+
+        cv.Draw()
+
         axis=ROOT.TH2F("axis"+str(random.random()),";"+names[truth_label]+" efficiency;Background efficiency",50,0,1.0,50,0.00008,1.0)
         axis.GetYaxis().SetNdivisions(508)
         axis.GetXaxis().SetNdivisions(508)
@@ -385,12 +311,40 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             legend.AddEntry("","tight WP eff: %.1f%%"%(tight_wps_sig[prob_label]*100.),"")
         legend.Draw("Same")
         
-        cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "roc_"+names[truth_label]+".pdf"))
-        cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "roc_"+names[truth_label]+".root"))
+        pCMS=ROOT.TPaveText(cv.GetLeftMargin(),0.94,cv.GetLeftMargin(),0.94,"NDC")
+        pCMS.SetFillColor(ROOT.kWhite)
+        pCMS.SetBorderSize(0)
+        pCMS.SetTextFont(63)
+        pCMS.SetTextSize(26*cvscale*fontScale)
+        pCMS.SetTextAlign(11)
+        pCMS.AddText("CMS Simulation")
+        pCMS.Draw("Same")
+
+        pPT=ROOT.TPaveText(cv.GetLeftMargin()+0.3,0.94,cv.GetLeftMargin()+0.3,0.94,"NDC")
+        pPT.SetFillColor(ROOT.kWhite)
+        pPT.SetBorderSize(0)
+        pPT.SetTextFont(53)
+        pPT.SetTextSize(24*cvscale*fontScale)
+        pPT.SetTextAlign(11)
+        pPT.AddText(cut_text)
+        pPT.Draw("Same")
+
+        output_path = os.path.join(outputFolder, "epoch_"+str(epoch))
+        
+        if cut_text is not None:
+            output_path += "/"+cut_text+"/"
+            
+        print "Output path is", output_path
+  
+        if not os.path.exists(output_path):
+           os.makedirs(output_path)
+        cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".pdf"))
+        cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".png"))
+        cv.Print(os.path.join(output_path,"roc_"+names[truth_label]+".root"))
 
         for prob_label in range(truth_label):
             average_auc = .5*(all_aucs[prob_label,truth_label] + all_aucs[truth_label, prob_label])
-            print "average auc between ", names[truth_label]," and ", names[prob_label]," is: ", average_auc
+            #print "average auc between ", names[truth_label]," and ", names[prob_label]," is: ", average_auc
             M_score += average_auc
             
     M_score = 2.*M_score/((dimension)*(dimension-1)) 
@@ -398,20 +352,20 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
     print "The M score is: ", M_score
     print "-"*100
     
-    rootOutput = ROOT.TFile(os.path.join(outputFolder, "epoch_"+str(epoch),"report.root"),"RECREATE")
+    #rootOutput = ROOT.TFile(os.path.join(outputFolder, "epoch_"+str(epoch),"report.root"),"RECREATE")
     
     for idis in range(dimension):
-        cv = ROOT.TCanvas("cv"+str(idis),"",800,600)
+        cv = ROOT.TCanvas("cv"+str(idis)+str(epoch),"",800,600)
         cv.SetRightMargin(0.25)
         cv.SetBottomMargin(0.18)
         cv.SetLeftMargin(0.16)
-        
+        cv.Draw()
         ymax = 0.
         ymin = 1000
         for h in hists[idis]:
             h.Rebin(200)
             if h.Integral()>0:
-                h.SetDirectory(rootOutput)
+                #h.SetDirectory(rootOutput)
                 h.Scale(1./h.Integral())
                 ymax = max(ymax,h.GetMaximum())
                 ymin = max(10**-5.5,min(ymin,h.GetMinimum()))
@@ -423,16 +377,22 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         legend.SetBorderSize(0)
         legend.SetTextFont(42)
         legend.SetFillStyle(0)
-        
+
         for iprob in range(dimension):
             hists[idis][iprob].SetLineColor(int(colWheelDark+250.*iprob/(len(featureDict["truth"]["branches"])-1)))
             hists[idis][iprob].SetLineWidth(3)
             hists[idis][iprob].SetLineStyle(1+iprob%2)
             hists[idis][iprob].Draw("HISTSame")
-            legend.AddEntry(hists[idis][iprob],names[iprob],"L")
+            legend.AddEntry(hists[idis][iprob],names[iprob],"L")        
         legend.Draw("Same")
-        cv.Print(os.path.join(outputFolder,"epoch_"+str(epoch),disName+".pdf"))
-        cv.Print(os.path.join(outputFolder,"epoch_"+str(epoch),disName+".root"))
+
+        pCMS.Draw("Same")
+
+        pPT.Draw("Same")
+
+        cv.Print(os.path.join(output_path,  disName+".pdf"))
+        cv.Print(os.path.join(output_path,  disName+".png"))
+        cv.Print(os.path.join(output_path,  disName+".root"))
         
     conf_matrix = confusion_matrix(
         y_true=np.array(truths,dtype=int), 
@@ -446,14 +406,15 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         for ipred in range(len(featureDict["truth"]["branches"])):
             total += conf_matrix[itruth][ipred]
         for ipred in range(len(featureDict["truth"]["branches"])):
-            conf_matrix_norm[itruth][ipred] = 1.*conf_matrix[itruth][ipred]/total
-      
+            if total != 0:
+                conf_matrix_norm[itruth][ipred] = 1.*conf_matrix[itruth][ipred]/total
+
     hist_conf = ROOT.TH2F("conf_hist","",
-        len(featureDict["truth"]["branches"]),0,len(featureDict["truth"]["branches"]),
-        len(featureDict["truth"]["branches"]),0,len(featureDict["truth"]["branches"])
+       len(featureDict["truth"]["branches"]),0,len(featureDict["truth"]["branches"]),
+       len(featureDict["truth"]["branches"]),0,len(featureDict["truth"]["branches"])
     )
 
-    hist_conf.SetDirectory(rootOutput)
+    #hist_conf.SetDirectory(rootOutput)
     for itruth in range(len(featureDict["truth"]["branches"])):
         hist_conf.GetYaxis().SetBinLabel(itruth+1,"Pred. "+names[itruth])
         hist_conf.GetXaxis().SetBinLabel(itruth+1,"True "+names[itruth])
@@ -463,15 +424,18 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
     hist_conf.GetXaxis().SetLabelOffset(0.02)
     hist_conf.GetZaxis().SetTitleOffset(1.25)
     hist_conf.SetMarkerSize(1.8)
-    cv = ROOT.TCanvas("conf","",900,700)
+    cv = ROOT.TCanvas("conf"+str(epoch),"",900,700)
     cv.SetRightMargin(0.22)
     cv.SetBottomMargin(0.18)
     cv.SetLeftMargin(0.25)
     hist_conf.Draw("colztext")
-    cv.Print(os.path.join(outputFolder,"epoch_"+str(epoch),"confusion.pdf"))
-    rootOutput.Write()
-    rootOutput.Close()
+    
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.pdf"))
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.root"))
+    cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "confusion.png"))
+
+    #rootOutput.Write()
+    #rootOutput.Close()
 
     return M_score
-
 

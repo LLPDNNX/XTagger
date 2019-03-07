@@ -108,6 +108,13 @@ IF (ROOT_FOUND)
     OUTPUT_VARIABLE root_headers )
   SET(ROOT_INCLUDE_DIR ${root_headers})
       # CACHE INTERNAL "")
+      
+  # ask root-config for extra flags
+  EXEC_PROGRAM( ${ROOT_CONFIG_EXECUTABLE}
+    ARGS "--cflags" 
+    OUTPUT_VARIABLE root_cflags )
+  SET(ROOT_DEFINITIONS ${root_cflags})
+      # CACHE INTERNAL "")
 
   # ask root-config for the library varaibles
   EXEC_PROGRAM( ${ROOT_CONFIG_EXECUTABLE}

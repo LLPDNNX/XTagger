@@ -1,14 +1,18 @@
 #ifndef ROOT_TF_ROOTMUTEX_H
 #define ROOT_TF_ROOTMUTEX_H
 
+#include "TError.h"
+
 #include <mutex>
 
 class RootMutex
 {
     private:
         std::mutex _rmutex;
+        
         RootMutex()
         {
+            gErrorIgnoreLevel = 50000;
         }
         
     public:
@@ -21,6 +25,7 @@ class RootMutex
                     _lockmutex(m)
                 { 
                     _lockmutex.lock();  
+                    //std::cout<<"lock aquired"<<std::endl;
                 }
                 
             public:
@@ -36,6 +41,7 @@ class RootMutex
                 
                 ~Lock()
                 {
+                    //std::cout<<"lock released"<<std::endl;
                     _lockmutex.unlock();
                 }
         };

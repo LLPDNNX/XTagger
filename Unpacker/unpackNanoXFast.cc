@@ -71,8 +71,10 @@ class UnpackedTree
         float cpf_ptrel[maxEntries];
         float cpf_drminsv[maxEntries];
         float cpf_vertex_association[maxEntries];
+	float cpf_fromPV[maxEntries];
         float cpf_puppi_weight[maxEntries];
         float cpf_track_chi2[maxEntries];
+	float cpf_track_ndof[maxEntries];
         float cpf_track_quality[maxEntries];
         float cpf_jetmassdroprel[maxEntries];
         float cpf_relIso01[maxEntries];
@@ -103,14 +105,19 @@ class UnpackedTree
         float sv_deltaR[maxEntries];
         float sv_ntracks[maxEntries];
         float sv_chi2[maxEntries];
-        float sv_normchi2[maxEntries];
+        float sv_ndof[maxEntries];
         float sv_dxy[maxEntries];
         float sv_dxysig[maxEntries];
         float sv_d3d[maxEntries];
         float sv_d3dsig[maxEntries];
         float sv_costhetasvpv[maxEntries];
         float sv_enratio[maxEntries];
-        
+	
+	unsigned int nlegacyTag;
+	float legacyTag_median_dxy;
+	float legacyTag_median_trackSip2dSig;
+        float legacyTag_alpha;
+	
     public:
         UnpackedTree(const std::string& fileName, bool addTruth=true):
             addTruth_(addTruth),
@@ -170,8 +177,10 @@ class UnpackedTree
             tree_->Branch("cpf_ptrel",&cpf_ptrel,"cpf_ptrel[ncpf]/F",bufferSize);
             tree_->Branch("cpf_drminsv",&cpf_drminsv,"cpf_drminsv[ncpf]/F",bufferSize);
             tree_->Branch("cpf_vertex_association",&cpf_vertex_association,"cpf_vertex_association[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_fromPV",&cpf_fromPV,"cpf_fromPV[ncpf]/F",bufferSize);
             tree_->Branch("cpf_puppi_weight",&cpf_puppi_weight,"cpf_puppi_weight[ncpf]/F",bufferSize);
             tree_->Branch("cpf_track_chi2",&cpf_track_chi2,"cpf_track_chi2[ncpf]/F",bufferSize);
+	    tree_->Branch("cpf_track_ndof",&cpf_track_ndof,"cpf_track_ndof[ncpf]/F",bufferSize);
             tree_->Branch("cpf_track_quality",&cpf_track_quality,"cpf_track_quality[ncpf]/F",bufferSize);
             tree_->Branch("cpf_jetmassdroprel",&cpf_jetmassdroprel,"cpf_jetmassdroprel[ncpf]/F",bufferSize);
             tree_->Branch("cpf_relIso01",&cpf_relIso01,"cpf_relIso01[ncpf]/F",bufferSize);
@@ -202,13 +211,18 @@ class UnpackedTree
             tree_->Branch("sv_deltaR",&sv_deltaR,"sv_deltaR[nsv]/F",bufferSize);
             tree_->Branch("sv_ntracks",&sv_ntracks,"sv_ntracks[nsv]/F",bufferSize);
             tree_->Branch("sv_chi2",&sv_chi2,"sv_chi2[nsv]/F",bufferSize);
-            tree_->Branch("sv_normchi2",&sv_normchi2,"sv_normchi2[nsv]/F",bufferSize);
+            tree_->Branch("sv_ndof",&sv_ndof,"sv_ndof[nsv]/F",bufferSize);
             tree_->Branch("sv_dxy",&sv_dxy,"sv_dxy[nsv]/F",bufferSize);
             tree_->Branch("sv_dxysig",&sv_dxysig,"sv_dxysig[nsv]/F",bufferSize);
             tree_->Branch("sv_d3d",&sv_d3d,"sv_d3d[nsv]/F",bufferSize);
             tree_->Branch("sv_d3dsig",&sv_d3dsig,"sv_d3dsig[nsv]/F",bufferSize);
             tree_->Branch("sv_costhetasvpv",&sv_costhetasvpv,"sv_costhetasvpv[nsv]/F",bufferSize);
             tree_->Branch("sv_enratio",&sv_enratio,"sv_enratio[nsv]/F",bufferSize);
+		    
+	    tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy[nlegacyTag]/F",bufferSize);
+	    tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig[nlegacyTag]/F",bufferSize);
+	    tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha[nlegacyTag]/F",bufferSize);
+
         
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
@@ -510,6 +524,11 @@ class NanoXTree
             tree_->SetBranchAddress("sv_d3dsig",&sv_d3dsig);
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
+		  
+	    tree_->SetBranchAddress("nlegacyTag",&nlegacyTag);
+	    tree_->SetBranchAddress("legacyTag_median_dxy",&legacyTag_median_dxy);
+	    tree_->SetBranchAddress("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig);
+	    tree_->SetBranchAddress("legacyTag_alpha",&legacyTag_alpha);
             
             //getEvent(0,true);
 
@@ -855,7 +874,14 @@ class NanoXTree
             unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
             unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
             unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
-        
+		
+	    unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
+            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
+            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
+		
+	    unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet]
+	    unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet]
+	    unpackedTree.legacyTag_alpha = legacyTag_alpha[jet]
         
             int npf_offset = 0;
             for (size_t i = 0; i < jet; ++i)

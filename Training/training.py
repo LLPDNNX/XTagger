@@ -772,11 +772,12 @@ while (epoch < num_epochs):
                     train_batch_value_domain[k] = train_batch_value_domain_1[k]+iterda*(train_batch_value_domain_2[k]-train_batch_value_domain_1[k])
                 '''
                 train_batch_value_domain = sess.run(train_batch_da)
-                #np.random.uniform(-3,5)
+                ctau = np.random.uniform(-2,5,size=(train_batch_value_domain.shape[0],1))
 
                 if isParametric:
                     train_inputs_domain = [
-                                    train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
+                                    ctau,
+                                    #train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],

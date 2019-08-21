@@ -9,7 +9,7 @@ dependencies:
  - Keras==2.1.5
  - scipy==1.0.0
  - scikit-learn==0.20.0
- - matplotlib==2.1.2
+ - matplotlib
  - pydot==1.2.4
  - tensorflow-gpu==1.6.0
  - gpustat==0.4.1

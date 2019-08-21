@@ -64,6 +64,8 @@ function run_setup()
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
     source activate tf_cpu &>> $LOGFILE || return 1
     
+    conda list
+    
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
     echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh

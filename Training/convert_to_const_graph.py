@@ -46,8 +46,12 @@ print "sv shape: ",sv.shape.as_list()
 print "globalvars shape: ",globalvars.shape.as_list()
 if arguments.parametric:
     print "gen shape: ",gen.shape.as_list()
-    
+
 modelDA = nominal_model.ModelDA(
+    globalvars,
+    cpf,
+    npf,
+    sv,
     len(featureDict["truth"]["branches"]),
     isParametric=arguments.parametric,
     useLSTM=False
@@ -56,10 +60,13 @@ modelDA = nominal_model.ModelDA(
 
 print "learning phase: ",sess.run(keras.backend.learning_phase())
 
-class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen)
+if arguments.parametric:
+    class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen=gen)
+else:
+    class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv)
+    
 prediction = tf.identity(class_prediction,name="prediction")
 
-#prediction = tf.identity(full_prediction,name="prediction")
 
 if arguments.parametric:
     model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv], outputs=class_prediction)
@@ -89,8 +96,9 @@ feed_dict={
 if arguments.parametric:
     feed_dict[tf_gen] = numpy.zeros(shape(tf_gen))
 
-full_prediction_val = sess.run(
-    class_prediction,
+
+prediction_val = sess.run(
+    prediction,
     feed_dict=feed_dict
 )
 

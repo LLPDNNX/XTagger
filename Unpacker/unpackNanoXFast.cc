@@ -71,10 +71,10 @@ class UnpackedTree
         float cpf_ptrel[maxEntries];
         float cpf_drminsv[maxEntries];
         float cpf_vertex_association[maxEntries];
-	float cpf_fromPV[maxEntries];
+        float cpf_fromPV[maxEntries];
         float cpf_puppi_weight[maxEntries];
         float cpf_track_chi2[maxEntries];
-	float cpf_track_ndof[maxEntries];
+        float cpf_track_ndof[maxEntries];
         float cpf_track_quality[maxEntries];
         float cpf_jetmassdroprel[maxEntries];
         float cpf_relIso01[maxEntries];
@@ -113,9 +113,9 @@ class UnpackedTree
         float sv_costhetasvpv[maxEntries];
         float sv_enratio[maxEntries];
 	
-	unsigned int nlegacyTag;
-	float legacyTag_median_dxy;
-	float legacyTag_median_trackSip2dSig;
+        unsigned int nlegacyTag;
+        float legacyTag_median_dxy;
+        float legacyTag_median_trackSip2dSig;
         float legacyTag_alpha;
 	
     public:
@@ -180,7 +180,7 @@ class UnpackedTree
             tree_->Branch("cpf_fromPV",&cpf_fromPV,"cpf_fromPV[ncpf]/F",bufferSize);
             tree_->Branch("cpf_puppi_weight",&cpf_puppi_weight,"cpf_puppi_weight[ncpf]/F",bufferSize);
             tree_->Branch("cpf_track_chi2",&cpf_track_chi2,"cpf_track_chi2[ncpf]/F",bufferSize);
-	    tree_->Branch("cpf_track_ndof",&cpf_track_ndof,"cpf_track_ndof[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_track_ndof",&cpf_track_ndof,"cpf_track_ndof[ncpf]/F",bufferSize);
             tree_->Branch("cpf_track_quality",&cpf_track_quality,"cpf_track_quality[ncpf]/F",bufferSize);
             tree_->Branch("cpf_jetmassdroprel",&cpf_jetmassdroprel,"cpf_jetmassdroprel[ncpf]/F",bufferSize);
             tree_->Branch("cpf_relIso01",&cpf_relIso01,"cpf_relIso01[ncpf]/F",bufferSize);
@@ -220,9 +220,9 @@ class UnpackedTree
             tree_->Branch("sv_enratio",&sv_enratio,"sv_enratio[nsv]/F",bufferSize);
 		    
             tree_->Branch("nlegacyTag",&nlegacyTag,"nlegacyTag/I",bufferSize);
-	    tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy/F",bufferSize);
-	    tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig/F",bufferSize);
-	    tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha/F",bufferSize);
+            tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy/F",bufferSize);
+            tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig/F",bufferSize);
+            tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha/F",bufferSize);
 
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
@@ -535,9 +535,9 @@ class NanoXTree
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
 		  
             tree_->SetBranchAddress("nlegacyTag",&nlegacyTag);
-	    tree_->SetBranchAddress("legacyTag_median_dxy",&legacyTag_median_dxy);
-	    tree_->SetBranchAddress("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig);
-	    tree_->SetBranchAddress("legacyTag_alpha",&legacyTag_alpha);
+            tree_->SetBranchAddress("legacyTag_median_dxy",&legacyTag_median_dxy);
+            tree_->SetBranchAddress("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig);
+            tree_->SetBranchAddress("legacyTag_alpha",&legacyTag_alpha);
             
             //getEvent(0,true);
 
@@ -834,22 +834,12 @@ class NanoXTree
                 unpackedTree.cpf_trackDeltaR[i] = cpf_trackDeltaR[cpf_offset+i];
                 unpackedTree.cpf_trackPtRatio[i] = cpf_trackPtRatio[cpf_offset+i];
                 unpackedTree.cpf_trackPParRatio[i] = cpf_trackPParRatio[cpf_offset+i];
+                
                 unpackedTree.cpf_trackSip2dVal[i] = cpf_trackSip2dVal[cpf_offset+i];
-
-                if (!isnan(cpf_trackSip2dSig[cpf_offset+i])){
-                    unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
-                }
-                else{
-                    unpackedTree.cpf_trackSip2dSig[i] = -1;
-                }
+                unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
                 unpackedTree.cpf_trackSip3dVal[i] = cpf_trackSip3dVal[cpf_offset+i];
-
-                if (!isnan(cpf_trackSip3dSig[cpf_offset+i])){
-                    unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
-                }
-                else{
-                    unpackedTree.cpf_trackSip3dSig[i] = -1;
-                }
+                unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
+                
                 unpackedTree.cpf_trackJetDistVal[i] = cpf_trackJetDistVal[cpf_offset+i];
                 unpackedTree.cpf_trackJetDistSig[i] = cpf_trackJetDistSig[cpf_offset+i];
                 unpackedTree.cpf_ptrel[i] = cpf_ptrel[cpf_offset+i];
@@ -900,19 +890,19 @@ class NanoXTree
             unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
             unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
 		
-	    unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
+            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
             unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
             unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
 		
-	    unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet];
+            unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet];
             if (!isnan(legacyTag_median_trackSip2dSig[jet]) and !isinf(legacyTag_median_trackSip2dSig[jet])){
-	        unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
+	            unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
             }
             else{
-	        unpackedTree.legacyTag_median_trackSip2dSig = -6.;
+	            unpackedTree.legacyTag_median_trackSip2dSig = -6.;
             }
-	    unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
-	    unpackedTree.legacyTag_alpha = legacyTag_alpha[jet];
+            unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
+            unpackedTree.legacyTag_alpha = legacyTag_alpha[jet];
         
             int npf_offset = 0;
             for (size_t i = 0; i < jet; ++i)

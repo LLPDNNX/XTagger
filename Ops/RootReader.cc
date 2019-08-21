@@ -24,6 +24,7 @@ REGISTER_OP("RootReader")
     .Attr("branches: list(string)")
     .Attr("treename: string")
     .Attr("naninf: int = 0")
+    .Attr("throw_on_nan: bool = False")
     .Attr("batch: int = 1")
     .Output("out: float32")
     .Output("num: int32")
@@ -124,13 +125,15 @@ class RootReaderOp:
         {
             private:
                 unsigned int size_;
+                const bool throwOnNan_;
                 std::unique_ptr<TTreeFormula> formula_;
             public:
                 typedef TensorFiller<OUT> Base;
             
-                TensorFillerTmpl(const string& name, const string& expr, unsigned int size):
+                TensorFillerTmpl(const string& name, const string& expr, unsigned int size, bool throwOnNan=false):
                     TensorFiller<OUT>(name,expr),
                     size_(size),
+                    throwOnNan_(throwOnNan),
                     formula_(nullptr)
                 {
                 }
@@ -158,6 +161,10 @@ class RootReaderOp:
                     {
                         //std::cout<<TensorFiller<OUT>::expr()<<std::endl;
                         double result = formula_->EvalInstance(i);
+                        if (throwOnNan_ and (std::isnan(result) or std::isinf(result)))
+                        {
+                            throw std::runtime_error("Got invalid value "+std::to_string(result)+" from expression "+this->expr_);
+                        }
                         flatTensor(index+i)=Base::resetNanOrInf(result,reset);
                     }
                     for (unsigned int i = std::min(leafSize,size_); i < size_; ++i)
@@ -176,6 +183,7 @@ class RootReaderOp:
         size_t currentEntry_;
         
         int naninf_;
+        bool throwOnNan_;
         string treename_;
         unsigned int size_;
         int nBatch_;
@@ -187,6 +195,7 @@ class RootReaderOp:
             inputFile_(nullptr),
             currentEntry_(0),
             naninf_(0),
+            throwOnNan_(false),
             size_(0),
             nBatch_(1),
             nEvents_(0)
@@ -209,6 +218,10 @@ class RootReaderOp:
             );
             OP_REQUIRES_OK(
                 context,
+                context->GetAttr("throw_on_nan",&throwOnNan_)
+            );
+            OP_REQUIRES_OK(
+                context,
                 context->GetAttr("batch",&nBatch_)
             );
             for (unsigned int iname = 0; iname < branchNames.size(); ++iname)
@@ -222,7 +235,8 @@ class RootReaderOp:
                         tensorFillers_.emplace_back(std::make_shared<TensorFillerTmpl<float>>(
                             "expr_"+std::to_string(iname),
                             name,
-                            1
+                            1,
+                            throwOnNan_
                         ));
                         size_+=1;
                     }
@@ -235,7 +249,8 @@ class RootReaderOp:
                             tensorFillers_.emplace_back(std::make_shared<TensorFillerTmpl<unsigned int, float>>(
                                 "expr_"+std::to_string(iname),
                                 string(name.begin(),it),
-                                1
+                                1,
+                                throwOnNan_
                             ));
                             size_+=1;
                         }
@@ -252,7 +267,8 @@ class RootReaderOp:
                         std::make_shared<TensorFillerTmpl<float>>(
                             "expr_"+std::to_string(iname),
                             branchName,
-                            size
+                            size,
+                            throwOnNan_
                         )
                     );
                 }

@@ -57,71 +57,42 @@ function run_setup()
     export TEMP=$TMPDIR
     mkdir $TMPDIR
    
-    
     echo "Create environment for CPU"
-    #rm -f /tmp/*
     
-    conda create -n tf_cpu python=2.7 --yes &>> $LOGFILE || return 1
+    conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
     source activate tf_cpu &>> $LOGFILE || return 1
     
-    #pip install tensorflow==1.6.0 || return 1
-    #conda install -c conda-forge cmake --yes || return 1
-    #conda install -c nlesc root-numpy=4.4.0 --yes || return 1
-    #conda install -c conda-forge boost=1.64.0 --yes || return 1
+    conda list
     
-    echo "Installing pip packages"
-    pip install --no-cache-dir -r $SCRIPT_DIR/packages_cpu.pip &>> $LOGFILE || return 1
-    
-    #root needs to be installed after the pip packages because it seems to break yaml compilation
-    #echo "Installing graphviz"
-    #conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
-    echo "Installing root"
-    conda install -c conda-forge root=6.14.06 --yes &>> $LOGFILE || return 1
-    #conda update -f libstdcxx-ng --yes &>> $LOGFILE || return 1
-        
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
-    #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_cpu.sh
     echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
-
-    source deactivate &>> $LOGFILE || return 1
-    
     echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_cpu.sh
     echo "export OMP_NUM_THREADS=8 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -v 8380000 #Kib; about 8.6GB" >> $SCRIPT_DIR/env_cpu.sh
+
+    source deactivate &>> $LOGFILE || return 1
     
     
     echo "Create environment for GPU"
-    #rm -f /tmp/*
     
-    conda create -n tf_gpu python=2.7 --yes &>> $LOGFILE || return 1
-    source activate tf_gpu &>> $LOGFILE || return 1
+    conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
+    source activate tf_cpu &>> $LOGFILE || return 1
     
-    #pip install tensorflow==1.6.0 || return 1
-    #conda install -c conda-forge cmake --yes || return 1
-    #conda install -c nlesc root-numpy=4.4.0 --yes || return 1
-    #conda install -c conda-forge boost=1.64.0 --yes || return 1
-    
-    echo "Installing pip packages"
-    pip install --no-cache-dir -r $SCRIPT_DIR/packages_gpu.pip &>> $LOGFILE || return 1
-    #echo "Installing graphviz"
-    #conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
-    
-    #root needs to be installed after the pip packages because it seems to break yaml compilation
-    echo "Installing root"
-    conda install -c conda-forge root=6.14.06 --yes &>> $LOGFILE || return 1
+    conda list
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh
-    #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_gpu.sh
     echo "source activate tf_gpu" >> $SCRIPT_DIR/env_gpu.sh
-
+    echo "export LD_LIBRARY_PATH="$INSTALL_ABSDIR"/miniconda/envs/tf_cpu/x86_64-conda_cos6-linux-gnu/lib:\$LD_LIBRARY_PATH" >> $SCRIPT_DIR/env_gpu.sh
     echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_gpu.sh
     echo "export OMP_NUM_THREADS=16 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_gpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_gpu.sh
 
     source deactivate &>> $LOGFILE || return 1
+    
+    
     
     rm -rf $INSTALL_ABSDIR/tmp &>> $LOGFILE
 

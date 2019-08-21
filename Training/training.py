@@ -59,7 +59,7 @@ parser.add_argument('--wasserstein', action='store_true',
                     dest='wasserstein',
                     help='uses wasserstein distance instead', default=False)
 parser.add_argument('-m', '--model', action='store', help='model file',
-                    default='llp_model_da')
+                    default='nominal_model')
 parser.add_argument('--bagging', action='store', type=float, help='bagging fraction (default: 1. = no bagging)',
                     default=1., dest='bagging')
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
@@ -186,76 +186,74 @@ fileListTrain = getListOfInputFiles(filePathTrain)
 print_delimiter()
 fileListTest = getListOfInputFiles(filePathTest)
 print_delimiter()
-fileListTrainDA = getListOfInputFiles(filePathTrainDA)
-print_delimiter()
-fileListTestDA = getListOfInputFiles(filePathTestDA)
+if not noDA:
+    fileListTrainDA = getListOfInputFiles(filePathTrainDA)
+    print_delimiter()
+    fileListTestDA = getListOfInputFiles(filePathTestDA)
 
 # select only a fraction of files
 if (nFiles is not None) and (nFiles<len(fileListTrain)):
     fileListTrain = fileListTrain[:nFiles]
     fileListTest = fileListTest[:nFiles]
     
-
-    
-
-chainDA = ROOT.TChain("jets")
-for f in fileListTrainDA:
-    chainDA.AddFile(f)
-for globalFeature in [
-    ["global_pt",1.,3.2,"y"],
-    ["global_eta",-3,3],
-]:
-    #print globalFeature, chainDA.FindLeaf(globalFeature).GetMaximum(), chainDA.FindLeaf(globalFeature).GetMinimum()
-    histData = ROOT.TH1F("histData"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
-    histData.Sumw2()
-    #histData.SetDirectory(0)
-    histData.SetMarkerStyle(20)
-    histData.SetMarkerSize(1.2)
-    chainDA.Project(histData.GetName(),globalFeature[0],"(isData>0.5)*(xsecweight)")
-    histMC = ROOT.TH1F("histMC"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
-    histMC.Sumw2()
-    #histMC.SetDirectory(0)
-    histMC.SetLineWidth(2)
-    histMC.SetLineColor(ROOT.kAzure-4)
-    chainDA.Project(histMC.GetName(),globalFeature[0],"(isData<0.5)*(xsecweight)")
-    
-    cv = ROOT.TCanvas("cvDA"+globalFeature[0]+str(random.random()),"",800,700)
-    
-    if len(globalFeature)>=4:
-        if globalFeature[3].find('y')>=0 and globalFeature[3].find('x')>=0:
-            cv.SetLogx(1)
-            cv.SetLogy(1)
-            axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-                50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
-                50,numpy.linspace(0.5,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum()))),num=51)
-            )
-        else:
-            if globalFeature[3].find('y')>=0:
+if not noDA:
+    chainDA = ROOT.TChain("jets")
+    for f in fileListTrainDA:
+        chainDA.AddFile(f)
+    for globalFeature in [
+        ["global_pt",1.,3.2,"y"],
+        ["global_eta",-3,3],
+    ]:
+        #print globalFeature, chainDA.FindLeaf(globalFeature).GetMaximum(), chainDA.FindLeaf(globalFeature).GetMinimum()
+        histData = ROOT.TH1F("histData"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+        histData.Sumw2()
+        #histData.SetDirectory(0)
+        histData.SetMarkerStyle(20)
+        histData.SetMarkerSize(1.2)
+        chainDA.Project(histData.GetName(),globalFeature[0],"(isData>0.5)*(xsecweight)")
+        histMC = ROOT.TH1F("histMC"+globalFeature[0]+str(random.random()),"",50,globalFeature[1],globalFeature[2])
+        histMC.Sumw2()
+        #histMC.SetDirectory(0)
+        histMC.SetLineWidth(2)
+        histMC.SetLineColor(ROOT.kAzure-4)
+        chainDA.Project(histMC.GetName(),globalFeature[0],"(isData<0.5)*(xsecweight)")
+        
+        cv = ROOT.TCanvas("cvDA"+globalFeature[0]+str(random.random()),"",800,700)
+        
+        if len(globalFeature)>=4:
+            if globalFeature[3].find('y')>=0 and globalFeature[3].find('x')>=0:
+                cv.SetLogx(1)
                 cv.SetLogy(1)
                 axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-                    50,globalFeature[1],globalFeature[2],50,0.8,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum())))
-                )
-            elif globalFeature[3].find('x')>=0:
-                cv.SetLogx(1)
-                axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
                     50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
-                    50,numpy.linspace(0.5,1.1*max(histData.GetMaximum(),histMC.GetMaximum()),num=51)
+                    50,numpy.linspace(0.5,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum()))),num=51)
                 )
             else:
-                print "unknown option"
-                sys.exit(1)
-    else:
-        axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
-            50,globalFeature[1],globalFeature[2],50,0,1.1*max(histData.GetMaximum(),histMC.GetMaximum())
-        )
+                if globalFeature[3].find('y')>=0:
+                    cv.SetLogy(1)
+                    axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                        50,globalFeature[1],globalFeature[2],50,0.8,10**(1.1*math.log10(max(histData.GetMaximum(),histMC.GetMaximum())))
+                    )
+                elif globalFeature[3].find('x')>=0:
+                    cv.SetLogx(1)
+                    axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                        50,numpy.logspace(globalFeature[1],globalFeature[2],num=51),
+                        50,numpy.linspace(0.5,1.1*max(histData.GetMaximum(),histMC.GetMaximum()),num=51)
+                    )
+                else:
+                    print "unknown option"
+                    sys.exit(1)
+        else:
+            axis = ROOT.TH2F("axis"+globalFeature[0]+str(random.random()),";"+globalFeature[0]+";",
+                50,globalFeature[1],globalFeature[2],50,0,1.1*max(histData.GetMaximum(),histMC.GetMaximum())
+            )
 
-    axis.Draw("AXIS")
-    histMC.Draw("HISTSAME")
-    histData.Draw("SAMEPE")
-    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
-    cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
-    
-
+        axis.Draw("AXIS")
+        histMC.Draw("HISTSAME")
+        histData.Draw("SAMEPE")
+        cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".pdf"))
+        cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
+        
 
 # define the feature dictionary for training
 # Count the number of entries in total
@@ -310,7 +308,6 @@ print "class balance before resampling", \
 print_delimiter()
 
 #make flat in pt
-
 for ieta in range(targetShape.GetNbinsY()):
     ptAve = 0
     for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
@@ -319,6 +316,18 @@ for ieta in range(targetShape.GetNbinsY()):
     for ipt in range(targetShape.GetNbinsX()):
         if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
             targetShape.SetBinContent(ipt+1,ieta+1,ptMin)
+
+'''
+for ieta in range(targetShape.GetNbinsY()):
+    ptSum = 0.
+    for ipt in range(targetShape.GetNbinsX()):
+        ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
+    ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
+    #ptAvg = ptSum/targetShape.GetNbinsX()
+    for ipt in range(targetShape.GetNbinsX()):
+        if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
+            targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+'''
 
 weightsPt = {}
 weightsEta = {}
@@ -585,9 +594,10 @@ while (epoch < num_epochs):
 
     train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
     test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
-    
-    train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
-    test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
+
+    if not noDA:
+        train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
+        test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
 
     modelDA = modelModule.ModelDA(
         len(featureDict["truth"]["branches"]),
@@ -595,7 +605,7 @@ while (epoch < num_epochs):
         useLSTM=False,
         useWasserstein=useWasserstein
     )
-    
+
     modelDiscriminators = setupDiscriminatorsFused(modelDA)
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
@@ -1031,70 +1041,70 @@ while (epoch < num_epochs):
     except tf.errors.OutOfRangeError:
         print('Done testing for %d steps.' % (step))
         
-        
-    try:
-        step = 0
-        while not coord.should_stop():
-            step += 1
-            test_batch_value_domain = sess.run(test_batch_da)
-            if test_batch_value_domain['num'].shape[0]==0:
-                continue
+    if not noDA:
+        try:
+            step = 0
+            while not coord.should_stop():
+                step += 1
+                test_batch_value_domain = sess.run(test_batch_da)
+                if test_batch_value_domain['num'].shape[0]==0:
+                    continue
 
-            if isParametric:
-                #ctau = 0.#np.random.randint(-3, 5)
-                test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
-                                test_batch_value_domain['globalvars'],
-                                test_batch_value_domain['cpf'],
-                                test_batch_value_domain['npf'],
-                                test_batch_value_domain['sv']]
-            else:
-                test_inputs_domain = [test_batch_value_domain['globalvars'],
-                                test_batch_value_domain['cpf'],
-                                test_batch_value_domain['npf'],
-                                test_batch_value_domain['sv']]
+                if isParametric:
+                    #ctau = 0.#np.random.randint(-3, 5)
+                    test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
+                                    test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
+                else:
+                    test_inputs_domain = [test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
 
-            test_outputs_domain = modelDomainDiscriminator.test_on_batch(
-                    test_inputs_domain,
-                    (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
-                    sample_weight=test_batch_value_domain["xsecweight"][:,0]
-            )
-            test_daprediction_class = modelClassDiscriminator.predict_on_batch(
-                    test_inputs_domain
-            )
-            
-            
-            for ibatch in range(test_batch_value_domain["isData"].shape[0]):
-                isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
-                sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
+                test_outputs_domain = modelDomainDiscriminator.test_on_batch(
+                        test_inputs_domain,
+                        (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
+                        sample_weight=test_batch_value_domain["xsecweight"][:,0]
+                )
+                test_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                        test_inputs_domain
+                )
+                
+                
+                for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                    isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
 
-                for idis in range(len(featureDict["truth"]["branches"])):
-                    daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+                    for idis in range(len(featureDict["truth"]["branches"])):
+                        daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
 
-            
-            nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
+                
+                nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
 
-            nTestDomain += nTestBatchDomain
+                nTestDomain += nTestBatchDomain
 
-            if nTestBatchDomain>0:
-                total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain#/domainLossWeight
+                if nTestBatchDomain>0:
+                    total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain#/domainLossWeight
 
-            if step % 10 == 0:
-                duration = (time.time() - start_time)/10.
-                print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs_domain[0], test_outputs_domain[1]*100., duration)
+                if step % 10 == 0:
+                    duration = (time.time() - start_time)/10.
+                    print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs_domain[0], test_outputs_domain[1]*100., duration)
 
-                start_time = time.time()
+                    start_time = time.time()
 
-    except tf.errors.OutOfRangeError:
-        print('Done testing for %d steps.' % (step))
-        
+        except tf.errors.OutOfRangeError:
+            print('Done testing for %d steps.' % (step))
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
     if noDA:
         avgLoss_train_domain = 0
+        avgLoss_test_domain = 0
     else:
         avgLoss_train_domain = total_loss_train_domain/nTrainDomain
-    avgLoss_test_domain = total_loss_test_domain/nTestDomain
+        avgLoss_test_domain = total_loss_test_domain/nTestDomain
 
     if epoch == 0:
 
@@ -1106,101 +1116,105 @@ while (epoch < num_epochs):
     print "Epoch duration = (%.1f min)" % ((time.time() - epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%" % (nTrain, nTest, 100. * nTest/(nTrain+nTest))
     print "Average loss class = %.4f (%.4f)" % (avgLoss_train, avgLoss_test)
-    print "Average loss domain = %.4f (%.4f)" % (avgLoss_train_domain, avgLoss_test_domain)
+    if not noDA:
+        print "Average loss domain = %.4f (%.4f)" % (avgLoss_train_domain, avgLoss_test_domain)
     print "Learning rate = %.4e" % (learning_rate_val)
 
     M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
     labels = ["B","C","UDS","G","LLP"]
     
-    for idis in range(len(featureDict["truth"]["branches"])):
-        cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
-        cv.Divide(1,2,0,0)
-        cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
-        cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
-        cv.GetPad(1).SetFillStyle(4000)
-        cv.GetPad(2).SetFillStyle(4000)
-        cv.GetPad(1).SetMargin(0.135, 0.04, 0.45, 0.06)
-        cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
-        cv.GetPad(1).SetLogy(1)
-        cv.cd(1)
-        
-        statictics = ""
-        if daHists[idis][0].Integral()>0.:
-            daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
-        
-            eventsAboveWp = {
-                50: [0.,0.],
-                80: [0.,0.],
-                95: [0.,0.],
-            }
-            sumMC = 0.
+    if not noDA:
+        for idis in range(len(featureDict["truth"]["branches"])):
+            cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
+            cv.Divide(1,2,0,0)
+            cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
+            cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
+            cv.GetPad(1).SetFillStyle(4000)
+            cv.GetPad(2).SetFillStyle(4000)
+            cv.GetPad(1).SetMargin(0.135, 0.04, 0.45, 0.06)
+            cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
+            cv.GetPad(1).SetLogy(1)
+            cv.cd(1)
+            
+            statictics = ""
+            if daHists[idis][0].Integral()>0.:
+                daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
+            
+                eventsAboveWp = {
+                    50: [0.,0.],
+                    80: [0.,0.],
+                    95: [0.,0.],
+                }
+                sumMC = 0.
+                for ibin in range(daHists[idis][0].GetNbinsX()):
+                    cMC = daHists[idis][0].GetBinContent(ibin+1)
+                    sumMC += cMC
+                    cData = daHists[idis][1].GetBinContent(ibin+1)
+                    for wp in eventsAboveWp.keys():
+                        if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
+                            eventsAboveWp[wp][0]+=cMC
+                            eventsAboveWp[wp][1]+=cData
+                
+                for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
+                    statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
+                        wp,
+                        100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
+                    )
+                    if iwp<(len(eventsAboveWp.keys())-1):
+                        statictics+=","
+                    statictics+="  "
+                
+            
+            daHists[idis][0].Rebin(200)
+            daHists[idis][1].Rebin(200)
+            ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
+            ymin = ymax
             for ibin in range(daHists[idis][0].GetNbinsX()):
                 cMC = daHists[idis][0].GetBinContent(ibin+1)
-                sumMC += cMC
                 cData = daHists[idis][1].GetBinContent(ibin+1)
-                for wp in eventsAboveWp.keys():
-                    if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
-                        eventsAboveWp[wp][0]+=cMC
-                        eventsAboveWp[wp][1]+=cData
+                if cMC>1 and cData>1:
+                    ymin = min([ymin,cMC,cData])
+                 
+            ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
+            axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
+            axis.GetXaxis().SetLabelSize(0)
+            axis.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetLeftMargin()-cv.GetPad(1).GetRightMargin()))
+            axis.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetTopMargin()-cv.GetPad(1).GetBottomMargin()))
+            axis.Draw("AXIS")
+            daHists[idis][0].Draw("HISTSAME")
+            daHists[idis][1].Draw("PESAME")
             
-            for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
-                statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
-                    wp,
-                    100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
-                )
-                if iwp<(len(eventsAboveWp.keys())-1):
-                    statictics+=","
-                statictics+="  "
+            pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
+            pText.SetTextFont(43)
+            pText.SetTextAlign(32)
+            pText.SetTextSize(30)
+            pText.AddText(statictics)
+            pText.Draw("Same")
             
-        
-        daHists[idis][0].Rebin(200)
-        daHists[idis][1].Rebin(200)
-        ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
-        ymin = ymax
-        for ibin in range(daHists[idis][0].GetNbinsX()):
-            cMC = daHists[idis][0].GetBinContent(ibin+1)
-            cData = daHists[idis][1].GetBinContent(ibin+1)
-            if cMC>1 and cData>1:
-                ymin = min([ymin,cMC,cData])
-             
-        ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
-        axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
-        axis.GetXaxis().SetLabelSize(0)
-        axis.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetLeftMargin()-cv.GetPad(1).GetRightMargin()))
-        axis.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetTopMargin()-cv.GetPad(1).GetBottomMargin()))
-        axis.Draw("AXIS")
-        daHists[idis][0].Draw("HISTSAME")
-        daHists[idis][1].Draw("PESAME")
-        
-        pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
-        pText.SetTextFont(43)
-        pText.SetTextAlign(32)
-        pText.SetTextSize(30)
-        pText.AddText(statictics)
-        pText.Draw("Same")
-        
-        cv.cd(2)
-        axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0.2,1.8)
-        axisRes.Draw("AXIS")
-        axisRes.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetLeftMargin()-cv.GetPad(2).GetRightMargin()))
-        axisRes.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetTopMargin()-cv.GetPad(2).GetBottomMargin()))
-        axisLine = ROOT.TF1("axisLine","1",0,1)
-        axisLine.SetLineColor(ROOT.kBlack)
-        axisLine.Draw("Same")
-        axisLineUp = ROOT.TF1("axisLineUp","1.5",0,1)
-        axisLineUp.SetLineColor(ROOT.kBlack)
-        axisLineUp.SetLineStyle(2)
-        axisLineUp.Draw("Same")
-        axisLineDown = ROOT.TF1("axisLineDown","0.5",0,1)
-        axisLineDown.SetLineColor(ROOT.kBlack)
-        axisLineDown.SetLineStyle(2)
-        axisLineDown.Draw("Same")
-        daHistsRes = daHists[idis][1].Clone(daHists[idis][1].GetName()+"res")
-        daHistsRes.Divide(daHists[idis][0])
-        daHistsRes.Draw("PESAME")
-        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".pdf"))
-        cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".png"))
+            cv.cd(2)
+            axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0.2,1.8)
+            axisRes.Draw("AXIS")
+            axisRes.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetLeftMargin()-cv.GetPad(2).GetRightMargin()))
+            axisRes.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetTopMargin()-cv.GetPad(2).GetBottomMargin()))
+            axisLine = ROOT.TF1("axisLine","1",0,1)
+            axisLine.SetLineColor(ROOT.kBlack)
+            axisLine.Draw("Same")
+            axisLineUp = ROOT.TF1("axisLineUp","1.5",0,1)
+            axisLineUp.SetLineColor(ROOT.kBlack)
+            axisLineUp.SetLineStyle(2)
+            axisLineUp.Draw("Same")
+            axisLineDown = ROOT.TF1("axisLineDown","0.5",0,1)
+            axisLineDown.SetLineColor(ROOT.kBlack)
+            axisLineDown.SetLineStyle(2)
+            axisLineDown.Draw("Same")
+            daHistsRes = daHists[idis][1].Clone(daHists[idis][1].GetName()+"res")
+            daHistsRes.Divide(daHists[idis][0])
+            daHistsRes.Draw("PESAME")
+            cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".pdf"))
+            cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".png"))
+    
+    
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
     f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+"\n")
     f.close()
@@ -1214,4 +1228,3 @@ while (epoch < num_epochs):
     coord.join(threads)
     K.clear_session()
     epoch += 1
-    

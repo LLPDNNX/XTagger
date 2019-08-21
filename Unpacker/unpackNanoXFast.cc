@@ -715,7 +715,7 @@ class NanoXTree
             
             rand = uniform_dist_(randomGenerator_);
             ctau = 1e9;
-            logpt = global_pt[jet];
+            logpt = std::log10(std::max(0.1f,global_pt[jet]));
             
             for (auto setter: setters_)
             {
@@ -1077,6 +1077,7 @@ int main(int argc, char **argv)
     std::vector<std::vector<std::string>> inputFileNames;
     std::vector<std::vector<std::string>> selectors;
     std::vector<std::vector<std::string>> setters;
+    std::vector<int> caps;
     
     std::vector<std::string> inputs = parser.get<std::vector<std::string>>("i");
     if (inputs.size()==0)
@@ -1092,6 +1093,7 @@ int main(int argc, char **argv)
             inputFileNames.push_back(std::vector<std::string>{s});
             selectors.push_back(std::vector<std::string>{});
             setters.push_back(std::vector<std::string>{});
+            caps.push_back(-1);
         }
         else if(ends_with(s,".txt"))
         {
@@ -1099,6 +1101,7 @@ int main(int argc, char **argv)
             std::vector<std::string> files;
             std::vector<std::string> select;
             std::vector<std::string> setter;
+            int cap = -1;
             for( std::string line; getline( input, line ); )
             {
                 if (line.size()>0)
@@ -1110,6 +1113,10 @@ int main(int argc, char **argv)
                     else if (begins_with(line,"#set"))
                     {
                         setter.emplace_back(line.begin()+4,line.end());
+                    }
+                    else if (begins_with(line,"#cap"))
+                    {
+                        cap = atoi(std::string(line.begin()+4,line.end()).c_str());
                     }
                     else if (begins_with(line,"#"))
                     {
@@ -1123,6 +1130,7 @@ int main(int argc, char **argv)
             }
             selectors.push_back(select);
             setters.push_back(setter);
+            caps.push_back(cap);
             inputFileNames.push_back(files);
         }
         else
@@ -1137,6 +1145,7 @@ int main(int argc, char **argv)
         auto inputFileNameList = inputFileNames[i];
         TChain* chain = new TChain("Events","Events");
         //int nfiles = 0;
+        int totalEntries = 0;
         for (const auto& inputFileName: inputFileNameList)
         {
             //std::cout<<"   "<<argv[iarg]<<", nEvents="<<;
@@ -1155,9 +1164,16 @@ int main(int argc, char **argv)
                 continue;
             }
             int nEvents = tree->GetEntries();
+            totalEntries += nEvents;
             std::cout<<"   "<<inputFileName<<", nEvents="<<nEvents<<std::endl;
             file->Close();
             chain->AddFile(inputFileName.c_str());
+            
+            if (caps[i]>0 and totalEntries>caps[i])
+            {
+                std::cout<<"   "<<inputFileName<<"number of "<<caps[i]<<" events reached"<<std::endl;
+                break;
+            }
             //nfiles+=1;
             //if (nfiles>1) break;
         }

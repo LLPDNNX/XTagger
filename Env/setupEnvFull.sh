@@ -44,8 +44,8 @@ function run_setup()
         return 1
     fi
 
-    wget -P $INSTALL_ABSDIR https://repo.continuum.io/miniconda/Miniconda2-4.3.31-Linux-x86_64.sh &>> $LOGFILE || return 1
-    bash $INSTALL_ABSDIR/Miniconda2-4.3.31-Linux-x86_64.sh -b -s -p $INSTALL_ABSDIR/miniconda &>> $LOGFILE || return 1
+    wget -P $INSTALL_ABSDIR https://repo.continuum.io/miniconda/Miniconda2-4.7.10-Linux-x86_64.sh &>> $LOGFILE || return 1
+    bash $INSTALL_ABSDIR/Miniconda2-4.7.10-Linux-x86_64.sh -b -s -p $INSTALL_ABSDIR/miniconda &>> $LOGFILE || return 1
 
     CONDA_BIN=$INSTALL_ABSDIR/miniconda/bin
     export PATH=$CONDA_BIN:$PATH
@@ -73,12 +73,12 @@ function run_setup()
     pip install --no-cache-dir -r $SCRIPT_DIR/packages_cpu.pip &>> $LOGFILE || return 1
     
     #root needs to be installed after the pip packages because it seems to break yaml compilation
-    echo "Installing graphviz"
-    conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
+    #echo "Installing graphviz"
+    #conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     echo "Installing root"
-    conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
-    conda update -f libstdcxx-ng --yes &>> $LOGFILE || return 1
-    
+    conda install -c conda-forge root=6.14.06 --yes &>> $LOGFILE || return 1
+    #conda update -f libstdcxx-ng --yes &>> $LOGFILE || return 1
+        
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
     #echo "export LD_PRELOAD="$INSTALL_ABSDIR"/miniconda/lib/libmkl_core.so:"$INSTALL_ABSDIR"/miniconda/lib/libmkl_sequential.so:\$LD_PRELOAD" >> $SCRIPT_DIR/env_cpu.sh
@@ -105,12 +105,12 @@ function run_setup()
     
     echo "Installing pip packages"
     pip install --no-cache-dir -r $SCRIPT_DIR/packages_gpu.pip &>> $LOGFILE || return 1
-    echo "Installing graphviz"
-    conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
+    #echo "Installing graphviz"
+    #conda install -c anaconda graphviz --yes &>> $LOGFILE || return 1
     
     #root needs to be installed after the pip packages because it seems to break yaml compilation
     echo "Installing root"
-    conda install -c nlesc root-numpy=4.4.0 --yes &>> $LOGFILE || return 1
+    conda install -c conda-forge root=6.14.06 --yes &>> $LOGFILE || return 1
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh

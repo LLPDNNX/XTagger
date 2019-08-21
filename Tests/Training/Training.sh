@@ -10,14 +10,13 @@ function execute()
     python Training/training.py --name parametric -b 50 -c -p --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt -e 2 || return 1 
     python Training/training.py --name ctaux -b 50 -c --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt -e 2 || return 1 
     python Training/training.py --name nobalance -b 50 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt -e 2 || return 1 
-    python Training/training.py --name model -m no_lstm -b 50 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt -e 2 || return 1 
     
     python Training/convert_to_const_graph.py output/ctaux/epoch_1/model_epoch.hdf5 || return 1
     python Training/convert_to_const_graph.py -p output/parametric/epoch_1/model_epoch.hdf5 || return 1
     
-    python Training/training_da.py --name da -b 20 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
-    python Training/training_da.py --name da_bagging -b 20 --bagging 0.5 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
-    python Training/training_da.py --name da_wasser --wasserstein -b 20 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
+    #python Training/training_da.py --name da -b 20 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
+    #python Training/training_da.py --name da_bagging -b 20 --bagging 0.5 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
+    #python Training/training_da.py --name da_wasser --wasserstein -b 20 --train test-files/nanox_unpacked/train.txt --test test-files/nanox_unpacked/test.txt --trainDA test-files/nanox_unpacked/da_train.txt --testDA test-files/nanox_unpacked/da_test.txt -e 2 || return 1 
 }
 
 execute

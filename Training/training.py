@@ -310,15 +310,15 @@ print "class balance before resampling", \
 print_delimiter()
 
 #make flat in pt
+
 for ieta in range(targetShape.GetNbinsY()):
-    ptSum = 0.
+    ptAve = 0
+    for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
+        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)
+    ptMin = 2.*ptAve/(targetShape.GetNbinsX())
     for ipt in range(targetShape.GetNbinsX()):
-        ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
-    ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
-    ptAvg = ptSum/targetShape.GetNbinsX()
-    for ipt in range(targetShape.GetNbinsX()):
-        if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
-            targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+        if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
+            targetShape.SetBinContent(ipt+1,ieta+1,ptMin)
 
 weightsPt = {}
 weightsEta = {}

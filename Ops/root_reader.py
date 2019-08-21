@@ -19,7 +19,8 @@ class root_reader():
         feature_dict,
         treename,
         batch=1,
-        naninf=0
+        naninf=0,
+        throw_on_nan=False
     ):
         self._feature_dict = feature_dict
         
@@ -54,7 +55,8 @@ class root_reader():
             queue.queue_ref, 
             self._branch_list,
             treename=treename,
-            naninf=naninf, 
+            naninf=naninf,
+            throw_on_nan=throw_on_nan, 
             batch=batch
         )
         

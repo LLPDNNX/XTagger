@@ -834,22 +834,12 @@ class NanoXTree
                 unpackedTree.cpf_trackDeltaR[i] = cpf_trackDeltaR[cpf_offset+i];
                 unpackedTree.cpf_trackPtRatio[i] = cpf_trackPtRatio[cpf_offset+i];
                 unpackedTree.cpf_trackPParRatio[i] = cpf_trackPParRatio[cpf_offset+i];
+                
                 unpackedTree.cpf_trackSip2dVal[i] = cpf_trackSip2dVal[cpf_offset+i];
-
-                if (!isnan(cpf_trackSip2dSig[cpf_offset+i])){
-                    unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
-                }
-                else{
-                    unpackedTree.cpf_trackSip2dSig[i] = -1;
-                }
+                unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
                 unpackedTree.cpf_trackSip3dVal[i] = cpf_trackSip3dVal[cpf_offset+i];
-
-                if (!isnan(cpf_trackSip3dSig[cpf_offset+i])){
-                    unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
-                }
-                else{
-                    unpackedTree.cpf_trackSip3dSig[i] = -1;
-                }
+                unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
+                
                 unpackedTree.cpf_trackJetDistVal[i] = cpf_trackJetDistVal[cpf_offset+i];
                 unpackedTree.cpf_trackJetDistSig[i] = cpf_trackJetDistSig[cpf_offset+i];
                 unpackedTree.cpf_ptrel[i] = cpf_ptrel[cpf_offset+i];

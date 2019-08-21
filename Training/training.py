@@ -522,7 +522,7 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.
             maxThreads = OMP_NUM_THREADS
         for _ in range(min(1+int(len(inputFileList)/2.), maxThreads)):
             reader_batch = max(10,int(batchSize/20.))
-            reader = root_reader(fileListQueue, features, "jets", batch=reader_batch).batch()
+            reader = root_reader(fileListQueue, features, "jets", batch=reader_batch,throw_on_nan=False).batch()
             rootreader_op.append(reader)
             if resample:
                 weight = classification_weights(
@@ -721,7 +721,6 @@ while (epoch < num_epochs):
             step += 1
             train_batch_value = sess.run(train_batch)
             
-            
             if train_batch_value['num'].shape[0]==0:
                 continue
                 
@@ -772,12 +771,12 @@ while (epoch < num_epochs):
                     train_batch_value_domain[k] = train_batch_value_domain_1[k]+iterda*(train_batch_value_domain_2[k]-train_batch_value_domain_1[k])
                 '''
                 train_batch_value_domain = sess.run(train_batch_da)
-                ctau = np.random.uniform(-2,5,size=(train_batch_value_domain.shape[0],1))
+                #ctau = np.random.uniform(-2,5,size=(train_batch_value_domain.shape[0],1))
 
                 if isParametric:
                     train_inputs_domain = [
-                                    ctau,
-                                    #train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
+                                    #ctau,
+                                    train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],

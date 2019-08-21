@@ -219,11 +219,11 @@ class UnpackedTree
             tree_->Branch("sv_costhetasvpv",&sv_costhetasvpv,"sv_costhetasvpv[nsv]/F",bufferSize);
             tree_->Branch("sv_enratio",&sv_enratio,"sv_enratio[nsv]/F",bufferSize);
 		    
-	    tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy[nlegacyTag]/F",bufferSize);
-	    tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig[nlegacyTag]/F",bufferSize);
-	    tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha[nlegacyTag]/F",bufferSize);
+            tree_->Branch("nlegacyTag",&nlegacyTag,"nlegacyTag/I",bufferSize);
+	    tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy/F",bufferSize);
+	    tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig/F",bufferSize);
+	    tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha/F",bufferSize);
 
-        
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
         
@@ -325,8 +325,10 @@ class NanoXTree
         float cpf_ptrel[maxEntries];
         float cpf_drminsv[maxEntries];
         float cpf_vertex_association[maxEntries];
+        float cpf_fromPV[maxEntries];
         float cpf_puppi_weight[maxEntries];
         float cpf_track_chi2[maxEntries];
+        float cpf_track_ndof[maxEntries];
         float cpf_track_quality[maxEntries];
         float cpf_jetmassdroprel[maxEntries];
         float cpf_relIso01[maxEntries];
@@ -364,13 +366,18 @@ class NanoXTree
         float sv_deltaR[maxEntries];
         float sv_ntracks[maxEntries];
         float sv_chi2[maxEntries];
-        float sv_normchi2[maxEntries];
+        float sv_ndof[maxEntries];
         float sv_dxy[maxEntries];
         float sv_dxysig[maxEntries];
         float sv_d3d[maxEntries];
         float sv_d3dsig[maxEntries];
         float sv_costhetasvpv[maxEntries];
         float sv_enratio[maxEntries];
+
+        unsigned int nlegacyTag[maxEntries];
+        float legacyTag_median_dxy[maxEntries];
+        float legacyTag_median_trackSip2dSig[maxEntries];
+        float legacyTag_alpha[maxEntries];
         
         
         std::mt19937 randomGenerator_;
@@ -478,8 +485,10 @@ class NanoXTree
             tree_->SetBranchAddress("cpf_ptrel",&cpf_ptrel);
             tree_->SetBranchAddress("cpf_drminsv",&cpf_drminsv);
             tree_->SetBranchAddress("cpf_vertex_association",&cpf_vertex_association);
+            tree_->SetBranchAddress("cpf_fromPV",&cpf_fromPV);
             tree_->SetBranchAddress("cpf_puppi_weight",&cpf_puppi_weight);
             tree_->SetBranchAddress("cpf_track_chi2",&cpf_track_chi2);
+            tree_->SetBranchAddress("cpf_track_ndof",&cpf_track_ndof);
             tree_->SetBranchAddress("cpf_track_quality",&cpf_track_quality);
             tree_->SetBranchAddress("cpf_jetmassdroprel",&cpf_jetmassdroprel);
             tree_->SetBranchAddress("cpf_relIso01",&cpf_relIso01);
@@ -517,7 +526,7 @@ class NanoXTree
             tree_->SetBranchAddress("sv_deltaR",&sv_deltaR);
             tree_->SetBranchAddress("sv_ntracks",&sv_ntracks);
             tree_->SetBranchAddress("sv_chi2",&sv_chi2);
-            tree_->SetBranchAddress("sv_normchi2",&sv_normchi2);
+            tree_->SetBranchAddress("sv_ndof",&sv_ndof);
             tree_->SetBranchAddress("sv_dxy",&sv_dxy);
             tree_->SetBranchAddress("sv_dxysig",&sv_dxysig);
             tree_->SetBranchAddress("sv_d3d",&sv_d3d);
@@ -525,7 +534,7 @@ class NanoXTree
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
 		  
-	    tree_->SetBranchAddress("nlegacyTag",&nlegacyTag);
+            tree_->SetBranchAddress("nlegacyTag",&nlegacyTag);
 	    tree_->SetBranchAddress("legacyTag_median_dxy",&legacyTag_median_dxy);
 	    tree_->SetBranchAddress("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig);
 	    tree_->SetBranchAddress("legacyTag_alpha",&legacyTag_alpha);
@@ -826,16 +835,30 @@ class NanoXTree
                 unpackedTree.cpf_trackPtRatio[i] = cpf_trackPtRatio[cpf_offset+i];
                 unpackedTree.cpf_trackPParRatio[i] = cpf_trackPParRatio[cpf_offset+i];
                 unpackedTree.cpf_trackSip2dVal[i] = cpf_trackSip2dVal[cpf_offset+i];
-                unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
+
+                if (!isnan(cpf_trackSip2dSig[cpf_offset+i])){
+                    unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
+                }
+                else{
+                    unpackedTree.cpf_trackSip2dSig[i] = -1;
+                }
                 unpackedTree.cpf_trackSip3dVal[i] = cpf_trackSip3dVal[cpf_offset+i];
-                unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
+
+                if (!isnan(cpf_trackSip3dSig[cpf_offset+i])){
+                    unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
+                }
+                else{
+                    unpackedTree.cpf_trackSip3dSig[i] = -1;
+                }
                 unpackedTree.cpf_trackJetDistVal[i] = cpf_trackJetDistVal[cpf_offset+i];
                 unpackedTree.cpf_trackJetDistSig[i] = cpf_trackJetDistSig[cpf_offset+i];
                 unpackedTree.cpf_ptrel[i] = cpf_ptrel[cpf_offset+i];
                 unpackedTree.cpf_drminsv[i] = cpf_drminsv[cpf_offset+i];
                 unpackedTree.cpf_vertex_association[i] = cpf_vertex_association[cpf_offset+i];
                 unpackedTree.cpf_puppi_weight[i] = cpf_puppi_weight[cpf_offset+i];
+                unpackedTree.cpf_fromPV[i] = cpf_fromPV[cpf_offset+i];
                 unpackedTree.cpf_track_chi2[i] = cpf_track_chi2[cpf_offset+i];
+                unpackedTree.cpf_track_ndof[i] = cpf_track_ndof[cpf_offset+i];
                 unpackedTree.cpf_track_quality[i] = cpf_track_quality[cpf_offset+i];
                 unpackedTree.cpf_jetmassdroprel[i] = cpf_jetmassdroprel[cpf_offset+i];
                 unpackedTree.cpf_relIso01[i] = cpf_relIso01[cpf_offset+i];
@@ -858,7 +881,9 @@ class NanoXTree
                 unpackedTree.cpf_drminsv[i] = 0;
                 unpackedTree.cpf_vertex_association[i] = 0;
                 unpackedTree.cpf_puppi_weight[i] = 0;
+                unpackedTree.cpf_fromPV[i] = 0;
                 unpackedTree.cpf_track_chi2[i] = 0;
+                unpackedTree.cpf_track_ndof[i] = 0;
                 unpackedTree.cpf_track_quality[i] = 0;
                 unpackedTree.cpf_jetmassdroprel[i] = 0;
                 unpackedTree.cpf_relIso01[i] = 0;
@@ -879,9 +904,15 @@ class NanoXTree
             unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
             unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
 		
-	    unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet]
-	    unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet]
-	    unpackedTree.legacyTag_alpha = legacyTag_alpha[jet]
+	    unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet];
+            if (!isnan(legacyTag_median_trackSip2dSig[jet]) and !isinf(legacyTag_median_trackSip2dSig[jet])){
+	        unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
+            }
+            else{
+	        unpackedTree.legacyTag_median_trackSip2dSig = -6.;
+            }
+	    unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
+	    unpackedTree.legacyTag_alpha = legacyTag_alpha[jet];
         
             int npf_offset = 0;
             for (size_t i = 0; i < jet; ++i)
@@ -930,7 +961,7 @@ class NanoXTree
                 unpackedTree.sv_deltaR[i] = sv_deltaR[sv_offset+i];
                 unpackedTree.sv_ntracks[i] = sv_ntracks[sv_offset+i];
                 unpackedTree.sv_chi2[i] = sv_chi2[sv_offset+i];
-                unpackedTree.sv_normchi2[i] = sv_normchi2[sv_offset+i];
+                unpackedTree.sv_ndof[i] = sv_ndof[sv_offset+i];
                 unpackedTree.sv_dxy[i] = sv_dxy[sv_offset+i];
                 unpackedTree.sv_dxysig[i] = sv_dxysig[sv_offset+i];
                 unpackedTree.sv_d3d[i] = sv_d3d[sv_offset+i];
@@ -946,7 +977,7 @@ class NanoXTree
                 unpackedTree.sv_deltaR[i] = 0;
                 unpackedTree.sv_ntracks[i] = 0;
                 unpackedTree.sv_chi2[i] = 0;
-                unpackedTree.sv_normchi2[i] = 0;
+                unpackedTree.sv_ndof[i] = 0;
                 unpackedTree.sv_dxy[i] = 0;
                 unpackedTree.sv_dxysig[i] = 0;
                 unpackedTree.sv_d3d[i] = 0;

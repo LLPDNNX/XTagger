@@ -6,7 +6,7 @@ import keras
 import numpy
 from keras import backend as K
 from feature_dict import featureDict
-import llp_model_simple
+import nominal_model
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--parametric', action='store_true',
@@ -46,24 +46,25 @@ print "sv shape: ",sv.shape.as_list()
 print "globalvars shape: ",globalvars.shape.as_list()
 if arguments.parametric:
     print "gen shape: ",gen.shape.as_list()
-
-conv_prediction, lstm_prediction, full_prediction = llp_model_simple.model(
-    globalvars,
-    cpf,
-    npf,
-    sv,
+    
+modelDA = nominal_model.ModelDA(
     len(featureDict["truth"]["branches"]),
-    gen=gen,
     isParametric=arguments.parametric,
-    options={}
+    useLSTM=False
 )
 
-prediction = tf.identity(full_prediction,name="prediction")
+
+print "learning phase: ",sess.run(keras.backend.learning_phase())
+
+class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen)
+prediction = tf.identity(class_prediction,name="prediction")
+
+#prediction = tf.identity(full_prediction,name="prediction")
 
 if arguments.parametric:
-    model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv], outputs=full_prediction)
+    model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv], outputs=class_prediction)
 else:
-    model = keras.Model(inputs=[globalvars, cpf, npf, sv], outputs=full_prediction)
+    model = keras.Model(inputs=[globalvars, cpf, npf, sv], outputs=class_prediction)
 
 init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 sess.run(init_op)
@@ -89,7 +90,7 @@ if arguments.parametric:
     feed_dict[tf_gen] = numpy.zeros(shape(tf_gen))
 
 full_prediction_val = sess.run(
-    full_prediction,
+    class_prediction,
     feed_dict=feed_dict
 )
 

@@ -1,24 +1,15 @@
 featureDict = {
-
-     "sv" : {
+    "isData": {
         "branches":[
-            'sv_pt',
-            'sv_deltaR',
-            'sv_mass',
-            'sv_ntracks',
-            'sv_chi2',
-            'sv_ndof',
-            'sv_dxy',
-            'sv_dxysig',
-            'sv_d3d',
-            'sv_d3dsig',
-            'sv_costhetasvpv',
-            'sv_enratio',
-            
-        ],
-        "max":4
+            'isData'
+        ]
     },
-
+    
+    "xsecweight": {
+        "branches":[
+            'xsecweight'
+        ]
+    },
     "truth": {
         "branches":[
             'jetorigin_isB||jetorigin_isBB||jetorigin_isGBB||jetorigin_isLeptonic_B||jetorigin_isLeptonic_C',         
@@ -52,13 +43,12 @@ featureDict = {
             'csv_trackSip3dSigAboveCharm', 
             'csv_jetNSelectedTracks', 
             'csv_jetNTracksEtaRel',
-            'legacyTag_median_dxy',
-            'legacyTag_median_trackSip2dSig',
-            'legacyTag_alpha'
+            #'legacyTag_median_dxy',
+            #'legacyTag_median_trackSip2dSig',
+            #'legacyTag_alpha'
         ],
 
     },
-
 
     "cpf": {
         "branches": [
@@ -72,16 +62,14 @@ featureDict = {
             'cpf_trackSip3dVal',
             'cpf_trackSip3dSig',
             'cpf_trackJetDistVal',
-
             'cpf_ptrel', 
             'cpf_drminsv',
             'cpf_vertex_association',
-            'cpf_fromPV'
+            'cpf_fromPV',
             'cpf_puppi_weight',
             'cpf_track_chi2',
             'cpf_track_ndof',
             'cpf_track_quality',
-            #added to test
             #'cpf_jetmassdroprel',
             #'cpf_relIso01',
             #'cpf_isLepton',
@@ -99,12 +87,30 @@ featureDict = {
             'npf_hcal_fraction',
             'npf_drminsv',
             'npf_puppi_weight',
-            # added
             #'npf_jetmassdroprel',
             #'npf_relIso01'
 
         ],
         "max":25
-    }
+    },
+
+     "sv" : {
+        "branches":[
+            'sv_pt',
+            'sv_deltaR',
+            'sv_mass',
+            'sv_ntracks',
+            'sv_chi2',
+            'sv_ndof',
+            'sv_dxy',
+            'sv_dxysig',
+            'sv_d3d',
+            'sv_d3dsig',
+            'sv_costhetasvpv',
+            'sv_enratio',
+        ],
+        "max":4
+    },
+
 }
 

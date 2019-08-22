@@ -2,7 +2,6 @@ name: tf_gpu
 channels:
  - conda-forge
 dependencies:
- - python==2
  - root==6.16
  - pyyaml==3.12
  - h5py==2.7.1

@@ -291,7 +291,7 @@ print_delimiter()
 for ieta in range(targetShape.GetNbinsY()):
     ptAve = 0
     for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
-        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)
+        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)*0.8
     ptMin = 2.*ptAve/(targetShape.GetNbinsX())
     for ipt in range(targetShape.GetNbinsX()):
         if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
@@ -594,9 +594,12 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 1.
+    domainLossWeight = max(0,epoch-2)/50.+(max(0,epoch-2)/75.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    
+    #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
     #since learning rate is decreased increase DA weight at higher epochs
-    domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    #domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
     
     if noDA:
         classLossWeight = 1.

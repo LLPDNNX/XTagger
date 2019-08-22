@@ -63,7 +63,7 @@ function run_setup()
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
     conda list
-    source deactivate tf_cpu &>> $LOGFILE || return 1
+    source deactivate &>> $LOGFILE || return 1
     
     
     echo "Generate setup script"
@@ -79,7 +79,7 @@ function run_setup()
     
     conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
     conda list
-    source deactivate tf_gpu &>> $LOGFILE || return 1
+    source deactivate &>> $LOGFILE || return 1
     
     
     echo "Generate setup script"

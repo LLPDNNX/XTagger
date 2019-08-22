@@ -543,7 +543,7 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.
         return batch
 
 
-learning_rate_val = 0.005
+learning_rate_val = 0.001
 
 if resumeTraining>0:
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "r")
@@ -706,9 +706,6 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
-        
-            if step>600:
-                break
             step += 1
             
 

@@ -57,9 +57,7 @@ function run_setup()
     export TEMP=$TMPDIR
     mkdir $TMPDIR
    
-    
     echo "Create environment for CPU"
-    #rm -f /tmp/*
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
     source activate tf_cpu
@@ -73,7 +71,6 @@ function run_setup()
     echo "export OMP_NUM_THREADS=8 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -v 8380000 #Kib; about 8.6GB" >> $SCRIPT_DIR/env_cpu.sh
-
     
     
     rm -rf $INSTALL_ABSDIR/tmp &>> $LOGFILE

@@ -1,6 +1,5 @@
 name: tf_cpu
 dependencies:
- - conda-forge::root==6.16
  - pypi::pyyaml==3.12
  - pypi::h5py==2.7.1
  - pypi::scipy==1.0.0
@@ -8,5 +7,5 @@ dependencies:
  - pypi::matplotlib==2.2.4
  - pypi::pydot==1.2.4
  - pypi::tensorflow==1.6.0
- - pypi::Keras==2.1.5
- 
+ - pkgs/main::Keras==2.1.5
+ - conda-forge::root==6.16

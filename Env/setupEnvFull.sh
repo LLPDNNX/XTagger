@@ -62,7 +62,6 @@ function run_setup()
     echo "Create environment for CPU"
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    conda install root==6.16 -c conda-forge --yes 
     conda list
     source deactivate tf_cpu &>> $LOGFILE || return 1
     
@@ -79,7 +78,6 @@ function run_setup()
     echo "Create environment for GPU"
     
     conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    conda install root==6.16 -c conda-forge --yes 
     conda list
     source deactivate tf_gpu &>> $LOGFILE || return 1
     

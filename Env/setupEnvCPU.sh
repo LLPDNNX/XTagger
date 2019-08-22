@@ -62,7 +62,6 @@ function run_setup()
     #rm -f /tmp/*
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    conda install root==6.16 -c conda-forge --yes 
     conda list
     source deactivate &>> $LOGFILE || return 1
     

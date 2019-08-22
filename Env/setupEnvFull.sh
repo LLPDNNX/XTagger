@@ -62,9 +62,10 @@ function run_setup()
     echo "Create environment for CPU"
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    source deactivate tf_cpu &>> $LOGFILE || return 1
-    
+    source activate tf_cpu
     conda list
+    source deactivate &>> $LOGFILE || return 1
+    
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
@@ -73,16 +74,15 @@ function run_setup()
     echo "export OMP_NUM_THREADS=8 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -v 8380000 #Kib; about 8.6GB" >> $SCRIPT_DIR/env_cpu.sh
-
-    source deactivate &>> $LOGFILE || return 1
     
     
     echo "Create environment for GPU"
     
     conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    source deactivate tf_gpu &>> $LOGFILE || return 1
-    
+    source activate tf_gpu
     conda list
+    source deactivate &>> $LOGFILE || return 1
+    
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh
@@ -92,9 +92,6 @@ function run_setup()
     echo "export OMP_NUM_THREADS=16 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_gpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_gpu.sh
 
-    source deactivate &>> $LOGFILE || return 1
-    
-    
     
     rm -rf $INSTALL_ABSDIR/tmp &>> $LOGFILE
 

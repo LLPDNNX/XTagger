@@ -48,10 +48,6 @@ if arguments.parametric:
     print "gen shape: ",gen.shape.as_list()
 
 modelDA = nominal_model.ModelDA(
-    globalvars,
-    cpf,
-    npf,
-    sv,
     len(featureDict["truth"]["branches"]),
     isParametric=arguments.parametric,
     useLSTM=False

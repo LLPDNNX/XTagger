@@ -114,26 +114,6 @@ del featureDictDA["truth"]
 del featureDictDA["gen"]
 
 print_delimiter()
-
-#limit CUDA_VISIBLE_DEVICES to a free GPU if unset by e.g. batch system; fails if no GPU available
-try:
-    if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
-        print "Env 'CUDA_VISIBLE_DEVICES' not set! Trying manually setup ..."
-        imp.find_module('setGPU')
-        import setGPU
-        print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
-    else:
-        try:
-            igpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
-            print "Using GPU: '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (taken from env)"
-        except Exception,e:
-            print "WARNING: GPU from env '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' not properly set!"
-            imp.find_module('setGPU')
-            import setGPU
-            print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
-        
-except ImportError:
-    pass
         
 #query all available devices
 nCPU = 0
@@ -311,7 +291,7 @@ print_delimiter()
 for ieta in range(targetShape.GetNbinsY()):
     ptAve = 0
     for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
-        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)
+        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)*0.8
     ptMin = 2.*ptAve/(targetShape.GetNbinsX())
     for ipt in range(targetShape.GetNbinsX()):
         if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
@@ -563,7 +543,7 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.
         return batch
 
 
-learning_rate_val = 0.005
+learning_rate_val = 0.001
 
 if resumeTraining>0:
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "r")
@@ -614,12 +594,15 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
+    classLossWeight = 1.
+    domainLossWeight = max(0,epoch-2)/50.+(max(0,epoch-2)/75.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    
+    #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
     #since learning rate is decreased increase DA weight at higher epochs
-    domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    #domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
     
     if noDA:
-        classLossWeight = 1
+        classLossWeight = 1.
         domainLossWeight = 0
         
     def wasserstein_loss(x,y):
@@ -638,7 +621,7 @@ while (epoch < num_epochs):
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
                        loss=classLossFctType, metrics=['accuracy'],
-                       loss_weights=[1.])
+                       loss_weights=[classLossWeight])
                        
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
     classInputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
@@ -647,7 +630,7 @@ while (epoch < num_epochs):
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
                        loss=domainLossFctType, metrics=['accuracy'],
-                       loss_weights=[1.])
+                       loss_weights=[domainLossWeight])
                        
     domainLossFct = modelDomainDiscriminator.total_loss #includes also regularization loss
     domainInputGradients = tf.gradients(domainLossFct,modelDomainDiscriminator.inputs)
@@ -666,7 +649,7 @@ while (epoch < num_epochs):
     optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
                        loss=domainLossFctType, metrics=['accuracy'],
-                       loss_weights=[1.])
+                       loss_weights=[domainLossWeight])
  
     if epoch == 0:
         print "class network"
@@ -727,6 +710,8 @@ while (epoch < num_epochs):
         step = 0
         while not coord.should_stop():
             step += 1
+            
+
             train_batch_value = sess.run(train_batch)
             
             if train_batch_value['num'].shape[0]==0:
@@ -820,14 +805,14 @@ while (epoch < num_epochs):
                                     
 
             if not noDA:
-                if epoch==0 and step<20:
+                if (epoch==0 and step<=30):
                     #train first class discriminator only
                     train_outputs= modelClassDiscriminator.train_on_batch(
                         train_inputs_class, 
                         train_batch_value["truth"]
                     )
                     train_outputs_domain = [0.,0.]
-                elif (epoch==0 and (step>=20 and step<40)) or (epoch>0 and (step>=0 and step<20)):
+                elif (epoch==0 and (step>30 and step<=60)) or (epoch>0 and step<=30):
                     #train domain discriminator only while keeping features frozen 
                     train_outputs_domain = modelDomainDiscriminatorFrozen.train_on_batch(
                         train_inputs_domain, 
@@ -836,28 +821,6 @@ while (epoch < num_epochs):
                     )
                     train_outputs = [0.,0.]
                 else:
-
-                    
-                    '''
-                    train_domain_outputs = modelClassDiscriminator.predict_on_batch(
-                        train_inputs_domain
-                    )
-                    
-                    #randomly drop classes
-                    classToKeep = np.random.uniform(0,1,train_batch_value["truth"].shape[1])>0.4
-                    classToKeep[np.random.randint(0,train_batch_value["truth"].shape[1]-1)]=True #keep at least one class
-                    predictedClass = np.argmax(train_domain_outputs,axis=1)
-                    train_da_weight = np.multiply(train_da_weight,1.*classToKeep[predictedClass])
-                    np.nan_to_num(train_da_weight,copy=False)
-                    '''
-                    if epoch>2:
-                        #train first domain only
-                        train_outputs_domain = modelDomainDiscriminator.train_on_batch(
-                            train_inputs_domain, 
-                            (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
-                            sample_weight=train_da_weight
-                        )
-                    
                     #finally train both discriminators together
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
                         train_inputs_class+train_inputs_domain, 
@@ -871,7 +834,7 @@ while (epoch < num_epochs):
                     train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
                         
             else:
-                
+                #train only class branch if noDA
                 train_outputs = modelClassDiscriminator.train_on_batch(
                     train_inputs_class,
                     train_batch_value["truth"]
@@ -1220,7 +1183,7 @@ while (epoch < num_epochs):
     f.close()
 
     if epoch > 1 and previous_train_loss < avgLoss_train:
-        learning_rate_val = learning_rate_val*0.9
+        learning_rate_val = learning_rate_val*0.85
         print "Decreasing learning rate to %.4e" % (learning_rate_val)
     previous_train_loss = avgLoss_train
 

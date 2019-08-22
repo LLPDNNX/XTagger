@@ -62,9 +62,9 @@ function run_setup()
     #rm -f /tmp/*
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    source activate tf_cpu &>> $LOGFILE || return 1
-    
+    source activate tf_cpu
     conda list
+    source deactivate &>> $LOGFILE || return 1
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
@@ -74,7 +74,7 @@ function run_setup()
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -v 8380000 #Kib; about 8.6GB" >> $SCRIPT_DIR/env_cpu.sh
 
-    source deactivate &>> $LOGFILE || return 1
+    
     
     rm -rf $INSTALL_ABSDIR/tmp &>> $LOGFILE
 

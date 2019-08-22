@@ -125,6 +125,7 @@ class ModelDA(object):
                 self.sv_lstm = keras.layers.Flatten()
     
         with tf.variable_scope("features"):
+            self.global_norm = keras.layers.BatchNormalization()
             self.full_features = Sequence(scope='features')
             self.full_features.add(keras.layers.Concatenate())
             self.full_features.add(Dense(200,options=options,name="features1"))
@@ -181,10 +182,12 @@ class ModelDA(object):
         npf_lstm = self.npf_lstm(npf_conv)
         sv_lstm = self.sv_lstm(sv_conv)
         
+        globalvars_norm = self.global_norm(globalvars)
+        
         if self.isParametric:
-            full_features = self.full_features([globalvars,gen,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([globalvars_norm,gen,cpf_lstm,npf_lstm,sv_lstm])
         else:
-            full_features = self.full_features([globalvars,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([globalvars_norm,cpf_lstm,npf_lstm,sv_lstm])
             
         return full_features
     

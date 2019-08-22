@@ -1,7 +1,4 @@
 name: tf_cpu
-channels:
- - conda-forge
- - quantstack
 dependencies:
  - conda-forge::root==6.16
  - pypi::pyyaml==3.12

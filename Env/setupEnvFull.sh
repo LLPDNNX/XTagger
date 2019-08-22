@@ -1,6 +1,4 @@
 #!/bin/bash
-#!/usr/bin/env bash
-
 
 SCRIPT_DIR=`dirname ${BASH_SOURCE[0]}`
 STOP=""
@@ -66,10 +64,9 @@ function run_setup()
     conda list
     source deactivate &>> $LOGFILE || return 1
     
-    
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
-    echo "conda deactivate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
+    echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
     echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_cpu.sh
     echo "export OMP_NUM_THREADS=8 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_cpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_cpu.sh
@@ -77,12 +74,11 @@ function run_setup()
     
     
     echo "Create environment for GPU"
-    
+     
     conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
     source activate tf_gpu
     conda list
     source deactivate &>> $LOGFILE || return 1
-    
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh

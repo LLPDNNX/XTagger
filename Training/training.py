@@ -114,26 +114,6 @@ del featureDictDA["truth"]
 del featureDictDA["gen"]
 
 print_delimiter()
-
-#limit CUDA_VISIBLE_DEVICES to a free GPU if unset by e.g. batch system; fails if no GPU available
-try:
-    if not os.environ.has_key('CUDA_VISIBLE_DEVICES'):
-        print "Env 'CUDA_VISIBLE_DEVICES' not set! Trying manually setup ..."
-        imp.find_module('setGPU')
-        import setGPU
-        print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
-    else:
-        try:
-            igpu = int(os.environ['CUDA_VISIBLE_DEVICES'])
-            print "Using GPU: '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (taken from env)"
-        except Exception,e:
-            print "WARNING: GPU from env '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' not properly set!"
-            imp.find_module('setGPU')
-            import setGPU
-            print "Using GPU '"+str(os.environ['CUDA_VISIBLE_DEVICES'])+"' (manually set by 'setGPU')"
-        
-except ImportError:
-    pass
         
 #query all available devices
 nCPU = 0

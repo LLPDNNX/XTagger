@@ -3,7 +3,7 @@ dependencies:
  - pypi::pyyaml==3.12
  - pypi::h5py==2.7.1
  - pypi::scipy==1.0.0
- - pypi::sklearn
+ - pypi::scikit-learn
  - pypi::matplotlib==2.2.4
  - pypi::pydot==1.2.4
  - pypi::tensorflow==1.6.0

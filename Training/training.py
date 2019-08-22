@@ -196,8 +196,6 @@ if (nFiles is not None) and (nFiles<len(fileListTrain)):
     fileListTrain = fileListTrain[:nFiles]
     fileListTest = fileListTest[:nFiles]
     
-
-    
 if not noDA:
     chainDA = ROOT.TChain("jets")
     for f in fileListTrainDA:
@@ -257,7 +255,6 @@ if not noDA:
         cv.Print(os.path.join(outputFolder,"da_"+globalFeature[0]+".png"))
         
 
-
 # define the feature dictionary for training
 # Count the number of entries in total
 histsPerClass = {}
@@ -312,6 +309,16 @@ print_delimiter()
 
 #make flat in pt
 for ieta in range(targetShape.GetNbinsY()):
+    ptAve = 0
+    for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
+        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)
+    ptMin = 2.*ptAve/(targetShape.GetNbinsX())
+    for ipt in range(targetShape.GetNbinsX()):
+        if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
+            targetShape.SetBinContent(ipt+1,ieta+1,ptMin)
+
+'''
+for ieta in range(targetShape.GetNbinsY()):
     ptSum = 0.
     for ipt in range(targetShape.GetNbinsX()):
         ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
@@ -320,6 +327,7 @@ for ieta in range(targetShape.GetNbinsY()):
     for ipt in range(targetShape.GetNbinsX()):
         if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
             targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+'''
 
 weightsPt = {}
 weightsEta = {}
@@ -586,7 +594,7 @@ while (epoch < num_epochs):
 
     train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
     test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
-    
+
     if not noDA:
         train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
         test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
@@ -597,7 +605,7 @@ while (epoch < num_epochs):
         useLSTM=False,
         useWasserstein=useWasserstein
     )
-    
+
     modelDiscriminators = setupDiscriminatorsFused(modelDA)
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
@@ -1033,7 +1041,6 @@ while (epoch < num_epochs):
     except tf.errors.OutOfRangeError:
         print('Done testing for %d steps.' % (step))
         
-        
     if not noDA:
         try:
             step = 0
@@ -1089,7 +1096,6 @@ while (epoch < num_epochs):
 
         except tf.errors.OutOfRangeError:
             print('Done testing for %d steps.' % (step))
-        
 
     avgLoss_train = total_loss_train/nTrain
     avgLoss_test = total_loss_test/nTest
@@ -1222,5 +1228,3 @@ while (epoch < num_epochs):
     coord.join(threads)
     K.clear_session()
     epoch += 1
-    
-

@@ -12,3 +12,4 @@ dependencies:
  - matplotlib==2.2.4
  - pydot==1.2.4
  - tensorflow==1.6.0
+

@@ -12,6 +12,7 @@ dependencies:
  - matplotlib==2.2.4
  - pydot==1.2.4
  - tensorflow-gpu==1.6.0
- - gpustat==0.4.1
- - setGPU==0.0.7
+ - pip:
+    - gpustat==0.4.1
+    - setGPU==0.0.7
  

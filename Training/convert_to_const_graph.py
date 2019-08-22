@@ -67,7 +67,6 @@ else:
     
 prediction = tf.identity(class_prediction,name="prediction")
 
-
 if arguments.parametric:
     model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv], outputs=class_prediction)
 else:
@@ -95,7 +94,6 @@ feed_dict={
 }
 if arguments.parametric:
     feed_dict[tf_gen] = numpy.zeros(shape(tf_gen))
-
 
 prediction_val = sess.run(
     prediction,

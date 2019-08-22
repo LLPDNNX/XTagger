@@ -11,4 +11,7 @@ dependencies:
  - pypi::tensorflow-gpu==1.6.0
  - pypi::gpustat==0.4.1
  - pypi::setGPU==0.0.7
+ #- pip:
+    #- gpustat==0.4.1
+    #- setGPU==0.0.7
  

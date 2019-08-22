@@ -62,7 +62,7 @@ function run_setup()
     echo "Create environment for CPU"
     
     conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    conda deactivate tf_cpu &>> $LOGFILE || return 1
+    source deactivate tf_cpu &>> $LOGFILE || return 1
     
     conda list
     
@@ -80,13 +80,13 @@ function run_setup()
     echo "Create environment for GPU"
     
     conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
-    conda deactivate tf_gpu &>> $LOGFILE || return 1
+    source deactivate tf_gpu &>> $LOGFILE || return 1
     
     conda list
     
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh
-    echo "conda deactivate tf_gpu" >> $SCRIPT_DIR/env_gpu.sh
+    echo "source deactivate tf_gpu" >> $SCRIPT_DIR/env_gpu.sh
     echo "export LD_LIBRARY_PATH="$INSTALL_ABSDIR"/miniconda/envs/tf_cpu/x86_64-conda_cos6-linux-gnu/lib:\$LD_LIBRARY_PATH" >> $SCRIPT_DIR/env_gpu.sh
     echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_gpu.sh
     echo "export OMP_NUM_THREADS=16 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_gpu.sh

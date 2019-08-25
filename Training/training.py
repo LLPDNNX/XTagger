@@ -564,6 +564,18 @@ def random_ctau(start,end,v):
     h = ((h >> 16) ^ h) * 0x45d9f3b
     h = (h >> 16) ^ h
     return start+((17+h+h/100+h/10000)%(end-start))
+    
+    
+lr_per_epoch = []
+class_weight_per_epoch = []
+domain_weight_per_epoch = []
+    
+avgLoss_train_per_epoch = []
+avgLoss_test_per_epoch = []
+avgLoss_train_domain_per_epoch = []
+avgLoss_test_domain_per_epoch = []
+
+
 
 while (epoch < num_epochs):
 
@@ -595,7 +607,8 @@ while (epoch < num_epochs):
     #modelTest = setupModelDiscriminator()
     
     classLossWeight = 1.
-    domainLossWeight = max(0,epoch-2)/50.+(max(0,epoch-2)/75.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
     
     #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
     #since learning rate is decreased increase DA weight at higher epochs
@@ -604,6 +617,11 @@ while (epoch < num_epochs):
     if noDA:
         classLossWeight = 1.
         domainLossWeight = 0
+        
+    lr_per_epoch.append(learning_rate_val)
+    class_weight_per_epoch.append(classLossWeight)
+    domain_weight_per_epoch.append(domainLossWeight)
+        
         
     def wasserstein_loss(x,y):
         return K.mean(x*y)
@@ -621,7 +639,7 @@ while (epoch < num_epochs):
     optClass = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelClassDiscriminator.compile(optClass,
                        loss=classLossFctType, metrics=['accuracy'],
-                       loss_weights=[classLossWeight])
+                       loss_weights=[1.])
                        
     classLossFct = modelClassDiscriminator.total_loss #includes also regularization loss
     classInputGradients = tf.gradients(classLossFct,modelClassDiscriminator.inputs)
@@ -630,7 +648,7 @@ while (epoch < num_epochs):
     optDomain = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminator.compile(optDomain,
                        loss=domainLossFctType, metrics=['accuracy'],
-                       loss_weights=[domainLossWeight])
+                       loss_weights=[1.])
                        
     domainLossFct = modelDomainDiscriminator.total_loss #includes also regularization loss
     domainInputGradients = tf.gradients(domainLossFct,modelDomainDiscriminator.inputs)
@@ -649,7 +667,7 @@ while (epoch < num_epochs):
     optDomainFrozen = keras.optimizers.Adam(lr=learning_rate_val, beta_1=0.9, beta_2=0.999)
     modelDomainDiscriminatorFrozen.compile(optDomainFrozen,
                        loss=domainLossFctType, metrics=['accuracy'],
-                       loss_weights=[domainLossWeight])
+                       loss_weights=[1.])
  
     if epoch == 0:
         print "class network"
@@ -695,6 +713,10 @@ while (epoch < num_epochs):
     
     total_loss_train_domain = 0
     total_loss_test_domain = 0
+    
+    
+    
+    
 
     start_time = time.time()
 
@@ -718,7 +740,7 @@ while (epoch < num_epochs):
                 continue
                 
             if isParametric:
-                train_inputs_class = [train_batch_value['gen'][:, 0:1],
+                train_inputs_class = [train_batch_value['gen'],
                                 train_batch_value['globalvars'],
                                 train_batch_value['cpf'],
                                 train_batch_value['npf'],
@@ -752,24 +774,14 @@ while (epoch < num_epochs):
                             train_inputs_class[igrad]+=direction*classInputGradientsVal[igrad]
             
             if not noDA:
-                '''
-                train_batch_value_domain_1 = sess.run(train_batch_da)
-                train_batch_value_domain_2 = sess.run(train_batch_da)
-                if train_batch_value_domain_1['num'].shape[0]==0 or train_batch_value_domain_2['num'].shape[0]==0:
-                    continue
-                train_batch_value_domain = {}
-                
-                iterda = np.random.normal(0,0.1)
-                for k in train_batch_value_domain_1.keys():
-                    train_batch_value_domain[k] = train_batch_value_domain_1[k]+iterda*(train_batch_value_domain_2[k]-train_batch_value_domain_1[k])
-                '''
+
                 train_batch_value_domain = sess.run(train_batch_da)
                 #ctau = np.random.uniform(-2,5,size=(train_batch_value_domain.shape[0],1))
 
                 if isParametric:
                     train_inputs_domain = [
                                     #ctau,
-                                    train_batch_value['gen'][:, 0:1], #use the SAME liftimes as in MC!!!
+                                    train_batch_value['gen'], #use the SAME liftimes as in MC!!!
                                     train_batch_value_domain['globalvars'],
                                     train_batch_value_domain['cpf'],
                                     train_batch_value_domain['npf'],
@@ -811,7 +823,13 @@ while (epoch < num_epochs):
                         train_inputs_class, 
                         train_batch_value["truth"]
                     )
-                    train_outputs_domain = [0.,0.]
+                    train_outputs_domain = modelDomainDiscriminatorFrozen.test_on_batch(
+                        train_inputs_domain, 
+                        (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
+                        sample_weight=train_da_weight
+                    )
+                    
+                    
                 elif (epoch==0 and (step>30 and step<=60)) or (epoch>0 and step<=30):
                     #train domain discriminator only while keeping features frozen 
                     train_outputs_domain = modelDomainDiscriminatorFrozen.train_on_batch(
@@ -819,7 +837,12 @@ while (epoch < num_epochs):
                         (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
                         sample_weight=train_da_weight
                     )
-                    train_outputs = [0.,0.]
+                    train_outputs = modelClassDiscriminator.test_on_batch(
+                        train_inputs_class, 
+                        train_batch_value["truth"]
+                    )
+                    
+                    
                 else:
                     #finally train both discriminators together
                     train_outputs_fused = modelFusedDiscriminator.train_on_batch(
@@ -832,7 +855,7 @@ while (epoch < num_epochs):
                     )
                     train_outputs = train_outputs_fused[1],train_outputs_fused[3]
                     train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
-                        
+   
             else:
                 #train only class branch if noDA
                 train_outputs = modelClassDiscriminator.train_on_batch(
@@ -840,6 +863,7 @@ while (epoch < num_epochs):
                     train_batch_value["truth"]
                 )
                 train_outputs_domain = [0,0]
+            
             
             
 
@@ -952,7 +976,7 @@ while (epoch < num_epochs):
                 continue
 
             if isParametric:
-                test_inputs = [test_batch_value['gen'][:, 0],
+                test_inputs = [test_batch_value['gen'],
                                test_batch_value['globalvars'],
                                test_batch_value['cpf'],
                                test_batch_value['npf'],
@@ -965,7 +989,6 @@ while (epoch < num_epochs):
 
             test_outputs = modelClassDiscriminator.test_on_batch(test_inputs, test_batch_value["truth"])
             test_prediction = modelClassDiscriminator.predict_on_batch(test_inputs)
-            
             
             #print train_batch_value_domain["isData"][:10]
             #print train_batch_value_domain["xsecweight"][:10]
@@ -1068,6 +1091,11 @@ while (epoch < num_epochs):
     else:
         avgLoss_train_domain = total_loss_train_domain/nTrainDomain
         avgLoss_test_domain = total_loss_test_domain/nTestDomain
+        
+    avgLoss_train_per_epoch.append(avgLoss_train)
+    avgLoss_test_per_epoch.append(avgLoss_test)
+    avgLoss_train_domain_per_epoch.append(avgLoss_train_domain)
+    avgLoss_test_domain_per_epoch.append(avgLoss_test_domain)
 
     if epoch == 0:
 
@@ -1181,7 +1209,69 @@ while (epoch < num_epochs):
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
     f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+"\n")
     f.close()
-
+    
+    cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
+    '''
+    cv.Divide(1,3,0,0)
+    cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
+    cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
+    cv.GetPad(3).SetPad(0.0, 0.0, 1.0, 1.0)
+    cv.GetPad(1).SetFillStyle(4000)
+    cv.GetPad(2).SetFillStyle(4000)
+    cv.GetPad(3).SetFillStyle(4000)
+    cv.GetPad(1).SetMargin(0.135, 0.04, 0.6, 0.06)
+    cv.GetPad(2).SetMargin(0.135, 0.04, 0.27, 0.42)
+    cv.GetPad(3).SetMargin(0.135, 0.04, 0.15, 0.75)
+    #cv.GetPad(1).SetLogy(1)
+    cv.GetPad(2).SetLogy(1)
+    cv.GetPad(3).SetLogy(1)
+    cv.cd(1)
+    '''
+    cv.SetMargin(0.135, 0.04, 0.13, 0.04)
+    epocharray = np.linspace(1,len(lr_per_epoch),len(lr_per_epoch))
+    axis1 = ROOT.TH2F("axis1"+str(random.random()),";Epoch;Loss",
+        50,0,len(lr_per_epoch)+1,
+        50,
+        0.85*min(avgLoss_train_per_epoch+avgLoss_test_per_epoch+avgLoss_train_domain_per_epoch+avgLoss_test_domain_per_epoch),
+        1.15*max(avgLoss_train_per_epoch+avgLoss_test_per_epoch+avgLoss_train_domain_per_epoch+avgLoss_test_domain_per_epoch)
+    )
+    axis1.GetXaxis().SetTickLength(0.015/(1-cv.GetLeftMargin()-cv.GetRightMargin()))
+    axis1.GetYaxis().SetTickLength(0.015/(1-cv.GetTopMargin()-cv.GetBottomMargin()))
+    axis1.Draw("AXIS")
+    
+    g_train_class = ROOT.TGraph(len(epocharray),epocharray,np.array(avgLoss_train_per_epoch))
+    g_train_class.SetLineWidth(2)
+    g_train_class.SetLineColor(ROOT.kAzure-4)
+    g_train_class.SetMarkerColor(ROOT.kAzure-4)
+    g_train_class.SetMarkerSize(1.2)
+    g_train_class.Draw("PL")
+    g_test_class = ROOT.TGraph(len(epocharray),epocharray,np.array(avgLoss_test_per_epoch))
+    g_test_class.SetLineWidth(4)
+    g_test_class.SetLineStyle(2)
+    g_test_class.SetLineColor(ROOT.kBlue)
+    g_test_class.Draw("L")
+    g_train_domain = ROOT.TGraph(len(epocharray),epocharray,np.array(avgLoss_train_domain_per_epoch))
+    g_train_domain.SetLineWidth(2)
+    g_train_domain.SetLineColor(ROOT.kOrange+7)
+    g_train_domain.SetMarkerColor(ROOT.kOrange+7)
+    g_train_domain.SetMarkerSize(1.2)
+    g_train_domain.Draw("PL")
+    g_test_domain = ROOT.TGraph(len(epocharray),epocharray,np.array(avgLoss_test_domain_per_epoch))
+    g_test_domain.SetLineWidth(4)
+    g_test_domain.SetLineStyle(2)
+    g_test_domain.SetLineColor(ROOT.kRed+1)
+    g_test_domain.Draw("L")
+    cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"loss.pdf"))
+    '''
+    lr_per_epoch = []
+    class_weight_per_epoch = []
+    domain_weight_per_epoch = []
+        
+    avgLoss_train_per_epoch = []
+    avgLoss_test_per_epoch = []
+    avgLoss_train_domain_per_epoch = []
+    avgLoss_test_domain_per_epoch = []
+    '''
     if epoch > 1 and previous_train_loss < avgLoss_train:
         learning_rate_val = learning_rate_val*0.85
         print "Decreasing learning rate to %.4e" % (learning_rate_val)

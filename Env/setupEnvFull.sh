@@ -44,8 +44,8 @@ function run_setup()
         return 1
     fi
 
-    wget -P $INSTALL_ABSDIR https://repo.continuum.io/miniconda/Miniconda2-4.3.31-Linux-x86_64.sh &>> $LOGFILE || return 1
-    bash $INSTALL_ABSDIR/Miniconda2-4.3.31-Linux-x86_64.sh -b -s -p $INSTALL_ABSDIR/miniconda &>> $LOGFILE || return 1
+    wget -P $INSTALL_ABSDIR https://repo.continuum.io/miniconda/Miniconda2-4.7.10-Linux-x86_64.sh &>> $LOGFILE || return 1
+    bash $INSTALL_ABSDIR/Miniconda2-4.7.10-Linux-x86_64.sh -b -s -p $INSTALL_ABSDIR/miniconda &>> $LOGFILE || return 1
 
     CONDA_BIN=$INSTALL_ABSDIR/miniconda/bin
     export PATH=$CONDA_BIN:$PATH
@@ -59,7 +59,7 @@ function run_setup()
    
     echo "Create environment for CPU"
     
-    conda env create -f $SCRIPT_DIR/environment_cpu.yml -q python=2.7 &>> $LOGFILE || return 1
+    conda env create -f $SCRIPT_DIR/environment_cpu.yml -q &>> $LOGFILE || return 1
     source activate tf_cpu
     conda list
     source deactivate &>> $LOGFILE || return 1
@@ -75,7 +75,7 @@ function run_setup()
     
     echo "Create environment for GPU"
      
-    conda env create -f $SCRIPT_DIR/environment_gpu.yml -q python=2.7 &>> $LOGFILE || return 1
+    conda env create -f $SCRIPT_DIR/environment_gpu.yml -q &>> $LOGFILE || return 1
     source activate tf_gpu
     conda list
     source deactivate &>> $LOGFILE || return 1
@@ -83,7 +83,7 @@ function run_setup()
     echo "Generate setup script"
     echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh
     echo "source activate tf_gpu" >> $SCRIPT_DIR/env_gpu.sh
-    echo "export LD_LIBRARY_PATH="$INSTALL_ABSDIR"/miniconda/envs/tf_cpu/x86_64-conda_cos6-linux-gnu/lib:\$LD_LIBRARY_PATH" >> $SCRIPT_DIR/env_gpu.sh
+    echo "export LD_LIBRARY_PATH="$INSTALL_ABSDIR"/miniconda/envs/tf_gpu/x86_64-conda_cos6-linux-gnu/lib:\$LD_LIBRARY_PATH" >> $SCRIPT_DIR/env_gpu.sh
     echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_gpu.sh
     echo "export OMP_NUM_THREADS=16 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_gpu.sh
     echo "ulimit -s unlimited" >> $SCRIPT_DIR/env_gpu.sh

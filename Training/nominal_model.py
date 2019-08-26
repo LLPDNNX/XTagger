@@ -92,7 +92,7 @@ class ModelDA(object):
         self.useWasserstein = useWasserstein
         with tf.variable_scope("cpf_conv"):
             self.cpf_conv = Sequence(scope='cpf_conv')
-            self.cpf_conv.add(keras.layers.BatchNormalization())
+            #self.cpf_conv.add(keras.layers.BatchNormalization())
             self.cpf_conv.add(Conv(64,1,1,options=options,name="cpf_conv1"))
             self.cpf_conv.add(Conv(32,1,1,options=options,name="cpf_conv2"))
             self.cpf_conv.add(Conv(32,1,1,options=options,name="cpf_conv3"))
@@ -100,7 +100,7 @@ class ModelDA(object):
             
         with tf.variable_scope("npf_conv"):
             self.npf_conv = Sequence(scope='npf_conv')
-            self.npf_conv.add(keras.layers.BatchNormalization())
+            #self.npf_conv.add(keras.layers.BatchNormalization())
             self.npf_conv.add(Conv(32,1,1,options=options,name="npf_conv1"))
             self.npf_conv.add(Conv(16,1,1,options=options,name="npf_conv2"))
             self.npf_conv.add(Conv(16,1,1,options=options,name="npf_conv3"))
@@ -108,7 +108,7 @@ class ModelDA(object):
         
         with tf.variable_scope("sv_conv"):
             self.sv_conv = Sequence(scope='sv_conv')
-            self.sv_conv.add(keras.layers.BatchNormalization())
+            #self.sv_conv.add(keras.layers.BatchNormalization())
             self.sv_conv.add(Conv(32,1,1,options=options,name="sv_conv1"))
             self.sv_conv.add(Conv(16,1,1,options=options,name="sv_conv2"))
             self.sv_conv.add(Conv(16,1,1,options=options,name="sv_conv3"))
@@ -128,7 +128,7 @@ class ModelDA(object):
             self.global_norm = keras.layers.BatchNormalization()
             self.full_features = Sequence(scope='features')
             self.full_features.add(keras.layers.Concatenate())
-            self.full_features.add(Dense(200,options=options,name="features1"))
+            self.full_features.add(Dense(200,options=options,name="features1",activation=None))
             self.full_features.add(keras.layers.Activation('tanh',name="features2"))
             #self.full_features.add(keras.layers.GaussianNoise(0.1))
         '''
@@ -158,7 +158,7 @@ class ModelDA(object):
                 else:
                     backward = tf.negative(x*tf.exp(tf.abs(x)))
                 forward = tf.identity(x)
-                return backward + tf.stop_gradient(forward - backward)
+                return (backward + tf.stop_gradient(forward - backward))
                 
             self.domain_prediction = Sequence(scope='domain_prediction')
             self.domain_prediction.add(keras.layers.Lambda(gradientReverse))
@@ -185,9 +185,9 @@ class ModelDA(object):
         globalvars_norm = self.global_norm(globalvars)
         
         if self.isParametric:
-            full_features = self.full_features([globalvars_norm,gen,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([globalvars,gen,cpf_lstm,npf_lstm,sv_lstm])
         else:
-            full_features = self.full_features([globalvars_norm,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([globalvars,cpf_lstm,npf_lstm,sv_lstm])
             
         return full_features
     

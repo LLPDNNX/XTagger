@@ -64,6 +64,8 @@ parser.add_argument('--bagging', action='store', type=float, help='bagging fract
                     default=1., dest='bagging')
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
+parser.add_argument('--domainLossWeight', type=float,help='domain loss weight',
+                    default=-1,dest='domainLossWeight')
 
 arguments = parser.parse_args()
 
@@ -608,6 +610,8 @@ while (epoch < num_epochs):
     
     classLossWeight = 1.
     domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    if arguments.domainLossWeight != -1:
+        domainLossWeight = arguments.domainLossWeight
     #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
     
     #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
@@ -1114,6 +1118,7 @@ while (epoch < num_epochs):
     M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
     labels = ["B","C","UDS","G","LLP"]
+    JSD_scores = []
     
     if not noDA:
         for idis in range(len(featureDict["truth"]["branches"])):
@@ -1130,6 +1135,8 @@ while (epoch < num_epochs):
             
             statictics = ""
             if daHists[idis][0].Integral()>0.:
+                MCNorm = daHists[idis][0].Integral()
+                dataNorm = daHists[idis][1].Integral()
                 daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
             
                 eventsAboveWp = {
@@ -1138,10 +1145,18 @@ while (epoch < num_epochs):
                     95: [0.,0.],
                 }
                 sumMC = 0.
+                sumJSD = 0.
                 for ibin in range(daHists[idis][0].GetNbinsX()):
                     cMC = daHists[idis][0].GetBinContent(ibin+1)
                     sumMC += cMC
                     cData = daHists[idis][1].GetBinContent(ibin+1)
+                    # Calculate JSD
+                    MCProb = cMC/MCNorm
+                    dataProb = cData/dataNorm
+                    mean = 0.5*(MCProb+dataProb)
+                    if MCProb > 0 and dataProb > 0:
+                        sumJSD += 0.5*(MCProb*math.log10(MCProb/mean))+0.5*(dataProb*math.log10(dataProb/mean))
+
                     for wp in eventsAboveWp.keys():
                         if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
                             eventsAboveWp[wp][0]+=cMC
@@ -1155,8 +1170,9 @@ while (epoch < num_epochs):
                     if iwp<(len(eventsAboveWp.keys())-1):
                         statictics+=","
                     statictics+="  "
-                
-            
+                statictics+="JSD = %.7f" % sumJSD
+                JSD_scores.append(sumJSD)
+
             daHists[idis][0].Rebin(200)
             daHists[idis][1].Rebin(200)
             ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
@@ -1207,7 +1223,7 @@ while (epoch < num_epochs):
     
     
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
-    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+"\n")
+    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+";"+str(sum(JSD_scores)/len(JSD_scores))+"\n")
     f.close()
     
     cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)

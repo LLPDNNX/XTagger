@@ -1105,6 +1105,7 @@ while (epoch < num_epochs):
                 test_batch_value_domain = sess.run(test_batch_da)
                 if test_batch_value_domain['num'].shape[0]==0:
                     continue
+               
                 for logctau in range(-2, 5):
                     if isParametric:
                         test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*logctau,
@@ -1133,6 +1134,7 @@ while (epoch < num_epochs):
 
                         for idis in range(len(featureDict["truth"]["branches"])):
                             daHists[logctau][idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+<<<<<<< HEAD
 
                 if isParametric:
                     #ctau = 0.#np.random.randint(-3, 5)
@@ -1186,8 +1188,33 @@ while (epoch < num_epochs):
 
                     
 
+=======
+                   
+>>>>>>> fix pre-processing nad merge
                     if logctau == 0:
-
+         
+                        if epoch==0:
+                            preprocDomainVal = modelPreprocDomain.predict_on_batch(test_inputs_domain)
+                            for igroup,featureGroup in enumerate(["globalvars","cpf","npf","sv"]):
+                                groupValues = preprocDomainVal[igroup]
+                                if len(groupValues.shape)==3:
+                                    groupValues = groupValues[:,0,:]
+                                    #groupValues = np.mean(groupValues,axis=1)
+                                for ifeature,featureName in enumerate(featureDict[featureGroup]['branches']):
+                                    values = groupValues[:,ifeature]
+                                         
+                                    for ival in range(len(values)):
+                                        if test_batch_value_domain["isData"][ival,0]>0.5:
+                                            preprocHists[featureGroup][featureName]["domain_data"].Fill(
+                                                values[ival],
+                                                test_batch_value_domain["xsecweight"][ival,0]
+                                            )
+                                        else:
+                                            preprocHists[featureGroup][featureName]["domain_mc"].Fill(
+                                                values[ival],
+                                                test_batch_value_domain["xsecweight"][ival,0]
+                                            )
+         
                         nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
 
                         nTestDomain += nTestBatchDomain

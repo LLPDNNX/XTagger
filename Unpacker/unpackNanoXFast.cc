@@ -227,7 +227,6 @@ class UnpackedTree
         float muon_timeAtIpOutIn [maxEntries_muon];
 
         unsigned int nelectron;
-	int electron_jetIdx[maxEntries_electron];
         float electron_ptrel[maxEntries_electron];
         float electron_jetDeltaR[maxEntries_electron]; 
         float electron_deta[maxEntries_electron];
@@ -240,12 +239,10 @@ class UnpackedTree
         float electron_ecalEnergy[maxEntries_electron]; 
         float electron_isPassConversionVeto[maxEntries_electron];
         float electron_convDist[maxEntries_electron]; 
-        int   electron_convFlags[maxEntries_electron]; 
+        float electron_convFlags[maxEntries_electron]; 
         float electron_convRadius[maxEntries_electron]; 
         float electron_hadronicOverEm[maxEntries_electron];
         float electron_ecalDrivenSeed[maxEntries_electron];
-
-    // superCluster block
 
         float electron_SC_energy[maxEntries_electron]; 
         float electron_SC_deta[maxEntries_electron]; 
@@ -279,7 +276,6 @@ class UnpackedTree
         float electron_deltaPhiSuperClusterTrackAtVtx[maxEntries_electron];
         float electron_sCseedEta[maxEntries_electron];  
 
-    // electron gsf variables. 
         float electron_EtaRel[maxEntries_electron]; 
         float electron_dxy[maxEntries_electron]; 
         float electron_dz[maxEntries_electron];
@@ -287,16 +283,13 @@ class UnpackedTree
         float electron_gsfCharge[maxEntries_electron];
 
 
-        int   electron_numberOfBrems[maxEntries_electron];
+        float electron_numberOfBrems[maxEntries_electron];
         float electron_trackFbrem[maxEntries_electron]; 
         float electron_fbrem[maxEntries_electron]; 
         float electron_e5x5[maxEntries_electron]; 
         float electron_e5x5Rel[maxEntries_electron]; 
         float electron_e1x5Overe5x5[maxEntries_electron]; 
         float electron_e2x5MaxOvere5x5[maxEntries_electron];
-
-    // 5*5 cells cluster 
-    //
 
         float electron_full5x5_e5x5[maxEntries_electron];
         float electron_full5x5_e5x5Rel[maxEntries_electron]; 
@@ -307,9 +300,7 @@ class UnpackedTree
         float electron_full5x5_e2x5MaxOvere5x5[maxEntries_electron];
         float electron_full5x5_e2x5RightOvere5x5[maxEntries_electron];
         float electron_full5x5_e2x5TopOvere5x5[maxEntries_electron];
-
-
-
+        
         float electron_full5x5_eBottomOvere5x5[maxEntries_electron];
         float electron_full5x5_eLeftOvere5x5[maxEntries_electron];
         float electron_full5x5_eRightOvere5x5[maxEntries_electron];
@@ -322,9 +313,6 @@ class UnpackedTree
         float electron_full5x5_hcalOverEcalBc[maxEntries_electron];   
         float electron_full5x5_r9[maxEntries_electron];
 
-
-
-    // Isolation block
         float electron_neutralHadronIso[maxEntries_electron]; 
         float electron_particleIso [maxEntries_electron]; 
         float electron_photonIso[maxEntries_electron];
@@ -567,7 +555,6 @@ class UnpackedTree
 
 	    
             tree_->Branch("nelectron",&nelectron,"nelectron/I",bufferSize);
-            tree_->Branch("electron_jetIdx",&electron_jetIdx,"electron_jetIdx/I",bufferSize);
             tree_->Branch("electron_ptrel",&electron_ptrel,"electron_ptrel[nelectron]/F",bufferSize);
             tree_->Branch("electron_jetDeltaR",&electron_jetDeltaR,"electron_jetDeltaR[nelectron]/F" ,bufferSize); 
             tree_->Branch("electron_deta",&electron_deta,"electron_deta[nelectron]/F",bufferSize);
@@ -579,13 +566,11 @@ class UnpackedTree
             tree_->Branch("electron_isEE",&electron_isEE,"electron_isEE[nelectron]/F",bufferSize); 
             tree_->Branch("electron_ecalEnergy",&electron_ecalEnergy,"electron_ecalEnergy[nelectron]/F",bufferSize); 
             tree_->Branch("electron_isPassConversionVeto", &electron_isPassConversionVeto, "electron_isPassConversionVeto[nelectron]/F" ,bufferSize);
-            tree_->Branch("electron_convDist",&electron_convDist,"electron_convDist[nelectron]" ,bufferSize); 
-            tree_->Branch("electron_convFlags",&electron_convFlags,"electron_convFlags[nelectron]/I",bufferSize); 
+            tree_->Branch("electron_convDist",&electron_convDist,"electron_convDist[nelectron]/F" ,bufferSize); 
+            tree_->Branch("electron_convFlags",&electron_convFlags,"electron_convFlags[nelectron]/F",bufferSize); 
             tree_->Branch("electron_convRadius",&electron_convRadius,"electron_convRadius[nelectron]/F",bufferSize); 
             tree_->Branch("electron_hadronicOverEm",&electron_hadronicOverEm,"electron_hadronicOverEm[nelectron]/F",bufferSize);
             tree_->Branch("electron_ecalDrivenSeed",&electron_ecalDrivenSeed,"electron_ecalDrivenSeed[nelectron]/F",bufferSize);
-
-    // superCluster block
 
             tree_->Branch("electron_SC_energy",&electron_SC_energy,"electron_SC_energy[nelectron]/F",bufferSize); 
             tree_->Branch("electron_SC_deta",&electron_SC_deta,"electron_SC_deta[nelectron]/F",bufferSize); 
@@ -619,15 +604,13 @@ class UnpackedTree
             tree_->Branch("electron_deltaPhiSuperClusterTrackAtVtx",&electron_deltaPhiSuperClusterTrackAtVtx,"electron_deltaPhiSuperClusterTrackAtVtx[nelectron]/F",bufferSize);
             tree_->Branch("electron_sCseedEta",&electron_sCseedEta,"electron_sCseedEta[nelectron]/F",bufferSize);  
 
-    // electron gsf variables. 
             tree_->Branch("electron_EtaRel",&electron_EtaRel,"electron_EtaRel[nelectron]/F",bufferSize); 
             tree_->Branch("electron_dxy",&electron_dxy,"electron_dxy[nelectron]/F",bufferSize); 
             tree_->Branch("electron_dz",&electron_dz,"electron_dz[nelectron]/F",bufferSize);
             tree_->Branch("electron_nbOfMissingHits",&electron_nbOfMissingHits,"electron_nbOfMissingHits[nelectron]/F",bufferSize); 
             tree_->Branch("electron_gsfCharge",&electron_gsfCharge,"electron_gsfCharge[nelectron]/F",bufferSize);
 
-
-            tree_->Branch("electron_numberOfBrems",&electron_numberOfBrems,"electron_numberOfBrems[nelectron]/I",bufferSize);
+            tree_->Branch("electron_numberOfBrems",&electron_numberOfBrems,"electron_numberOfBrems[nelectron]/F",bufferSize);
             tree_->Branch("electron_trackFbrem",&electron_trackFbrem,"electron_trackFbrem[nelectron]/F",bufferSize); 
             tree_->Branch("electron_fbrem",&electron_fbrem,"electron_fbrem[nelectron]/F",bufferSize); 
             tree_->Branch("electron_e5x5",&electron_e5x5,"electron_e5x5[nelectron]/F",bufferSize); 
@@ -635,8 +618,6 @@ class UnpackedTree
             tree_->Branch("electron_e1x5Overe5x5",&electron_e1x5Overe5x5,"electron_e1x5Overe5x5[nelectron]/F",bufferSize); 
             tree_->Branch("electron_e2x5MaxOvere5x5",&electron_e2x5MaxOvere5x5,"electron_e2x5MaxOvere5x5[nelectron]/F",bufferSize);
 
-    // 5*5 cells cluster 
-    //
 
             tree_->Branch("electron_full5x5_e5x5",&electron_full5x5_e5x5,"electron_full5x5_e5x5[nelectron]/F",bufferSize);
             tree_->Branch("electron_full5x5_e5x5Rel",&electron_full5x5_e5x5Rel,"electron_full5x5_e5x5Rel[nelectron]/F",bufferSize); 
@@ -663,8 +644,6 @@ class UnpackedTree
             tree_->Branch("electron_full5x5_r9",&electron_full5x5_r9,"electron_full5x5_r9[nelectron]/F",bufferSize);
 
 
-
-    // Isolation block
             tree_->Branch("electron_neutralHadronIso",&electron_neutralHadronIso,"electron_neutralHadronIso[nelectron]/F",bufferSize); 
             tree_->Branch("electron_particleIso",&electron_particleIso,"electron_particleIso[nelectron]/F",bufferSize); 
             tree_->Branch("electron_photonIso",&electron_photonIso,"electron_photonIso[nelectron]/F",bufferSize);
@@ -953,10 +932,8 @@ class NanoXTree
         float muon_timeAtIpInOutErr [maxEntries]; 
         float muon_timeAtIpOutIn [maxEntries]; 
 
-        unsigned int nelectron;
 
-        unsigned int nelec;
-	int   electron_jetIdx[maxEntries];
+        unsigned int nelectron;
         float electron_ptrel[maxEntries];
         float electron_jetDeltaR[maxEntries]; 
         float electron_deta[maxEntries];
@@ -969,12 +946,10 @@ class NanoXTree
         float electron_ecalEnergy[maxEntries]; 
         float electron_isPassConversionVeto[maxEntries];
         float electron_convDist[maxEntries]; 
-        int   electron_convFlags[maxEntries]; 
+        int electron_convFlags[maxEntries]; 
         float electron_convRadius[maxEntries]; 
         float electron_hadronicOverEm[maxEntries];
         float electron_ecalDrivenSeed[maxEntries];
-
-    // superCluster block
 
         float electron_SC_energy[maxEntries]; 
         float electron_SC_deta[maxEntries]; 
@@ -1008,7 +983,6 @@ class NanoXTree
         float electron_deltaPhiSuperClusterTrackAtVtx[maxEntries];
         float electron_sCseedEta[maxEntries];  
 
-    // electron gsf variables. 
         float electron_EtaRel[maxEntries]; 
         float electron_dxy[maxEntries]; 
         float electron_dz[maxEntries];
@@ -1016,16 +990,13 @@ class NanoXTree
         float electron_gsfCharge[maxEntries];
 
 
-        int   electron_numberOfBrems[maxEntries];
+        int electron_numberOfBrems[maxEntries];
         float electron_trackFbrem[maxEntries]; 
         float electron_fbrem[maxEntries]; 
         float electron_e5x5[maxEntries]; 
         float electron_e5x5Rel[maxEntries]; 
         float electron_e1x5Overe5x5[maxEntries]; 
         float electron_e2x5MaxOvere5x5[maxEntries];
-
-    // 5*5 cells cluster 
-    //
 
         float electron_full5x5_e5x5[maxEntries];
         float electron_full5x5_e5x5Rel[maxEntries]; 
@@ -1053,7 +1024,6 @@ class NanoXTree
 
 
 
-    // Isolation block
         float electron_neutralHadronIso[maxEntries]; 
         float electron_particleIso [maxEntries]; 
         float electron_photonIso[maxEntries];
@@ -1311,7 +1281,7 @@ class NanoXTree
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
 		  
-	    tree_->SetBranchAddress("nmuon",&nmuon); 
+            tree_->SetBranchAddress("nmuon",&nmuon); 
             tree_->SetBranchAddress("muon_isGlobal",&muon_isGlobal); 
             tree_->SetBranchAddress("muon_isTight",&muon_isTight); 
             tree_->SetBranchAddress("muon_isMedium",&muon_isMedium); 
@@ -1361,7 +1331,6 @@ class NanoXTree
  
             tree_->SetBranchAddress("nelectron",&nelectron); 
  
-//            tree_->SetBranchAddress("nelec",&nelec);
             tree_->SetBranchAddress("electron_jetIdx",&electron_jetIdx);
             tree_->SetBranchAddress("electron_ptrel",&electron_ptrel);
             tree_->SetBranchAddress("electron_jetDeltaR",&electron_jetDeltaR); 
@@ -1379,8 +1348,6 @@ class NanoXTree
             tree_->SetBranchAddress("electron_convRadius",&electron_convRadius); 
             tree_->SetBranchAddress("electron_hadronicOverEm",&electron_hadronicOverEm);
             tree_->SetBranchAddress("electron_ecalDrivenSeed",&electron_ecalDrivenSeed);
-
-    // superCluster block
 
             tree_->SetBranchAddress("electron_SC_energy",&electron_SC_energy); 
             tree_->SetBranchAddress("electron_SC_deta",&electron_SC_deta); 
@@ -1414,7 +1381,6 @@ class NanoXTree
             tree_->SetBranchAddress("electron_deltaPhiSuperClusterTrackAtVtx",&electron_deltaPhiSuperClusterTrackAtVtx);
             tree_->SetBranchAddress("electron_sCseedEta",&electron_sCseedEta);  
 
-    // electron gsf variables. 
             tree_->SetBranchAddress("electron_EtaRel",&electron_EtaRel); 
             tree_->SetBranchAddress("electron_dxy",&electron_dxy); 
             tree_->SetBranchAddress("electron_dz",&electron_dz);
@@ -1429,9 +1395,6 @@ class NanoXTree
             tree_->SetBranchAddress("electron_e5x5Rel",&electron_e5x5Rel); 
             tree_->SetBranchAddress("electron_e1x5Overe5x5",&electron_e1x5Overe5x5); 
             tree_->SetBranchAddress("electron_e2x5MaxOvere5x5",&electron_e2x5MaxOvere5x5);
-
-    // 5*5 cells cluster 
-    //
 
             tree_->SetBranchAddress("electron_full5x5_e5x5",&electron_full5x5_e5x5);
             tree_->SetBranchAddress("electron_full5x5_e5x5Rel",&electron_full5x5_e5x5Rel); 
@@ -1457,9 +1420,6 @@ class NanoXTree
             tree_->SetBranchAddress("electron_full5x5_hcalOverEcalBc",&electron_full5x5_hcalOverEcalBc);   
             tree_->SetBranchAddress("electron_full5x5_r9",&electron_full5x5_r9);
 
-
-
-    // Isolation block
             tree_->SetBranchAddress("electron_neutralHadronIso",&electron_neutralHadronIso); 
             tree_->SetBranchAddress("electron_particleIso",&electron_particleIso); 
             tree_->SetBranchAddress("electron_photonIso",&electron_photonIso);
@@ -1716,7 +1676,7 @@ class NanoXTree
             
             
             rand = uniform_dist_(randomGenerator_);
-            //ctau = 1e9;
+            ctau = 1e-10;
             pt = global_pt[jet];
             
             for (auto setter: setters_)
@@ -2050,7 +2010,6 @@ class NanoXTree
             for (int i = 0; i < nelectron; ++i)
             {
 
-       	        unpackedTree.electron_jetIdx[i] = electron_jetIdx[electron_offset+i];
                 unpackedTree.electron_ptrel[i] = electron_ptrel[electron_offset+i]; 
                 unpackedTree.electron_jetDeltaR[i] =electron_jetDeltaR[electron_offset+i];  
                 unpackedTree.electron_deta[i] = electron_deta[electron_offset+i]; 
@@ -2067,8 +2026,6 @@ class NanoXTree
                 unpackedTree.electron_convRadius[i] = electron_convRadius[electron_offset+i];  
                 unpackedTree.electron_hadronicOverEm[i] = electron_hadronicOverEm[electron_offset+i]; 
                 unpackedTree.electron_ecalDrivenSeed[i] = electron_ecalDrivenSeed[electron_offset+i]; 
-
-    // superCluster block
 
                 unpackedTree.electron_SC_energy[i] = electron_SC_energy[electron_offset+i];  
                 unpackedTree.electron_SC_deta[i] = electron_SC_deta[electron_offset+i];  
@@ -2102,7 +2059,6 @@ class NanoXTree
                 unpackedTree.electron_deltaPhiSuperClusterTrackAtVtx [i] = electron_deltaPhiSuperClusterTrackAtVtx[electron_offset+i]; 
                 unpackedTree.electron_sCseedEta [i] = electron_sCseedEta[electron_offset+i];   
 
-    //     unpackedTree.electron gsf variables. 
                 unpackedTree.electron_EtaRel [i] = electron_EtaRel[electron_offset+i];  
                 unpackedTree.electron_dxy [i] = electron_dxy[electron_offset+i];  
                 unpackedTree.electron_dz [i] = electron_dz[electron_offset+i]; 
@@ -2118,8 +2074,6 @@ class NanoXTree
                 unpackedTree.electron_e1x5Overe5x5 [i] = electron_e1x5Overe5x5[electron_offset+i];  
                 unpackedTree.electron_e2x5MaxOvere5x5[i] = electron_e2x5MaxOvere5x5[electron_offset+i]; 
 
-    // 5*5 cells cluster 
-    //
 
                 unpackedTree.electron_full5x5_e5x5 [i] = electron_full5x5_e5x5[electron_offset+i]; 
                 unpackedTree.electron_full5x5_e5x5Rel [i] = electron_full5x5_e5x5Rel[electron_offset+i];  
@@ -2145,9 +2099,6 @@ class NanoXTree
                 unpackedTree.electron_full5x5_hcalOverEcalBc[i] = electron_full5x5_hcalOverEcalBc[electron_offset+i];    
                 unpackedTree.electron_full5x5_r9 [i] = electron_full5x5_r9[electron_offset+i]; 
 
-
-
-    // Isolation block
                 unpackedTree.electron_neutralHadronIso[i] = electron_neutralHadronIso[electron_offset+i];  
                 unpackedTree.electron_particleIso [i] = electron_particleIso[electron_offset+i];  
                 unpackedTree.electron_photonIso[i] = electron_photonIso[electron_offset+i]; 

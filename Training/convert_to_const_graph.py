@@ -48,7 +48,7 @@ if arguments.parametric:
     print "gen shape: ",gen.shape.as_list()
 
 modelDA = nominal_model.ModelDA(
-    len(featureDict["truth"]["branches"]),
+    featureDict,
     isParametric=arguments.parametric,
     useLSTM=False
 )
@@ -68,8 +68,11 @@ if arguments.parametric:
 else:
     model = keras.Model(inputs=[globalvars, cpf, npf, sv], outputs=class_prediction)
 
+
+train_writer = tf.summary.FileWriter("graph",sess.graph)
 init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
 sess.run(init_op)
+train_writer.close()
 
 def shape(tf_tensor):
     dims = tf_tensor.shape.as_list()
@@ -96,11 +99,14 @@ prediction_val = sess.run(
     feed_dict=feed_dict
 )
 
+
+
 const_graph = tf.graph_util.convert_variables_to_constants(
     sess,
     sess.graph.as_graph_def(),
     ["prediction"]
 )
+#print [n.name for n in const_graph.node]
 tf.train.write_graph(const_graph,"",arguments.weightfile[0].replace("hdf5","pb"),as_text=False)
 
 print "Sucessfully saved graph and weights into '%s'"%arguments.weightfile[0].replace("hdf5","pb")

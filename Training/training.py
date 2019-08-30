@@ -400,50 +400,7 @@ makePlot(outputFolder, weightsPt, branchNameList, binningPt,
 makePlot(outputFolder, weightsEta, branchNameList, binningEta,
          ";Jet #eta;Weight", "weight_eta", logy=0)
          
-             
-         
 
-   
-def setupDiscriminators(modelDA,add_summary=False, options={}):
-    result = {}
-
-    if isParametric:
-        gen = keras.layers.Input(shape=(1,))
-    else:
-        gen = None
-    globalvars = keras.layers.Input(
-            shape=(len(featureDict["globalvars"]["branches"]),))
-    cpf = keras.layers.Input(shape=(
-        featureDict["cpf"]["max"], len(featureDict["cpf"]["branches"])))
-    npf = keras.layers.Input(shape=(
-        featureDict["npf"]["max"], len(featureDict["npf"]["branches"])))
-    sv = keras.layers.Input(shape=(
-        featureDict["sv"]["max"], len(featureDict["sv"]["branches"])))
-
-    classPrediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen)
-    domainPrediction = modelDA.predictDomain(globalvars,cpf,npf,sv,gen)
-
-    inputs = []
-    if isParametric:
-        inputs.append(gen)
-    inputs.append(globalvars)
-    inputs.append(cpf)
-    inputs.append(npf)
-    inputs.append(sv)
-        
-    return {
-        "class":
-            keras.Model(
-                inputs=inputs, 
-                outputs=[classPrediction]
-            ),
-        "domain":
-            keras.Model(
-                inputs=inputs, 
-                outputs=[domainPrediction]
-            )
-    }
-    
     
 def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
     result = {}
@@ -470,9 +427,15 @@ def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
         featureDict["sv"]["max"], len(featureDict["sv"]["branches"])))
     svDomain = keras.layers.Input(shape=(
         featureDict["sv"]["max"], len(featureDict["sv"]["branches"])))
+        
+        
+    preprocClass = modelDA.getPreprocFeatures(globalvarsClass,cpfClass,npfClass,svClass)
+    preprocDomain = modelDA.getPreprocFeatures(globalvarsDomain,cpfDomain,npfDomain,svDomain)
 
     classPrediction = modelDA.predictClass(globalvarsClass,cpfClass,npfClass,svClass,genClass)
     domainPrediction = modelDA.predictDomain(globalvarsDomain,cpfDomain,npfDomain,svDomain,genDomain)
+    
+    
 
     inputsClass = []
     inputsDomain = []
@@ -496,6 +459,14 @@ def setupDiscriminatorsFused(modelDA,add_summary=False, options={}):
             inputs=inputsDomain, 
             outputs=[domainPrediction]
         ),
+        "preprocClass": keras.Model(
+            inputs=inputsClass,
+            outputs=preprocClass
+        ),
+        "preprocDomain": keras.Model(
+            inputs=inputsDomain,
+            outputs=preprocDomain
+        )
         
     }
         
@@ -600,7 +571,7 @@ while (epoch < num_epochs):
         test_batch_da = input_pipeline(fileListTestDA,featureDictDA, batchSize/5,resample=False,repeat=1) #break test loop on exception
 
     modelDA = modelModule.ModelDA(
-        len(featureDict["truth"]["branches"]),
+        featureDict,
         isParametric=isParametric,
         useLSTM=False,
         useWasserstein=useWasserstein
@@ -610,6 +581,9 @@ while (epoch < num_epochs):
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
+    
+    modelPreprocClass = modelDiscriminators["preprocClass"]
+    modelPreprocDomain = modelDiscriminators["preprocDomain"]
     
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
@@ -736,7 +710,7 @@ while (epoch < num_epochs):
     truthArray = []
     if isParametric:
         ctauArray = []
-
+        
     try:
         step = 0
         while not coord.should_stop():
@@ -979,6 +953,14 @@ while (epoch < num_epochs):
     truthArray = []
     if isParametric:
         ctauArray = []
+        
+        
+    if epoch==0:
+        preprocHists = {}
+        for featureGroup in ["globalvars","cpf","npf","sv"]:
+            preprocHists[featureGroup] = {}
+            for featureName in featureDict[featureGroup]['branches']:
+                preprocHists[featureGroup][featureName] = {"class":None,"domain_mc":None,"domain_data":None}
 
     try:
         step = 0
@@ -987,6 +969,8 @@ while (epoch < num_epochs):
             test_batch_value = sess.run(test_batch)
             if test_batch_value['num'].shape[0]==0:
                 continue
+                
+            
 
             if isParametric:
                 test_inputs = [test_batch_value['gen'],
@@ -1003,8 +987,43 @@ while (epoch < num_epochs):
             test_outputs = modelClassDiscriminator.test_on_batch(test_inputs, test_batch_value["truth"])
             test_prediction = modelClassDiscriminator.predict_on_batch(test_inputs)
             
-            #print train_batch_value_domain["isData"][:10]
-            #print train_batch_value_domain["xsecweight"][:10]
+            
+            if epoch==0:
+                preprocClassVal = modelPreprocClass.predict_on_batch(test_inputs)
+                for igroup,featureGroup in enumerate(["globalvars","cpf","npf","sv"]):
+                    groupValues = preprocClassVal[igroup]
+                    if len(groupValues.shape)==3:
+                        groupValues = groupValues[:,0,:]
+                        #groupValues = np.mean(groupValues,axis=1)
+                    for ifeature,featureName in enumerate(featureDict[featureGroup]['branches']):
+                        values = groupValues[:,ifeature]
+                            
+                        if preprocHists[featureGroup][featureName]["class"] == None:
+                            minVal = min(values)
+                            maxVal = max(values)
+                            preprocHists[featureGroup][featureName]["class"] = ROOT.TH1F(
+                                "class"+featureGroup+featureName+str(random.random()),
+                                ";"+featureGroup+"/"+featureName,
+                                100,
+                                minVal-(maxVal-minVal)*0.1,
+                                maxVal+(maxVal-minVal)*0.1,
+                            )
+                            preprocHists[featureGroup][featureName]["class"].SetDirectory(0)
+                            
+                            preprocHists[featureGroup][featureName]["domain_mc"] = preprocHists[featureGroup][featureName]["class"].Clone(
+                                "domain"+featureGroup+featureName+str(random.random()),
+                            )
+                            preprocHists[featureGroup][featureName]["domain_mc"].SetDirectory(0)
+                            
+                            preprocHists[featureGroup][featureName]["domain_data"] = preprocHists[featureGroup][featureName]["class"].Clone(
+                                "domain"+featureGroup+featureName+str(random.random()),
+                            )
+                            preprocHists[featureGroup][featureName]["domain_data"].SetDirectory(0)
+                            
+                        for ival in range(len(values)):
+                            preprocHists[featureGroup][featureName]["class"].Fill(values[ival])
+                            
+
                       
 
             ptArray = np.hstack((ptArray, test_batch_value["globalvars"][:, 0]))
@@ -1076,7 +1095,54 @@ while (epoch < num_epochs):
 
                         for idis in range(len(featureDict["truth"]["branches"])):
                             daHists[logctau][idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+                if isParametric:
+                    #ctau = 0.#np.random.randint(-3, 5)
+                    test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
+                                    test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
+                else:
+                    test_inputs_domain = [test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
 
+                test_outputs_domain = modelDomainDiscriminator.test_on_batch(
+                        test_inputs_domain,
+                        (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
+                        sample_weight=test_batch_value_domain["xsecweight"][:,0]
+                )
+                test_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                        test_inputs_domain
+                )
+                
+                if epoch==0:
+                    preprocDomainVal = modelPreprocDomain.predict_on_batch(test_inputs_domain)
+                    for igroup,featureGroup in enumerate(["globalvars","cpf","npf","sv"]):
+                        groupValues = preprocDomainVal[igroup]
+                        if len(groupValues.shape)==3:
+                            groupValues = groupValues[:,0,:]
+                            #groupValues = np.mean(groupValues,axis=1)
+                        for ifeature,featureName in enumerate(featureDict[featureGroup]['branches']):
+                            values = groupValues[:,ifeature]
+                                 
+                            for ival in range(len(values)):
+                                if test_batch_value_domain["isData"][ival,0]>0.5:
+                                    preprocHists[featureGroup][featureName]["domain_data"].Fill(
+                                        values[ival],
+                                        test_batch_value_domain["xsecweight"][ival,0]
+                                    )
+                                else:
+                                    preprocHists[featureGroup][featureName]["domain_mc"].Fill(
+                                        values[ival],
+                                        test_batch_value_domain["xsecweight"][ival,0]
+                                    )
+                    
+                
+                for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                    isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
                     
 
                     if logctau == 0:
@@ -1117,6 +1183,42 @@ while (epoch < num_epochs):
         plot_resampled(outputFolder, "testing_eta", "$\eta$", etaArray, binningEta, truthArray)
         if isParametric:
             plot_resampled(outputFolder, "testing_ctau", "$\log{(c {\\tau} / 1mm)}$", ctauArray, binningctau, truthArray)
+            
+            
+        for featureGroup in ["globalvars","cpf","npf","sv"]:
+            for featureName in featureDict[featureGroup]['branches']:
+                preprocHists[featureGroup][featureName]['class'].Scale(1./preprocHists[featureGroup][featureName]['class'].Integral())
+                if not noDA:
+                    preprocHists[featureGroup][featureName]['domain_mc'].Scale(1./preprocHists[featureGroup][featureName]['domain_mc'].Integral())
+                    preprocHists[featureGroup][featureName]['domain_data'].Scale(1./preprocHists[featureGroup][featureName]['domain_data'].Integral())
+                    
+                cv = ROOT.TCanvas("preproc"+featureGroup+featureName+str(random.random()),"",800,600)
+                axis = ROOT.TH2F(
+                    "axis"+featureGroup+featureName+str(random.random()),";"+featureGroup+"/"+featureName+";",
+                    50,preprocHists[featureGroup][featureName]['class'].GetXaxis().GetXmin(),preprocHists[featureGroup][featureName]['class'].GetXaxis().GetXmax(),
+                    50,0,1.1*max([
+                        preprocHists[featureGroup][featureName]['class'].GetMaximum(),
+                        preprocHists[featureGroup][featureName]['domain_mc'].GetMaximum(),
+                        preprocHists[featureGroup][featureName]['domain_data'].GetMaximum()
+                    ])
+                        
+                )
+                axis.Draw("AXIS")
+                
+                preprocHists[featureGroup][featureName]['class'].SetLineWidth(2)
+                preprocHists[featureGroup][featureName]['class'].SetLineColor(ROOT.kAzure-5)
+                preprocHists[featureGroup][featureName]['class'].Draw("HISTSAME")
+                if not noDA:
+                    preprocHists[featureGroup][featureName]['domain_mc'].SetLineWidth(3)
+                    #preprocHists[featureGroup][featureName]['domain_mc'].SetLineStyle(2)
+                    preprocHists[featureGroup][featureName]['domain_mc'].SetLineColor(ROOT.kRed+1)
+                    preprocHists[featureGroup][featureName]['domain_mc'].Draw("HISTSAME")
+                    
+                    preprocHists[featureGroup][featureName]['domain_data'].SetMarkerStyle(20)
+                    preprocHists[featureGroup][featureName]['domain_data'].SetMarkerSize(1.0)
+                    preprocHists[featureGroup][featureName]['domain_data'].Draw("PESAME")
+                cv.Print(os.path.join(outputFolder,featureGroup+"-"+featureName+".pdf"))
+                
 
     print "Epoch duration = (%.1f min)" % ((time.time() - epoch_duration)/60.)
     print "Training/Testing = %i/%i, Testing rate = %4.1f%%" % (nTrain, nTest, 100. * nTest/(nTrain+nTest))

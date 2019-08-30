@@ -86,12 +86,19 @@ class Dense(object):
     
     
 class ModelDA(object):
-    def __init__(self,nclasses,isParametric=False,useLSTM=True,useWasserstein=False,options={}):
-        self.nclasses = nclasses
+    def __init__(self,featureDict,isParametric=False,useLSTM=True,useWasserstein=False,options={}):
+        self.featureDict = featureDict
+        self.nclasses = len(self.featureDict["truth"]["branches"])
         self.isParametric = isParametric
         self.useWasserstein = useWasserstein
+        
         with tf.variable_scope("cpf_conv"):
+            self.cpf_preproc = keras.layers.Lambda(
+                self.preprocessingFct(self.featureDict["cpf"]["branches"],self.featureDict["cpf"]["preprocessing"])
+            )
+        
             self.cpf_conv = Sequence(scope='cpf_conv')
+            self.cpf_conv.add(self.cpf_preproc)
             #self.cpf_conv.add(keras.layers.BatchNormalization())
             self.cpf_conv.add(Conv(64,1,1,options=options,name="cpf_conv1"))
             self.cpf_conv.add(Conv(32,1,1,options=options,name="cpf_conv2"))
@@ -99,7 +106,11 @@ class ModelDA(object):
             self.cpf_conv.add(Conv(8,1,1,options=options,name="cpf_conv4"))
             
         with tf.variable_scope("npf_conv"):
+            self.npf_preproc = keras.layers.Lambda(
+                self.preprocessingFct(self.featureDict["npf"]["branches"],self.featureDict["npf"]["preprocessing"])
+            )
             self.npf_conv = Sequence(scope='npf_conv')
+            self.npf_conv.add(self.npf_preproc)
             #self.npf_conv.add(keras.layers.BatchNormalization())
             self.npf_conv.add(Conv(32,1,1,options=options,name="npf_conv1"))
             self.npf_conv.add(Conv(16,1,1,options=options,name="npf_conv2"))
@@ -107,7 +118,12 @@ class ModelDA(object):
             self.npf_conv.add(Conv(4,1,1,options=options,name="npf_conv4"))
         
         with tf.variable_scope("sv_conv"):
+            self.sv_preproc = keras.layers.Lambda(
+                self.preprocessingFct(self.featureDict["sv"]["branches"],self.featureDict["sv"]["preprocessing"])
+            )
+        
             self.sv_conv = Sequence(scope='sv_conv')
+            self.sv_conv.add(self.sv_preproc)
             #self.sv_conv.add(keras.layers.BatchNormalization())
             self.sv_conv.add(Conv(32,1,1,options=options,name="sv_conv1"))
             self.sv_conv.add(Conv(16,1,1,options=options,name="sv_conv2"))
@@ -125,31 +141,20 @@ class ModelDA(object):
                 self.sv_lstm = keras.layers.Flatten()
     
         with tf.variable_scope("features"):
-            self.global_norm = keras.layers.BatchNormalization()
+            self.global_preproc = keras.layers.Lambda(
+                self.preprocessingFct(self.featureDict["globalvars"]["branches"],self.featureDict["globalvars"]["preprocessing"])
+            )
             self.full_features = Sequence(scope='features')
             self.full_features.add(keras.layers.Concatenate())
             self.full_features.add(Dense(200,options=options,name="features1",activation=None))
             self.full_features.add(keras.layers.Activation('tanh',name="features2"))
             #self.full_features.add(keras.layers.GaussianNoise(0.1))
-        '''
-        self.conv_class_prediction = Sequence(scope='class_prediction')
-        self.conv_class_prediction.add(keras.layers.Flatten())
-        self.conv_class_prediction.add(keras.layers.Concatenate())
-        self.conv_class_prediction.add(Dense(20,options=options))
-        self.conv_class_prediction.add(Dense(20,options=options))
-        self.conv_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(),options=options))
-        
-        self.lstm_class_prediction = Sequence(scope='class_prediction')
-        self.lstm_class_prediction.add(keras.layers.Concatenate())
-        self.lstm_class_prediction.add(Dense(20,options=options))
-        self.lstm_class_prediction.add(Dense(20,options=options))
-        self.lstm_class_prediction.add(Dense(nclasses,activation=keras.layers.Softmax(),options=options))
-        '''
+
         with tf.variable_scope("class_prediction"):
             self.full_class_prediction = Sequence(scope='class_prediction')
             self.full_class_prediction.add(Dense(100,options=options))
             self.full_class_prediction.add(Dense(100,options=options))
-            self.full_class_prediction.add(Dense(nclasses,dropout=0,activation=keras.layers.Softmax(name="prediction"),options=options))
+            self.full_class_prediction.add(Dense(self.nclasses,dropout=0,activation=keras.layers.Softmax(name="prediction"),options=options))
 
         with tf.variable_scope("domain_prediction"):
             def gradientReverse(x):
@@ -172,6 +177,29 @@ class ModelDA(object):
                 self.domain_prediction.add(Dense(50,options=options,dropout=0.1))
                 self.domain_prediction.add(Dense(1,activation=keras.layers.Activation('sigmoid'),options=options,dropout=0))
 
+    def preprocessingFct(self,featureNames,preprocDict):
+        def applyPreproc(inputFeatures):
+            unstackFeatures = tf.unstack(inputFeatures,axis=-1)
+            if len(unstackFeatures)!=len(featureNames):
+                print "ERROR: Number of features (",len(unstackFeatures),") does not match given list of names (",len(featureNames),"): ",featureNames
+                sys.exit(1)
+            unusedPreproc = preprocDict.keys()
+            if len(unusedPreproc)==0:
+                return inputFeatures
+            for i,featureName in enumerate(featureNames):
+                if featureName in unusedPreproc:
+                    unusedPreproc.remove(featureName)
+                if featureName in preprocDict.keys():
+                    unstackFeatures[i] = preprocDict[featureName](unstackFeatures[i])
+                   
+            if len(unusedPreproc)>0:
+                print "WARNING - following preprocessing not applied: ",unusedPreproc
+            return tf.stack(unstackFeatures,axis=-1)
+        return applyPreproc
+        
+    def getPreprocFeatures(self,globalvars,cpf,npf,sv):
+        return [self.global_preproc(globalvars),self.cpf_preproc(cpf),self.npf_preproc(npf),self.sv_preproc(sv)]
+    
             
     def extractFeatures(self,globalvars,cpf,npf,sv,gen=None):
         cpf_conv = self.cpf_conv(cpf)
@@ -182,12 +210,12 @@ class ModelDA(object):
         npf_lstm = self.npf_lstm(npf_conv)
         sv_lstm = self.sv_lstm(sv_conv)
         
-        globalvars_norm = self.global_norm(globalvars)
+        globalvars_preproc = self.global_preproc(globalvars)
         
         if self.isParametric:
-            full_features = self.full_features([globalvars,gen,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([gen,globalvars_preproc,cpf_lstm,npf_lstm,sv_lstm])
         else:
-            full_features = self.full_features([globalvars,cpf_lstm,npf_lstm,sv_lstm])
+            full_features = self.full_features([globalvars_preproc,cpf_lstm,npf_lstm,sv_lstm])
             
         return full_features
     

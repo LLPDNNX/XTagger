@@ -307,6 +307,7 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
     M_score = 0
     dimension = len(featureDict["truth"]["branches"])
     all_aucs = np.zeros([dimension,dimension])
+    wps_LLP = []
     for truth_label in range(dimension):
         signalHist = hists[truth_label][truth_label]
         rocs = []
@@ -320,6 +321,7 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
         for prob_label in range(dimension):
             if truth_label==prob_label:
                 continue
+
             bkgHist = hists[truth_label][prob_label]
             sigEff, bgRej, bgEff = getROC(signalHist,bkgHist)
             auc = getAUC(sigEff,bgRej) + 0.5
@@ -330,6 +332,8 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             sig_loose, bg_loose = find_nearest(sigEff, bgEff, 1e-1)
             sig_medium, bg_medium = find_nearest(sigEff, bgEff, 1e-2)
             sig_tight, bg_tight = find_nearest(sigEff, bgEff, 1e-3)
+            sig_ultra, bg_ultra = find_nearest(sigEff, bgEff, 1e-4)
+
             tight_wps_sig.append(sig_tight)
             tight_wps_bg.append(bg_tight)
 
@@ -383,6 +387,9 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
             tight_lines_y[prob_label].Draw("SAMEL")
             legend.AddEntry(roc,name[prob_label],"L")
             legend.AddEntry("","tight WP eff: %.1f%%"%(tight_wps_sig[prob_label]*100.),"")
+            if truth_label == 4:
+                wps_LLP = tight_wps_sig
+
         legend.Draw("Same")
         
         cv.Print(os.path.join(outputFolder, "epoch_"+str(epoch), "roc_"+names[truth_label]+".pdf"))
@@ -472,6 +479,6 @@ def make_plots(outputFolder, epoch, hists, truths, scores, featureDict):
     rootOutput.Write()
     rootOutput.Close()
 
-    return M_score
+    return wps_LLP, M_score
 
 

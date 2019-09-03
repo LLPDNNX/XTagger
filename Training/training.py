@@ -614,9 +614,9 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    classLossWeight = 1.
-    domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    domainLossWeight = lambda_val
+    classLossWeight = 1./(1+lambda_val)
+    #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
+    domainLossWeight = lambda_val/(1+lambda_val)
     #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
     
     #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)

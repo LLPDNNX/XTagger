@@ -1132,7 +1132,7 @@ while (epoch < num_epochs):
     tight_WP_effs, M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
     labels = ["B","C","UDS","G","LLP"]
-    JSD_scores = []
+    KS_scores = []
     
     if not noDA:
         for logctau in range(-2, 4):
@@ -1150,8 +1150,7 @@ while (epoch < num_epochs):
                 
                 statictics = ""
                 if daHists[logctau][idis][0].Integral()>0.:
-                    MCNorm = daHists[logctau][idis][0].Integral()
-                    dataNorm = daHists[logctau][idis][1].Integral()
+                    KS = daHists[logctau][idis][0].KolmogorovTest(daHists[logctau][idis][1], "M")
                     daHists[logctau][idis][0].Scale(daHists[logctau][idis][1].Integral()/daHists[logctau][idis][0].Integral())
                 
                     eventsAboveWp = {
@@ -1160,17 +1159,10 @@ while (epoch < num_epochs):
                         95: [0.,0.],
                     }
                     sumMC = 0.
-                    sumJSD = 0.
                     for ibin in range(daHists[logctau][idis][0].GetNbinsX()):
                         cMC = daHists[logctau][idis][0].GetBinContent(ibin+1)
                         sumMC += cMC
                         cData = daHists[logctau][idis][1].GetBinContent(ibin+1)
-                        # Calculate JSD
-                        MCProb = cMC/MCNorm
-                        dataProb = cData/dataNorm
-                        mean = 0.5*(MCProb+dataProb)
-                        if MCProb > 0 and dataProb > 0:
-                            sumJSD += 0.5*(MCProb*math.log(MCProb/mean)/math.log(2))+0.5*(dataProb*math.log(dataProb/mean)/math.log(2))
 
                         for wp in eventsAboveWp.keys():
                             if (sumMC/daHists[logctau][idis][0].Integral())>(wp*0.01):
@@ -1185,9 +1177,9 @@ while (epoch < num_epochs):
                         if iwp<(len(eventsAboveWp.keys())-1):
                             statictics+=","
                         statictics+="  "
-                    statictics+="JSD = %.7f" % sumJSD
+                    statictics+="D = %.7f" % KS
                     if idis == 4:
-                        JSD_scores.append(sumJSD)
+                        KS_scores.append(KS)
 
                 daHists[logctau][idis][0].Rebin(200)
                 daHists[logctau][idis][1].Rebin(200)
@@ -1239,10 +1231,9 @@ while (epoch < num_epochs):
         
     
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
-    tight_WP_effs = np.asarray(tight_WP_effs)
-    print JSD_scores
-    JSD_scores = np.asarray(JSD_scores)
-    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+np.array2string(tight_WP_effs,separator=';')+";"+np.array2string(JSD_scores,separator=';')+"\n")
+    tight_WP_eff = np.mean(np.asarray(tight_WP_effs))
+    KS_scores = np.asarray(KS_scores)
+    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(classLossWeight)+";"+str(domainLossWeight)+";"+str(tight_WP_eff)+";"+np.array2string(KS_scores,separator=';')+"\n")
     f.close()
     
     cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)

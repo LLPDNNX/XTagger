@@ -69,6 +69,8 @@ parser.add_argument('--lambda', type=float,help='domain loss weight',
                     default=0.3,dest='lambda_val')
 parser.add_argument('--kappa', type=float,help='learning rate decay val',
                     default=0.1,dest='kappa')
+parser.add_argument('--gamma', type=float,help='domain loss weight',
+                    default=0.1,dest='gamma')
 
 arguments = parser.parse_args()
 
@@ -92,6 +94,7 @@ resumeTraining = arguments.resume
 bagging = arguments.bagging
 kappa = arguments.kappa
 lambda_val = arguments.lambda_val
+gamma = arguments.gamma
 
 modelPath = arguments.model
 import importlib
@@ -614,9 +617,10 @@ while (epoch < num_epochs):
     #modelTrain = setupModelDiscriminator()
     #modelTest = setupModelDiscriminator()
     
-    classLossWeight = 1./(1+lambda_val)
+    classLossWeight = 1./(1.+lambda_val)
+    domainLossWeight = lambda_val/(1.+lambda_val)*(2./(1+math.exp(-gamma*epoch)) - 1.)
+
     #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    domainLossWeight = lambda_val/(1+lambda_val)
     #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
     
     #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)

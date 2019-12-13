@@ -156,7 +156,7 @@ class ModelDA(object):
                 if useWasserstein:
                     backward = tf.negative(x)
                 else:
-                    backward = tf.negative(x*tf.exp(tf.abs(x)))
+                    backward = tf.negative(x)
                 forward = tf.identity(x)
                 return (backward + tf.stop_gradient(forward - backward))
                 

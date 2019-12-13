@@ -20,6 +20,45 @@ from xtagger import classification_weights, fake_background
 from sklearn.metrics import auc
 from feature_dict import featureDict as featureDictTmpl
 from plot_macros import plot_resampled, make_plots, makePlot
+from style import ctauSymbol
+
+def get_model_memory_usage(batch_size, model):
+    import numpy as np
+    from keras import backend as K
+
+    shapes_mem_count = 0
+    internal_model_mem_count = 0
+    for l in model.layers:
+        layer_type = l.__class__.__name__
+        if layer_type == 'Model':
+            internal_model_mem_count += get_model_memory_usage(batch_size, l)
+        single_layer_mem = 1
+        i = 0
+        try:
+            print l.output_shape
+        except AttributeError:
+              print("An exception occurred")
+              continue
+
+        for s in l.output_shape:
+            if s is None:
+                continue
+            single_layer_mem *= s
+        shapes_mem_count += single_layer_mem
+
+
+    trainable_count = np.sum([K.count_params(p) for p in set(model.trainable_weights)])
+    non_trainable_count = np.sum([K.count_params(p) for p in set(model.non_trainable_weights)])
+
+    number_size = 4.0
+    if K.floatx() == 'float16':
+         number_size = 2.0
+    if K.floatx() == 'float64':
+         number_size = 8.0
+
+    total_memory = number_size*(batch_size*shapes_mem_count + trainable_count + non_trainable_count)
+    gbytes = np.round(total_memory / (1024.0 ** 3), 3) + internal_model_mem_count
+    return gbytes
 
 # tensorflow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -39,13 +78,13 @@ parser.add_argument('-b', '--batch', action='store', type=int,
 parser.add_argument('-c', action='store_true',
                     help='achieve class balance', default=False)
 parser.add_argument('-e', '--epoch', action='store', type=int,
-                    help='number of epochs', default=60)
+                    help='number of epochs', default=50)
 parser.add_argument('-o', '--overwrite', action='store_true',
                     dest='overwriteFlag',
                     help='overwrite output folder', default=False)
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
-                    help='train a parametric model', default=False)
+                    help='train a parametric model', default=True)
 parser.add_argument('--opt', action='store_true',default=False,
                     dest='opt',
                     help='optimize training through back stepping on class loss')
@@ -64,6 +103,12 @@ parser.add_argument('--bagging', action='store', type=float, help='bagging fract
                     default=1., dest='bagging')
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
+parser.add_argument('--lambda', type=float,help='domain loss weight',
+                    default=30.,dest='lambda_val')
+parser.add_argument('--kappa', type=float,help='learning rate decay val',
+                    default=0.1,dest='kappa')
+parser.add_argument('--gamma', type=float,help='domain loss weight',
+                    default=0.2,dest='gamma')
 
 arguments = parser.parse_args()
 
@@ -85,6 +130,9 @@ doOptimizationDomain = arguments.optDomain
 useWasserstein = arguments.wasserstein
 resumeTraining = arguments.resume
 bagging = arguments.bagging
+kappa = arguments.kappa
+lambda_val = arguments.lambda_val
+gamma = arguments.gamma
 
 modelPath = arguments.model
 import importlib
@@ -543,7 +591,6 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.
         return batch
 
 
-learning_rate_val = 0.001
 
 if resumeTraining>0:
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "r")
@@ -578,10 +625,12 @@ avgLoss_test_domain_per_epoch = []
 
 
 while (epoch < num_epochs):
-
     epoch_duration = time.time()
     print_delimiter()
     print "epoch", epoch+1
+    print_delimiter()
+    learning_rate_val = 0.01/(1+kappa*epoch)
+    print "Learning rate is "+str(learning_rate_val)
     print_delimiter()
 
     train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
@@ -603,25 +652,16 @@ while (epoch < num_epochs):
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
     
-    #modelTrain = setupModelDiscriminator()
-    #modelTest = setupModelDiscriminator()
-    
     classLossWeight = 1.
-    domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
-    
-    #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
-    #since learning rate is decreased increase DA weight at higher epochs
-    #domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    
+    domainLossWeight = lambda_val*(2./(1+math.exp(-gamma*epoch)) - 1.)
+
     if noDA:
         classLossWeight = 1.
-        domainLossWeight = 0
+        domainLossWeight = 0.
         
     lr_per_epoch.append(learning_rate_val)
     class_weight_per_epoch.append(classLossWeight)
     domain_weight_per_epoch.append(domainLossWeight)
-        
         
     def wasserstein_loss(x,y):
         return K.mean(x*y)
@@ -672,8 +712,10 @@ while (epoch < num_epochs):
     if epoch == 0:
         print "class network"
         modelClassDiscriminator.summary()
+        print get_model_memory_usage(batchSize, modelClassDiscriminator)
         print "domain network"
         modelDomainDiscriminator.summary()
+        print get_model_memory_usage(batchSize, modelDomainDiscriminator)
         print "domain network with frozen features"
         modelDomainDiscriminatorFrozen.summary()
     
@@ -684,6 +726,9 @@ while (epoch < num_epochs):
 
     sess = K.get_session()
     sess.run(init_op)
+
+    flops = tf.profiler.profile(sess.graph, options=tf.profiler.ProfileOptionBuilder.float_operation())
+    print('FLOP = ', flops.total_float_ops)
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -817,6 +862,7 @@ while (epoch < num_epochs):
                                     
 
             if not noDA:
+                '''
                 if (epoch==0 and step<=30):
                     #train first class discriminator only
                     train_outputs= modelClassDiscriminator.train_on_batch(
@@ -844,18 +890,19 @@ while (epoch < num_epochs):
                     
                     
                 else:
-                    #finally train both discriminators together
-                    train_outputs_fused = modelFusedDiscriminator.train_on_batch(
-                        train_inputs_class+train_inputs_domain, 
-                        [
-                            train_batch_value["truth"],
-                            (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
-                        ],
-                        sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]
-                    )
-                    train_outputs = train_outputs_fused[1],train_outputs_fused[3]
-                    train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
-   
+                '''
+                #finally train both discriminators together
+                train_outputs_fused = modelFusedDiscriminator.train_on_batch(
+                    train_inputs_class+train_inputs_domain, 
+                    [
+                        train_batch_value["truth"],
+                        (2.*train_batch_value_domain["isData"]-1) if useWasserstein else train_batch_value_domain["isData"],
+                    ],
+                    sample_weight=[np.ones(train_batch_value["truth"].shape[0]),train_da_weight]
+                )
+                train_outputs = train_outputs_fused[1],train_outputs_fused[3]
+                train_outputs_domain = train_outputs_fused[2],train_outputs_fused[4]
+
             else:
                 #train only class branch if noDA
                 train_outputs = modelClassDiscriminator.train_on_batch(
@@ -933,33 +980,35 @@ while (epoch < num_epochs):
     modelDomainDiscriminator.save_weights(os.path.join(outputFolder, "epoch_" + str(epoch),
                             "model_epoch_domain.hdf5"))
     hists = []
-    daHists = []
+    daHists = {}
     scores = []
     truths = []
+
+    for logctau in range(-2, 5):
+        daHists[logctau] = []
 
     for branches1 in featureDict["truth"]["branches"]:
         disName = branches1.replace("||", "_").replace("is", "").replace("from", "")
         histsPerDis = []
-        daHistsPerDis = []
         for branches2 in featureDict["truth"]["branches"]:
             probName = branches2.replace("||", "_").replace("is", "").replace("from", "")
             h = ROOT.TH1F(disName+probName, probName, 10000, 0, 1)
             h.SetDirectory(0)
             histsPerDis.append(h)
-            
-        hists.append(histsPerDis)
         
-        daMC = ROOT.TH1F(probName+"daMC", probName, 5000, 0, 1)
-        daMC.SetDirectory(0)
-        daMC.SetLineColor(ROOT.kAzure-4)
-        daMC.SetLineWidth(3)
-        daData = ROOT.TH1F(probName+"daData", probName, 5000, 0, 1)
-        daData.Sumw2()
-        daData.SetDirectory(0)
-        daData.SetMarkerStyle(20)
-        daData.SetMarkerSize(1.2)
-        daHists.append([daMC,daData])
-    
+        for logctau in range(-2, 5):
+            daMC = ROOT.TH1F(probName+"daMC"+str(logctau), probName, 5000, 0, 1)
+            daMC.SetDirectory(0)
+            daMC.SetLineColor(ROOT.kAzure-4)
+            daMC.SetLineWidth(3)
+            daData = ROOT.TH1F(probName+"daData"+str(logctau), probName, 5000, 0, 1)
+            daData.Sumw2()
+            daData.SetDirectory(0)
+            daData.SetMarkerStyle(20)
+            daData.SetMarkerSize(1.2)
+            daHists[logctau].append([daMC, daData])
+        
+        hists.append(histsPerDis)
 
     ptArray = []
     etaArray = []
@@ -1035,50 +1084,51 @@ while (epoch < num_epochs):
                 test_batch_value_domain = sess.run(test_batch_da)
                 if test_batch_value_domain['num'].shape[0]==0:
                     continue
+                for logctau in range(-2, 5):
+                    if isParametric:
+                        test_inputs_domain = [np.ones((test_batch_value_domain['num'].shape[0],1))*logctau,
+                                        test_batch_value_domain['globalvars'],
+                                        test_batch_value_domain['cpf'],
+                                        test_batch_value_domain['npf'],
+                                        test_batch_value_domain['sv']]
+                    else:
+                        test_inputs_domain = [test_batch_value_domain['globalvars'],
+                                        test_batch_value_domain['cpf'],
+                                        test_batch_value_domain['npf'],
+                                        test_batch_value_domain['sv']]
 
-                if isParametric:
-                    #ctau = 0.#np.random.randint(-3, 5)
-                    test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
-                                    test_batch_value_domain['globalvars'],
-                                    test_batch_value_domain['cpf'],
-                                    test_batch_value_domain['npf'],
-                                    test_batch_value_domain['sv']]
-                else:
-                    test_inputs_domain = [test_batch_value_domain['globalvars'],
-                                    test_batch_value_domain['cpf'],
-                                    test_batch_value_domain['npf'],
-                                    test_batch_value_domain['sv']]
+                    test_outputs_domain = modelDomainDiscriminator.test_on_batch(
+                            test_inputs_domain,
+                            (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
+                            sample_weight=test_batch_value_domain["xsecweight"][:,0]
+                    )
+                    test_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                            test_inputs_domain
+                    )
+                    
+                    for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                        isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                        sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
 
-                test_outputs_domain = modelDomainDiscriminator.test_on_batch(
-                        test_inputs_domain,
-                        (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
-                        sample_weight=test_batch_value_domain["xsecweight"][:,0]
-                )
-                test_daprediction_class = modelClassDiscriminator.predict_on_batch(
-                        test_inputs_domain
-                )
-                
-                
-                for ibatch in range(test_batch_value_domain["isData"].shape[0]):
-                    isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
-                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
+                        for idis in range(len(featureDict["truth"]["branches"])):
+                            daHists[logctau][idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
 
-                    for idis in range(len(featureDict["truth"]["branches"])):
-                        daHists[idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
+                    
 
-                
-                nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
+                    if logctau == 0:
 
-                nTestDomain += nTestBatchDomain
+                        nTestBatchDomain = test_batch_value_domain["isData"].shape[0]
 
-                if nTestBatchDomain>0:
-                    total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain#/domainLossWeight
+                        nTestDomain += nTestBatchDomain
 
-                if step % 10 == 0:
-                    duration = (time.time() - start_time)/10.
-                    print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs_domain[0], test_outputs_domain[1]*100., duration)
+                        if nTestBatchDomain>0:
+                            total_loss_test_domain += test_outputs_domain[0] * nTestBatchDomain#/domainLossWeight
 
-                    start_time = time.time()
+                        if step % 10 == 0:
+                            duration = (time.time() - start_time)/10.
+                            print 'Testing DA step %d: loss = %.3f, accuracy = %.2f%%, time = %.3f sec' % ( step, test_outputs_domain[0], test_outputs_domain[1]*100., duration)
+
+                            start_time = time.time()
 
         except tf.errors.OutOfRangeError:
             print('Done testing for %d steps.' % (step))
@@ -1111,103 +1161,111 @@ while (epoch < num_epochs):
         print "Average loss domain = %.4f (%.4f)" % (avgLoss_train_domain, avgLoss_test_domain)
     print "Learning rate = %.4e" % (learning_rate_val)
 
-    M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
+    tight_WP_effs, M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
     labels = ["B","C","UDS","G","LLP"]
+    KS_scores = []
     
     if not noDA:
-        for idis in range(len(featureDict["truth"]["branches"])):
-            cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
-            cv.Divide(1,2,0,0)
-            cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
-            cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
-            cv.GetPad(1).SetFillStyle(4000)
-            cv.GetPad(2).SetFillStyle(4000)
-            cv.GetPad(1).SetMargin(0.135, 0.04, 0.45, 0.06)
-            cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
-            cv.GetPad(1).SetLogy(1)
-            cv.cd(1)
-            
-            statictics = ""
-            if daHists[idis][0].Integral()>0.:
-                daHists[idis][0].Scale(daHists[idis][1].Integral()/daHists[idis][0].Integral())
-            
-                eventsAboveWp = {
-                    50: [0.,0.],
-                    80: [0.,0.],
-                    95: [0.,0.],
-                }
-                sumMC = 0.
-                for ibin in range(daHists[idis][0].GetNbinsX()):
-                    cMC = daHists[idis][0].GetBinContent(ibin+1)
-                    sumMC += cMC
-                    cData = daHists[idis][1].GetBinContent(ibin+1)
-                    for wp in eventsAboveWp.keys():
-                        if (sumMC/daHists[idis][0].Integral())>(wp*0.01):
-                            eventsAboveWp[wp][0]+=cMC
-                            eventsAboveWp[wp][1]+=cData
+        for logctau in range(-2, 4):
+            for idis in range(len(featureDict["truth"]["branches"])):
+                cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
+                cv.Divide(1,2,0,0)
+                cv.GetPad(1).SetPad(0.0, 0.0, 1.0, 1.0)
+                cv.GetPad(2).SetPad(0.0, 0.0, 1.0, 1.0)
+                cv.GetPad(1).SetFillStyle(4000)
+                cv.GetPad(2).SetFillStyle(4000)
+                cv.GetPad(1).SetMargin(0.135, 0.04, 0.45, 0.06)
+                cv.GetPad(2).SetMargin(0.135, 0.04, 0.15, 0.56)
+                cv.GetPad(1).SetLogy(1)
+                cv.cd(1)
                 
-                for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
-                    statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
-                        wp,
-                        100.*eventsAboveWp[wp][0]/daHists[idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[idis][1].Integral()
-                    )
-                    if iwp<(len(eventsAboveWp.keys())-1):
-                        statictics+=","
-                    statictics+="  "
+                statictics = ""
+                if daHists[logctau][idis][0].Integral()>0.:
+                    KS = daHists[logctau][idis][0].KolmogorovTest(daHists[logctau][idis][1], "M")
+                    daHists[logctau][idis][0].Scale(daHists[logctau][idis][1].Integral()/daHists[logctau][idis][0].Integral())
                 
-            
-            daHists[idis][0].Rebin(200)
-            daHists[idis][1].Rebin(200)
-            ymax = max([daHists[idis][0].GetMaximum(),daHists[idis][1].GetMaximum()])
-            ymin = ymax
-            for ibin in range(daHists[idis][0].GetNbinsX()):
-                cMC = daHists[idis][0].GetBinContent(ibin+1)
-                cData = daHists[idis][1].GetBinContent(ibin+1)
-                if cMC>1 and cData>1:
-                    ymin = min([ymin,cMC,cData])
-                 
-            ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
-            axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
-            axis.GetXaxis().SetLabelSize(0)
-            axis.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetLeftMargin()-cv.GetPad(1).GetRightMargin()))
-            axis.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetTopMargin()-cv.GetPad(1).GetBottomMargin()))
-            axis.Draw("AXIS")
-            daHists[idis][0].Draw("HISTSAME")
-            daHists[idis][1].Draw("PESAME")
-            
-            pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
-            pText.SetTextFont(43)
-            pText.SetTextAlign(32)
-            pText.SetTextSize(30)
-            pText.AddText(statictics)
-            pText.Draw("Same")
-            
-            cv.cd(2)
-            axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+");Data/Pred.",50,0,1,50,0.2,1.8)
-            axisRes.Draw("AXIS")
-            axisRes.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetLeftMargin()-cv.GetPad(2).GetRightMargin()))
-            axisRes.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetTopMargin()-cv.GetPad(2).GetBottomMargin()))
-            axisLine = ROOT.TF1("axisLine","1",0,1)
-            axisLine.SetLineColor(ROOT.kBlack)
-            axisLine.Draw("Same")
-            axisLineUp = ROOT.TF1("axisLineUp","1.5",0,1)
-            axisLineUp.SetLineColor(ROOT.kBlack)
-            axisLineUp.SetLineStyle(2)
-            axisLineUp.Draw("Same")
-            axisLineDown = ROOT.TF1("axisLineDown","0.5",0,1)
-            axisLineDown.SetLineColor(ROOT.kBlack)
-            axisLineDown.SetLineStyle(2)
-            axisLineDown.Draw("Same")
-            daHistsRes = daHists[idis][1].Clone(daHists[idis][1].GetName()+"res")
-            daHistsRes.Divide(daHists[idis][0])
-            daHistsRes.Draw("PESAME")
-            cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".pdf"))
-            cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+labels[idis].replace("||","_")+".png"))
-    
+                    eventsAboveWp = {
+                        50: [0.,0.],
+                        80: [0.,0.],
+                        95: [0.,0.],
+                    }
+                    sumMC = 0.
+                    for ibin in range(daHists[logctau][idis][0].GetNbinsX()):
+                        cMC = daHists[logctau][idis][0].GetBinContent(ibin+1)
+                        sumMC += cMC
+                        cData = daHists[logctau][idis][1].GetBinContent(ibin+1)
+
+                        for wp in eventsAboveWp.keys():
+                            if (sumMC/daHists[logctau][idis][0].Integral())>(wp*0.01):
+                                eventsAboveWp[wp][0]+=cMC
+                                eventsAboveWp[wp][1]+=cData
+                    
+                    for iwp,wp in enumerate(sorted(eventsAboveWp.keys())):
+                        statictics+="#Delta#epsilon#scale[0.7]{#lower[0.7]{%i}}: %+.1f%%"%(
+                            wp,
+                            100.*eventsAboveWp[wp][0]/daHists[logctau][idis][0].Integral()-100.*eventsAboveWp[wp][1]/daHists[logctau][idis][1].Integral()
+                        )
+                        if iwp<(len(eventsAboveWp.keys())-1):
+                            statictics+=","
+                        statictics+="  "
+                    statictics+="D = %.7f" % KS
+                    if idis == 4:
+                        KS_scores.append(KS)
+
+                daHists[logctau][idis][0].Rebin(200)
+                daHists[logctau][idis][1].Rebin(200)
+                ymax = max([daHists[logctau][idis][0].GetMaximum(),daHists[logctau][idis][1].GetMaximum()])
+                ymin = ymax
+                for ibin in range(daHists[logctau][idis][0].GetNbinsX()):
+                    cMC = daHists[logctau][idis][0].GetBinContent(ibin+1)
+                    cData = daHists[logctau][idis][1].GetBinContent(ibin+1)
+                    if cMC>1 and cData>1:
+                        ymin = min([ymin,cMC,cData])
+                     
+                ymin = math.exp(math.log(ymax)-1.2*(math.log(ymax)-math.log(ymin)))
+                axis = ROOT.TH2F("axis"+str(idis)+str(random.random()),";;Resampled jets",50,0,1,50,ymin,math.exp(1.1*math.log(ymax)))
+                axis.GetXaxis().SetLabelSize(0)
+                axis.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetLeftMargin()-cv.GetPad(1).GetRightMargin()))
+                axis.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(1).GetTopMargin()-cv.GetPad(1).GetBottomMargin()))
+                axis.Draw("AXIS")
+                daHists[logctau][idis][0].Draw("HISTSAME")
+                daHists[logctau][idis][1].Draw("PESAME")
+                
+                pText = ROOT.TPaveText(0.96,0.97,0.96,0.97,"NDC")
+                pText.SetTextFont(43)
+                pText.SetTextAlign(32)
+                pText.SetTextSize(30)
+                pText.AddText(statictics)
+                pText.Draw("Same")
+                
+                cv.cd(2)
+                axisRes = ROOT.TH2F("axis"+str(idis)+str(random.random()),";Prob("+labels[idis]+", "+ctauSymbol(logctau=logctau)[0]+");Data/Pred.",50,0,1,50,0.2,1.8)
+                axisRes.Draw("AXIS")
+                axisRes.GetXaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetLeftMargin()-cv.GetPad(2).GetRightMargin()))
+                axisRes.GetYaxis().SetTickLength(0.015/(1-cv.GetPad(2).GetTopMargin()-cv.GetPad(2).GetBottomMargin()))
+                axisLine = ROOT.TF1("axisLine","1",0,1)
+                axisLine.SetLineColor(ROOT.kBlack)
+                axisLine.Draw("Same")
+                axisLineUp = ROOT.TF1("axisLineUp","1.5",0,1)
+                axisLineUp.SetLineColor(ROOT.kBlack)
+                axisLineUp.SetLineStyle(2)
+                axisLineUp.Draw("Same")
+                axisLineDown = ROOT.TF1("axisLineDown","0.5",0,1)
+                axisLineDown.SetLineColor(ROOT.kBlack)
+                axisLineDown.SetLineStyle(2)
+                axisLineDown.Draw("Same")
+                daHistsRes = daHists[logctau][idis][1].Clone(daHists[logctau][idis][1].GetName()+"res")
+                daHistsRes.Divide(daHists[logctau][idis][0])
+                daHistsRes.Draw("PESAME")
+                cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+str(logctau)+labels[idis].replace("||","_")+".pdf"))
+                cv.Print(os.path.join(outputFolder,"epoch_" + str(epoch),"da_"+str(logctau)+labels[idis].replace("||","_")+".png"))
+        
     
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
-    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(M_score)+"\n")
+    tight_WP_eff = np.mean(np.asarray(tight_WP_effs))
+    KS_scores = np.asarray(KS_scores)
+    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(classLossWeight)+";"+str(domainLossWeight)+";"+str(tight_WP_eff)+";"+np.array2string(KS_scores,separator=';')+"\n")
     f.close()
     
     cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)
@@ -1271,10 +1329,10 @@ while (epoch < num_epochs):
     avgLoss_test_per_epoch = []
     avgLoss_train_domain_per_epoch = []
     avgLoss_test_domain_per_epoch = []
-    '''
     if epoch > 1 and previous_train_loss < avgLoss_train:
         learning_rate_val = learning_rate_val*0.85
         print "Decreasing learning rate to %.4e" % (learning_rate_val)
+    '''
     previous_train_loss = avgLoss_train
 
     coord.request_stop()

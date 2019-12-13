@@ -50,6 +50,7 @@ class UnpackedTree
         float global_pt;
         float global_eta;
         float global_rho;
+
         
         float isData;
         float xsecweight;
@@ -275,6 +276,9 @@ class NanoXTree
         unsigned int Jet_nConstituents[maxEntries];
         unsigned int Jet_cleanmask[maxEntries];
         float Jet_forDA[maxEntries];
+        int Jet_genJetIdx[maxEntries];
+
+        float GenJet_pt[maxEntries];
         
         unsigned int njetorigin;
         float jetorigin_isPU[maxEntries];
@@ -400,6 +404,7 @@ class NanoXTree
         float isUD;
         float isG;
         float fromLLP;
+        float isPU;
         
         float rand;
         float logpt;
@@ -428,12 +433,13 @@ class NanoXTree
             tree_->SetBranchAddress("Jet_jetId",&Jet_jetId);
             tree_->SetBranchAddress("Jet_cleanmask",&Jet_cleanmask);
             tree_->SetBranchAddress("Jet_nConstituents",&Jet_nConstituents);
+            tree_->SetBranchAddress("Jet_genJetIdx", &Jet_genJetIdx);
+            tree_->SetBranchAddress("GenJet_pt", &GenJet_pt);
         
             if (addTruth)
             {
                 tree_->SetBranchAddress("njetorigin",&njetorigin);
                 
-                tree_->SetBranchAddress("jetorigin_isPU",&jetorigin_isPU);
                 tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
                 
                 tree_->SetBranchAddress("jetorigin_displacement",&jetorigin_displacement);
@@ -450,6 +456,7 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_isS",&jetorigin_isS);
                 tree_->SetBranchAddress("jetorigin_isUD",&jetorigin_isUD);
                 tree_->SetBranchAddress("jetorigin_isG",&jetorigin_isG);
+                tree_->SetBranchAddress("jetorigin_isPU",&jetorigin_isPU);
                 tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP);
             }
             else
@@ -556,6 +563,7 @@ class NanoXTree
             symbolTable_.add_variable("isG",isG);
             
             symbolTable_.add_variable("fromLLP",fromLLP);
+            symbolTable_.add_variable("isPU",isPU);
             
             symbolTable_.add_variable("rand",rand);
             symbolTable_.add_variable("ctau",ctau);
@@ -581,6 +589,7 @@ class NanoXTree
                 parser.compile(setstring,exp);
                 setters_.emplace_back(std::move(exp));
             }
+ 
         }
         
         //this class does not play well with memory -> prevent funny usage
@@ -643,6 +652,18 @@ class NanoXTree
                 std::cout<<"Encountered mismatch between standard nanoaod jets and xtag info"<<std::endl;
                 return false;
             }
+
+            // Cut on pileup
+            /*
+            if (Jet_genJetIdx[jet] > -1)
+            {
+                if ((Jet_pt[jet] - GenJet_pt[Jet_genJetIdx[jet]])/GenJet_pt[Jet_genJetIdx[jet]] < -.75)
+                {
+                    //std::cout << Jet_pt[jet] << "; " << Jet_genJetIdx[jet] << "; " << jetorigin_fromLLP[jet] << std::endl;
+                    return false;
+                }
+            }
+            */
             
             if (this->njets()<jet)
             {
@@ -669,12 +690,12 @@ class NanoXTree
                 {
                     return false;
                 }
-                
+
                 if (jetorigin_isPU[jet]>0.5)
                 {
                     return false;
                 }
-                
+      
                 //setup variables for exp evaluation
                 isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 isBB = jetorigin_isBB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
@@ -689,8 +710,10 @@ class NanoXTree
                 isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
-                
+ 
                 fromLLP = jetorigin_fromLLP[jet]>0.5;
+                isPU = jetorigin_isPU[jet]>0.5;
+               
             }
             else
             {
@@ -710,6 +733,7 @@ class NanoXTree
                 isUD = 0;
                 isG = 0;
                 fromLLP = 0;
+                isPU = 0;
             }
             
             
@@ -723,6 +747,7 @@ class NanoXTree
                 setter.value();
                 //std::cout<<" -> "<<ctau<<std::endl;
             }
+
             
             for (auto exp: selections_)
             {
@@ -738,7 +763,6 @@ class NanoXTree
         int getJetClass(unsigned int jet)
         {
             if (not addTruth_) return 0; //default class
-            //if (jetorigin_isPU[jet]>0.5) return 11;
             if (jetorigin_fromLLP[jet]<0.5)
             {
                 if  (jetorigin_isB[jet]>0.5) return 0;
@@ -752,6 +776,7 @@ class NanoXTree
                 if  (jetorigin_isS[jet]>0.5) return 8;
                 if  (jetorigin_isUD[jet]>0.5) return 9;
                 if  (jetorigin_isG[jet]>0.5) return 10;
+                if  (jetorigin_isPU[jet]>0.5) return 12;
             }
             else
             {
@@ -785,7 +810,6 @@ class NanoXTree
             
             if (addTruth_)
             {
-                unpackedTree.jetorigin_isPU = jetorigin_isPU[jet];
                 unpackedTree.jetorigin_isUndefined = jetorigin_isUndefined[jet];
                 
                 unpackedTree.jetorigin_displacement = jetorigin_displacement[jet];
@@ -804,6 +828,7 @@ class NanoXTree
                 unpackedTree.jetorigin_isS = jetorigin_isS[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 unpackedTree.jetorigin_isUD = jetorigin_isUD[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 unpackedTree.jetorigin_isG = jetorigin_isG[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
+                unpackedTree.jetorigin_isPU = jetorigin_isPU[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;
                 unpackedTree.jetorigin_fromLLP = jetorigin_fromLLP[jet]>0.5;
             }
             else
@@ -1188,10 +1213,10 @@ int main(int argc, char **argv)
     std::cout<<"Number of independent inputs: "<<trees.size()<<std::endl;
     std::cout<<"Total number of events: "<<total_entries<<std::endl;
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTrain;
-    std::vector<std::vector<int>> eventsPerClassPerFileTrain(12,std::vector<int>(nOutputs,0));
+    std::vector<std::vector<int>> eventsPerClassPerFileTrain(13,std::vector<int>(nOutputs,0));
     
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTest;
-    std::vector<std::vector<int>> eventsPerClassPerFileTest(12,std::vector<int>(nOutputs,0));
+    std::vector<std::vector<int>> eventsPerClassPerFileTest(13,std::vector<int>(nOutputs,0));
 
     for (unsigned int i = 0; i < nOutputs; ++i)
     {

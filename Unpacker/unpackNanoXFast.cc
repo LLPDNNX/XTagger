@@ -690,6 +690,11 @@ class NanoXTree
                 {
                     return false;
                 }
+
+                if (jetorigin_isPU[jet]>0.5)
+                {
+                    return false;
+                }
       
                 //setup variables for exp evaluation
                 isB = jetorigin_isB[jet]>0.5 and jetorigin_fromLLP[jet]<0.5;

@@ -84,7 +84,7 @@ parser.add_argument('-o', '--overwrite', action='store_true',
                     help='overwrite output folder', default=False)
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
-                    help='train a parametric model', default=True)
+                    help='train a parametric model', default=False)
 parser.add_argument('--opt', action='store_true',default=False,
                     dest='opt',
                     help='optimize training through back stepping on class loss')

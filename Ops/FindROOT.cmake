@@ -1,16 +1,5 @@
-# - Find ROOT instalation
-# This module tries to find the ROOT installation on your system.
-# It tries to find the root-config script which gives you all the needed information.
-# If the system variable ROOTSYS is set this is straight forward.
-# If not the module uses the pathes given in ROOT_CONFIG_SEARCHPATH.
-# If you need an other path you should add this path to this varaible.  
-# The root-config script is then used to detect basically everything else.
-# This module defines a number of key variables and macros.
-
-# F.Uhlig@gsi.de (fairroot.gsi.de)
-
-
 MESSAGE(STATUS "Looking for Root...")
+unset(ROOT_FOUND)
 
 SET(ROOT_CONFIG_SEARCHPATH
   ${SIMPATH}/tools/root/bin
@@ -118,13 +107,10 @@ IF (ROOT_FOUND)
 
   # ask root-config for the library varaibles
   EXEC_PROGRAM( ${ROOT_CONFIG_EXECUTABLE}
-#    ARGS "--noldflags --noauxlibs --libs" 
     ARGS "--glibs" 
     OUTPUT_VARIABLE root_flags )
 
-#  STRING(REGEX MATCHALL "([^ ])+"  root_libs_all ${root_flags})
-#  STRING(REGEX MATCHALL "-L([^ ])+"  root_library ${root_flags})
-#  REMOVE_FROM_LIST(root_flags "${root_libs_all}" "${root_library}")
+
 
   SET(ROOT_LIBRARIES ${root_flags})
 
@@ -162,12 +148,6 @@ ENDIF (ROOT_FOUND)
 
 
 
-  ###########################################
-  #
-  #       Macros for building ROOT dictionary
-  #
-  ###########################################
-
 MACRO (ROOT_GENERATE_DICTIONARY_OLD )
  
    set(INFILES "")    
@@ -189,14 +169,9 @@ MACRO (ROOT_GENERATE_DICTIONARY_OLD )
      ENDIF (${_current_FILE} MATCHES "^.*\\.h$")
      
    endforeach (_current_FILE ${ARGN})
-   
-#  MESSAGE("INFILES: ${INFILES}")
-#  MESSAGE("OutFILE: ${OUTFILE}")
-#  MESSAGE("LINKDEF_FILE: ${LINKDEF_FILE}")
-#  MESSAGE("INCLUDE_DIRS: ${INCLUDE_DIRS}")
+
 
    STRING(REGEX REPLACE "(^.*).cxx" "\\1.h" bla "${OUTFILE}")
-#   MESSAGE("BLA: ${bla}")
    SET (OUTFILES ${OUTFILE} ${bla})
 
    ADD_CUSTOM_COMMAND(OUTPUT ${OUTFILES}
@@ -206,11 +181,6 @@ MACRO (ROOT_GENERATE_DICTIONARY_OLD )
 
 ENDMACRO (ROOT_GENERATE_DICTIONARY_OLD)
 
-  ###########################################
-  #
-  #       Macros for building ROOT dictionary
-  #
-  ###########################################
 
 MACRO (ROOT_GENERATE_DICTIONARY INFILES LINKDEF_FILE OUTFILE INCLUDE_DIRS_IN)
  
@@ -220,14 +190,7 @@ MACRO (ROOT_GENERATE_DICTIONARY INFILES LINKDEF_FILE OUTFILE INCLUDE_DIRS_IN)
     set(INCLUDE_DIRS ${INCLUDE_DIRS} -I${_current_FILE})   
   endforeach (_current_FILE ${INCLUDE_DIRS_IN})
  
-
-#  MESSAGE("INFILES: ${INFILES}")
-#  MESSAGE("OutFILE: ${OUTFILE}")
-#  MESSAGE("LINKDEF_FILE: ${LINKDEF_FILE}")
-#  MESSAGE("INCLUDE_DIRS: ${INCLUDE_DIRS}")
-
   STRING(REGEX REPLACE "^(.*)\\.(.*)$" "\\1.h" bla "${OUTFILE}")
-#  MESSAGE("BLA: ${bla}")
   SET (OUTFILES ${OUTFILE} ${bla})
 
 
@@ -252,16 +215,10 @@ MACRO (GENERATE_ROOT_TEST_SCRIPT SCRIPT_FULL_NAME)
   get_filename_component(file_name ${SCRIPT_FULL_NAME} NAME_WE)
   set(shell_script_name "${file_name}.sh")
 
-  #MESSAGE("PATH: ${path_name}")
-  #MESSAGE("Ext: ${file_extension}")
-  #MESSAGE("Name: ${file_name}")
-  #MESSAGE("Shell Name: ${shell_script_name}")
 
   string(REPLACE ${PROJECT_SOURCE_DIR} 
          ${PROJECT_BINARY_DIR} new_path ${path_name}
         )
-
-  #MESSAGE("New PATH: ${new_path}")
 
   file(MAKE_DIRECTORY ${new_path}/data)
 

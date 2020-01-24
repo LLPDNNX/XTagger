@@ -1,5 +1,5 @@
 project(RootReader)
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.15)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR} ${CMAKE_MODULE_PATH})
 
 
@@ -13,9 +13,10 @@ macro(copy_file_if_changed in_file out_file target)
     )
 endmacro(copy_file_if_changed)
 
+find_package(PythonInterp)
 find_package(TensorFlow)
 find_package(ROOT)
-find_package(PythonInterp)
+
 
 set(MODULENAME "xtagger" CACHE STRING "Module name")
 message(STATUS "Module name: ${MODULENAME}")

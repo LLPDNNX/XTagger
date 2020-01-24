@@ -3,7 +3,7 @@
 function execute() 
 {
     PROJECTDIR=$PWD
-    source Env/env.sh || return 1
+    source Env/env_cpu.sh || return 1
     mkdir Ops/build || return 1
     cd Ops/build || return 1
     cmake -DCMAKE_INSTALL_PREFIX=$PROJECTDIR/Ops/release .. || return 1

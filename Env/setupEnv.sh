@@ -56,19 +56,34 @@ function run_setup()
     export TEMP=$TMPDIR
     mkdir $TMPDIR
    
-    echo "Creating environment"
+    echo "Creating environment CPU"
     
-    conda env create -f $SCRIPT_DIR/environment.yml -q &>> $LOGFILE || return 1
-    source activate tf
+    conda env create -f $SCRIPT_DIR/environment_cpu.yml -q &>> $LOGFILE || return 1
+    source activate tf_cpu
     conda list
     source deactivate &>> $LOGFILE || return 1
     
-    echo "Generate setup script"
-    echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env.sh
-    echo "source activate tf" >> $SCRIPT_DIR/env.sh
-    echo "export KERAS_BACKEND=tensorflow" >> $SCRIPT_DIR/env.sh
-    echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env.sh
-    echo "export OMP_NUM_THREADS=8 #reduce further if out-of-memory" >> $SCRIPT_DIR/env.sh
+    echo "Generate setup scripts"
+    echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_cpu.sh
+    echo "source activate tf_cpu" >> $SCRIPT_DIR/env_cpu.sh
+    echo "export KERAS_BACKEND=tensorflow" >> $SCRIPT_DIR/env_cpu.sh
+    echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_cpu.sh
+    echo "export OMP_NUM_THREADS=4 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_cpu.sh
+    
+    
+    echo "Creating environment GPU"
+    
+    conda env create -f $SCRIPT_DIR/environment_gpu.yml -q &>> $LOGFILE || return 1
+    source activate tf_gpu
+    conda list
+    source deactivate &>> $LOGFILE || return 1
+    
+    echo "Generate setup scripts"
+    echo "export PATH="$INSTALL_ABSDIR"/miniconda/bin:\$PATH" > $SCRIPT_DIR/env_gpu.sh
+    echo "source activate tf_gpu" >> $SCRIPT_DIR/env_gpu.sh
+    echo "export KERAS_BACKEND=tensorflow" >> $SCRIPT_DIR/env_gpu.sh
+    echo "export TF_CPP_MIN_LOG_LEVEL=2" >> $SCRIPT_DIR/env_gpu.sh
+    echo "export OMP_NUM_THREADS=12 #reduce further if out-of-memory" >> $SCRIPT_DIR/env_gpu.sh
 }
 
 run_setup $1

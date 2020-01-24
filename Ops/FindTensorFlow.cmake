@@ -9,9 +9,8 @@ execute_process(
     RESULT_VARIABLE TF_VER_OK
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-string(REGEX MATCH "tf_version (.*)" _ ${TF_VER})
+string(REGEX MATCH "tf_version (.*)" TF_VER_MATCH "${TF_VER}")
 set(TF_VER ${CMAKE_MATCH_1})
-
 
 string(REPLACE "." ";" VERSION_LIST ${TF_VER})
 list(GET VERSION_LIST 0 TF_VER_MAJOR)
@@ -27,7 +26,8 @@ execute_process(
     RESULT_VARIABLE TF_INC_OK
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-string(REGEX MATCH "tf_includepath (.*)" _ ${TF_INC})
+
+string(REGEX MATCH "tf_includepath (.*)" _ "${TF_INC}")
 set(TF_INC ${CMAKE_MATCH_1})
 
 if (${TF_INC_OK} EQUAL 0)
@@ -46,7 +46,7 @@ execute_process(
     RESULT_VARIABLE TF_FORCEABI_OK
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-string(REGEX MATCH "use ABI0 (.*)" _ ${TF_FORCEABI})
+string(REGEX MATCH "use ABI0 (.*)" _ "${TF_FORCEABI}")
 set(TF_FORCEABI ${CMAKE_MATCH_1})
 
 if (TF_FORCEABI STREQUAL "True")
@@ -64,7 +64,7 @@ execute_process(
     RESULT_VARIABLE TF_LIB_OK
     OUTPUT_STRIP_TRAILING_WHITESPACE
 )
-string(REGEX MATCH "tf_libpath (.*)" _ ${TF_LIB})
+string(REGEX MATCH "tf_libpath (.*)" _ "${TF_LIB}")
 set(TF_LIB ${CMAKE_MATCH_1})
 
 message(STATUS "Tensorflow lib path: ${TF_LIB}")

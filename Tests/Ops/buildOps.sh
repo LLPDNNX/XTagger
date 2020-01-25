@@ -9,8 +9,7 @@ function execute()
     cmake -DCMAKE_INSTALL_PREFIX=$PROJECTDIR/Ops/release .. || return 1
     make || return 1
     make install || return 1
-    export PYTHONPATH=$PROJECTDIR/Ops/release/lib/python2.7/site-packages
-    python -c "import xtagger" || return 1
+    ctest || return 1
 }
 
 execute

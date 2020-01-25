@@ -1,14 +1,25 @@
+/*===================================================================
+Copyright 2019 Matthias Komm, Vilius Cepaitis, Robert Bainbridge, 
+Alex Tapper, Oliver Buchmueller. All Rights Reserved. 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+Unless required by applicable law or agreed to in writing, 
+software distributed under the License is distributed on an "AS IS" 
+BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express 
+or implied.See the License for the specific language governing 
+permissions and limitations under the License.
+===================================================================*/
+
+
 #include "tensorflow/core/framework/reader_base.h"
 #include "tensorflow/core/framework/op.h"
 
-
-
 using namespace tensorflow;
 
-//NOTE: regex is experimental in gcc 4.9 and below
-//TODO: define proper syntax and parsing e.g. support
-//  <name>; <name>/<type>; <name>[<num>,<max>]; <name>[<num>,<max>]/<type>
-//TODO (optional): add selections, add support for TSelector
 namespace syntax_test
 {
     static bool isArray(const string& s)
@@ -23,8 +34,7 @@ REGISTER_OP("RootReader")
     .Input("queue_handle: resource")
     .Attr("branches: list(string)")
     .Attr("treename: string")
-    .Attr("naninf: int = 0")
-    .Attr("throw_on_nan: bool = False")
+    .Attr("naninf: float = 0")
     .Attr("batch: int = 1")
     .Output("out: float32")
     .Output("num: int32")
@@ -33,7 +43,7 @@ REGISTER_OP("RootReader")
     {
         std::vector<string> branchNames;
         TF_RETURN_IF_ERROR(c->GetAttr("branches",&branchNames));
-        unsigned int size = 0;
+        int size = 0;
         for (auto name: branchNames)
         {
             
@@ -46,18 +56,16 @@ REGISTER_OP("RootReader")
                 auto p1 = std::find(name.begin(),name.end(),'[');
                 auto p2 = std::find(p1,name.end(),']');
                 
-                size += std::stol(std::string(p1+1,p2));
+                size += std::stoi(std::string(p1+1,p2));
             }
         }
-        //shape_inference::ShapeHandle s = c->MakeShape({c->MakeDim(branchNames.size())});
         shape_inference::ShapeHandle s1 = c->MakeShape({-1,c->MakeDim(size)});
         c->set_output(0, s1);
         
         shape_inference::ShapeHandle s2 = c->MakeShape({-1,1});
         c->set_output(1, s2);
         return Status::OK();
-    })
-    .Doc(R"doc(A Reader that outputs the lines of a file delimited by '\n'.)doc");
+    });
 
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/shape_inference.h"
@@ -114,8 +122,14 @@ class RootReaderOp:
                     return v;
                 }
                 
-                virtual void setBranchAddress(TTree* tree) = 0;
-                virtual unsigned int fillTensor(typename TTypes<OUT>::Flat& flatTensor, unsigned int index, const OUT& reset) const = 0;
+                virtual void setBranchAddress(OpKernelContext* context, TTree* tree) = 0;
+                virtual int fillTensor(
+                    typename TTypes<OUT>::Flat& flatTensor,
+                    int index,
+                    const OUT& reset
+                ) const = 0;
+                virtual ~TensorFiller() {}
+        
         };
         
         
@@ -124,16 +138,19 @@ class RootReaderOp:
             public TensorFiller<OUT>
         {
             private:
-                unsigned int size_;
-                const bool throwOnNan_;
+                int size_;
                 std::unique_ptr<TTreeFormula> formula_;
             public:
                 typedef TensorFiller<OUT> Base;
             
-                TensorFillerTmpl(const string& name, const string& expr, unsigned int size, bool throwOnNan=false):
+                TensorFillerTmpl(
+                    OpKernelConstruction*, 
+                    const string& name, 
+                    const string& expr, 
+                    int size
+                ):
                     TensorFiller<OUT>(name,expr),
                     size_(size),
-                    throwOnNan_(throwOnNan),
                     formula_(nullptr)
                 {
                 }
@@ -142,32 +159,37 @@ class RootReaderOp:
                 {
                 }
                 
-                virtual void setBranchAddress(TTree* tree)
+                virtual void setBranchAddress(OpKernelContext* context, TTree* tree)
                 {
-                    const long id = std::hash<std::thread::id>()(std::this_thread::get_id());
-                    formula_.reset(new TTreeFormula((Base::name()+std::to_string(id)).c_str(),Base::expr().c_str(),tree));
+                    std::size_t id = std::hash<std::thread::id>()(std::this_thread::get_id());
+                    formula_.reset(new TTreeFormula(
+                        (Base::name()+std::to_string(id)).c_str(),
+                        Base::expr().c_str(),
+                        tree
+                    ));
                     
-                    if(not formula_)
+                    if(not formula_ or formula_->GetNdim()==0)
                     {
-                        throw std::runtime_error("Cannot parse equation '"+Base::expr()+"'");
+                        context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,"Cannot parse equation '"+Base::expr()+"'"));
+                        return;
                     }
                     formula_->SetQuickLoad(true);
                 }
                 
-                virtual unsigned int fillTensor(typename TTypes<OUT>::Flat& flatTensor, unsigned int index, const OUT& reset) const
+                virtual int fillTensor(
+                    typename TTypes<OUT>::Flat& flatTensor, 
+                    int index, 
+                    const OUT& reset
+                ) const
                 {
-                    unsigned int leafSize = formula_->GetNdata(); //needs to be called; otherwise elements >0 are set to 0
-                    for (unsigned int i = 0; i < std::min<unsigned int>(leafSize,size_); ++i)
+                    //needs to be called; otherwise elements >0 are set to 0
+                    int leafSize = formula_->GetNdata(); 
+                    for (int i = 0; i < std::min<int>(leafSize,size_); ++i)
                     {
-                        //std::cout<<TensorFiller<OUT>::expr()<<std::endl;
-                        double result = formula_->EvalInstance(i);
-                        if (throwOnNan_ and (std::isnan(result) or std::isinf(result)))
-                        {
-                            throw std::runtime_error("Got invalid value "+std::to_string(result)+" from expression "+this->expr_);
-                        }
+                        OUT result = static_cast<OUT>(formula_->EvalInstance(i));
                         flatTensor(index+i)=Base::resetNanOrInf(result,reset);
                     }
-                    for (unsigned int i = std::min(leafSize,size_); i < size_; ++i)
+                    for (int i = std::min(leafSize,size_); i < size_; ++i)
                     {
                         flatTensor(index+i) = reset; //padding
                     }
@@ -179,15 +201,14 @@ class RootReaderOp:
         mutex localMutex_; //protects class members
         std::unique_ptr<TFile> inputFile_;
         TTree* tree_;
-        std::vector<std::shared_ptr<TensorFiller<float>>> tensorFillers_;
-        size_t currentEntry_;
+        std::vector<std::unique_ptr<TensorFiller<float>>> tensorFillers_;
+        int currentEntry_;
         
-        int naninf_;
-        bool throwOnNan_;
+        float naninf_;
         string treename_;
-        unsigned int size_;
+        int size_;
         int nBatch_;
-        unsigned int nEvents_;
+        int nEvents_;
         
     public:
         explicit RootReaderOp(OpKernelConstruction* context): 
@@ -195,12 +216,10 @@ class RootReaderOp:
             inputFile_(nullptr),
             currentEntry_(0),
             naninf_(0),
-            throwOnNan_(false),
             size_(0),
             nBatch_(1),
             nEvents_(0)
         {
-            //gROOT->gErrorIgenoreLevel = 5000;
             RootMutex::Lock lock = RootMutex::lock();
             
             std::vector<string> branchNames;
@@ -218,10 +237,6 @@ class RootReaderOp:
             );
             OP_REQUIRES_OK(
                 context,
-                context->GetAttr("throw_on_nan",&throwOnNan_)
-            );
-            OP_REQUIRES_OK(
-                context,
                 context->GetAttr("batch",&nBatch_)
             );
             for (unsigned int iname = 0; iname < branchNames.size(); ++iname)
@@ -232,28 +247,17 @@ class RootReaderOp:
                     auto it = std::find(name.begin(),name.end(),'/');
                     if (it==name.end())
                     {
-                        tensorFillers_.emplace_back(std::make_shared<TensorFillerTmpl<float>>(
-                            "expr_"+std::to_string(iname),
-                            name,
-                            1,
-                            throwOnNan_
-                        ));
-                        size_+=1;
-                    }
-                    else
-                    {
-                        string type(it+1,name.end());
-                        if (type=="UInt_t")
-                        {
-
-                            tensorFillers_.emplace_back(std::make_shared<TensorFillerTmpl<unsigned int, float>>(
+                        tensorFillers_.emplace_back(
+                            std::make_unique<
+                                TensorFillerTmpl<float>
+                            >(
+                                context,
                                 "expr_"+std::to_string(iname),
-                                string(name.begin(),it),
-                                1,
-                                throwOnNan_
-                            ));
-                            size_+=1;
-                        }
+                                name,
+                                1
+                            )
+                        );
+                        size_+=1;
                     }
                 }
                 else
@@ -261,14 +265,14 @@ class RootReaderOp:
                     auto p1 = std::find(name.begin(),name.end(),'[');
                     auto p2 = std::find(p1,name.end(),']');
                     std::string branchName(name.begin(),p1);
-                    unsigned int size = std::stol(std::string(p1+1,p2));
+                    int size = std::stoi(std::string(p1+1,p2));
                     size_+=size;
                     tensorFillers_.emplace_back(
-                        std::make_shared<TensorFillerTmpl<float>>(
+                        std::make_unique<TensorFillerTmpl<float>>(
+                            context,
                             "expr_"+std::to_string(iname),
                             branchName,
-                            size,
-                            throwOnNan_
+                            size
                         )
                     );
                 }
@@ -279,6 +283,7 @@ class RootReaderOp:
         {
             RootMutex::Lock lock = RootMutex::lock();
             tensorFillers_.clear();
+            if (inputFile_) inputFile_->Close();
         }
         
         void Compute(OpKernelContext* context)
@@ -288,42 +293,46 @@ class RootReaderOp:
             while (not inputFile_)
             {
                 QueueInterface* queue;
-                OP_REQUIRES_OK(context,GetResourceFromContext(context, "queue_handle", &queue));
+                OP_REQUIRES_OK(context,GetResourceFromContext(
+                    context, "queue_handle", &queue
+                ));
                 
                 string fileName = GetNextFilename(queue,context);
                 if (!context->status().ok())
                 {
-                    return; //status is bad when queue is closed, so no more reduce_files -> training has finished
+                    return;
                 }
-                if (fileName.size()==0) throw std::runtime_error("Got empty filename");
-                   
-                //creating TFile/setting branch adresses is not thread safe
+                if (fileName.size()==0) 
+                {
+                    context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,"Got empty filename"));
+                    return;
+                }
                 RootMutex::Lock lock = RootMutex::lock();
-                //TODO: use TF logging and set loglevel
-                //std::cout<<"opening file "<<fileName<<std::endl;
                 TFile* f = TFile::Open(fileName.c_str());
                 if (not (f and f->IsOpen()))
                 {
-                    throw std::runtime_error("Cannot read file '"+fileName+"'");
+                    context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,"Cannot read file '"+fileName+"'"));
+                    return;
                 }
-                //std::cout<<"-> sucessfully open file "<<fileName<<std::endl;
                 inputFile_.reset(f);
                 
                 currentEntry_ = 0;
                 tree_ = dynamic_cast<TTree*>(inputFile_->Get(treename_.c_str()));
                 if (not tree_)
                 {
-                    throw std::runtime_error("Cannot get tree '"+treename_+"' from file '"+fileName+"'");
+                    context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,"Cannot get tree '"+treename_+"' from file '"+fileName+"'"));
+                    return;
                 }
                 for (auto& tensorFiller: tensorFillers_)
                 {
-                    tensorFiller->setBranchAddress(tree_);
+                    tensorFiller->setBranchAddress(context,tree_);
+                    if (not context->status().ok()) return;
                 }
-                nEvents_ = tree_->GetEntries();
+                nEvents_ = static_cast<int>(tree_->GetEntries());
             }
             Tensor* output_tensor = nullptr;
             TensorShape shape;
-            unsigned int nBatches = std::min<unsigned int>(nEvents_-currentEntry_,nBatch_);
+            int64_t nBatches = std::min<int>(nEvents_-currentEntry_,nBatch_);
             shape.AddDim(nBatches);
             shape.AddDim(size_);
             OP_REQUIRES_OK(context, context->allocate_output("out", shape,&output_tensor));
@@ -336,9 +345,9 @@ class RootReaderOp:
             
             auto output_flat = output_tensor->flat<float>();
             auto output_num_flat = output_num->flat<int>();
-            unsigned int index = 0;
+            int index = 0;
             
-            for (unsigned int ibatch=0; ibatch<nBatches;++ibatch)
+            for (int64_t ibatch=0; ibatch<nBatches;++ibatch)
             {
                 tree_->GetEntry(currentEntry_);
                 output_num_flat(ibatch)=currentEntry_;
@@ -351,15 +360,12 @@ class RootReaderOp:
             if (currentEntry_>=nEvents_)
             {
                 RootMutex::Lock lock = RootMutex::lock();
-                //inputFile_->Close(); //sometimes this yields a segfault from root
                 inputFile_.reset(nullptr);
             }
         }
         
         string GetNextFilename(QueueInterface* queue, OpKernelContext* context) const 
         {
-            //mutex_lock localLock(localMutex_); //mutex here makes deadlock for some reason
-            //TODO: check core/framework/reader_base.cc for details
             string work;
             Notification n;
             queue->TryDequeue(
@@ -369,15 +375,21 @@ class RootReaderOp:
                     {
                         if (tuple.size() != 1) 
                         {
-                            context->SetStatus(errors::InvalidArgument("Expected single component queue"));
+                            context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                                "Expected single component queue"
+                            ));
                         } 
                         else if (tuple[0].dtype() != DT_STRING) 
                         {
-                            context->SetStatus(errors::InvalidArgument("Expected queue with single string component"));
+                            context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                                "Expected queue with single string component"
+                            ));
                         } 
                         else if (tuple[0].NumElements() != 1) 
                         {
-                            context->SetStatus(errors::InvalidArgument("Expected to dequeue a one-element string tensor"));
+                            context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                                "Expected to dequeue a one-element string tensor"
+                            ));
                         } 
                         else 
                         {
@@ -392,8 +404,5 @@ class RootReaderOp:
         }   
 };
 
-//mutex RootReaderOp::localMutex_;
-
-
-REGISTER_KERNEL_BUILDER(Name("RootReader").Device(DEVICE_CPU),RootReaderOp);
+REGISTER_KERNEL_BUILDER(Name("RootReader").Device(DEVICE_CPU),RootReaderOp)
 

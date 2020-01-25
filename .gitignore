@@ -1,6 +1,7 @@
 *.pyc
 *.so
-/env/
+*__init__.py
+Env/env
 Env/env.log
 Env/env_cpu.sh
 Env/env_gpu.sh
@@ -10,6 +11,7 @@ Ops/Makefile
 Ops/cmake_install.cmake
 Ops/install_manifest.txt
 Ops/release/
+Ops/build
 Unpacker/CMakeCache.txt
 Unpacker/CMakeFiles/
 Unpacker/Makefile

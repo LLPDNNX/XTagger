@@ -1,3 +1,21 @@
+'''===================================================================
+Copyright 2019 Matthias Komm, Vilius Cepaitis, Robert Bainbridge, 
+Alex Tapper, Oliver Buchmueller. All Rights Reserved. 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+Unless required by applicable law or agreed to in writing, 
+software distributed under the License is distributed on an "AS IS" 
+BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express 
+or implied.See the License for the specific language governing 
+permissions and limitations under the License.
+==================================================================='''
+
+
+
 import tensorflow as tf
 import os
 
@@ -19,8 +37,7 @@ class root_reader():
         feature_dict,
         treename,
         batch=1,
-        naninf=0,
-        throw_on_nan=False
+        naninf=0
     ):
         self._feature_dict = feature_dict
         
@@ -55,8 +72,7 @@ class root_reader():
             queue.queue_ref, 
             self._branch_list,
             treename=treename,
-            naninf=naninf,
-            throw_on_nan=throw_on_nan, 
+            naninf=naninf, 
             batch=batch
         )
         
@@ -66,8 +82,8 @@ class root_reader():
     def batch(self,preprocess=lambda x:x):
         result = {}
         op_batch_preprocessed = preprocess(self._op_batch)
-        for featureName in sorted(self._output_formatters.keys()):
-            result[featureName]=self._output_formatters[featureName](op_batch_preprocessed)
+        for feature_name in sorted(self._output_formatters.keys()):
+            result[feature_name]=self._output_formatters[feature_name](op_batch_preprocessed)
         result["num"] = self._op_num
         return result
         

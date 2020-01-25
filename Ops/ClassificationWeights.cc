@@ -1,11 +1,26 @@
+/*===================================================================
+Copyright 2019 Matthias Komm, Vilius Cepaitis, Robert Bainbridge, 
+Alex Tapper, Oliver Buchmueller. All Rights Reserved. 
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+    
+Unless required by applicable law or agreed to in writing, 
+software distributed under the License is distributed on an "AS IS" 
+BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express 
+or implied.See the License for the specific language governing 
+permissions and limitations under the License.
+===================================================================*/
+
+
 #include "tensorflow/core/framework/reader_base.h"
 #include "tensorflow/core/framework/op.h"
 
 #include <regex>
 
 using namespace tensorflow;
-
-//TODO: somehow need to parse pt for weight evaluation!!!
 
 REGISTER_OP("ClassificationWeights")
     .Input("labels: float32")
@@ -18,17 +33,16 @@ REGISTER_OP("ClassificationWeights")
     .SetShapeFn([](::tensorflow::shape_inference::InferenceContext* c) 
     {
         tensorflow::shape_inference::ShapeHandle label_shape =  c->input(0);
-        int batch_dim = c->Value(c->Dim(label_shape,0));
+        int64_t batch_dim = c->Value(c->Dim(label_shape,0));
         shape_inference::ShapeHandle s = c->MakeShape({batch_dim});
         c->set_output(0,s);
         return Status::OK();
-    })
-    .Doc(R"doc(A Reader that outputs the lines of a file delimited by '\n'.)doc");
+    });
 
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/shape_inference.h"
 
-#include "TH2F.h"
+#include "TH2.h"
 #include "TFile.h"
 
 #include "RootMutex.h"
@@ -41,8 +55,7 @@ class ClassificationWeightsOp:
     private:
         std::string filePath;
         std::vector<std::string> histNames;
-        bool transpose_;
-        std::vector<std::shared_ptr<TH2F>> hists;
+        std::vector<std::shared_ptr<TH2>> hists;
         std::vector<int> varIndex;
         
     public:
@@ -65,18 +78,28 @@ class ClassificationWeightsOp:
             TFile rootFile(filePath.c_str());
             if (not rootFile.IsOpen ())
             {
-                throw std::runtime_error("Root file '"+filePath+"' cannot be opened");
+                context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                    "Root file '"+filePath+"' cannot be opened"
+                ));
             }
             for (auto histName: histNames)
             {
-                TH2F* hist = dynamic_cast<TH2F*>(rootFile.Get(histName.c_str()));
+                if (not rootFile.Get(histName.c_str()))
+                {
+                    context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                        "Cannot find hist '"+histName+"' in file '"+filePath+"'"
+                    ));
+                }
+            
+                TH2* hist = dynamic_cast<TH2*>(rootFile.Get(histName.c_str())->Clone());
                 if (not hist)
                 {
-                    throw std::runtime_error("Cannot find hist '"+histName+"' in file '"+filePath+"'");
+                    context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                        "Cannot cast hist '"+histName+"' to TH2 in file '"+filePath+"'"
+                    ));
                 }
-                hist = (TH2F*)hist->Clone();
                 hist->SetDirectory(0);
-                hists.push_back(std::shared_ptr<TH2F>(hist));
+                hists.push_back(std::shared_ptr<TH2>(hist));
             }
         }
         
@@ -87,27 +110,30 @@ class ClassificationWeightsOp:
             hists.clear();
         }
         
-        float computeWeight(int classIndex, float value1, float value2)
+        float computeWeight(unsigned int classIndex, float value1, float value2)
         {
             TH2* hist = hists[classIndex].get();
             int bin = hist->FindBin(value1,value2);
-            return hist->GetBinContent(bin);
+            return static_cast<float>(hist->GetBinContent(bin));
         }
 
         void Compute(OpKernelContext* context)
         {
             const Tensor& label_tensor = context->input(0);
             auto label = label_tensor.flat<float>();
-            long num_batches = label_tensor.dim_size(0);
-            long label_length = label_tensor.dim_size(1);
-            if (label_length!=hists.size())
+            int64_t num_batches = label_tensor.dim_size(0);
+            int64_t label_length = label_tensor.dim_size(1);
+            if (label_length<0 or static_cast<unsigned int>(label_length)!=hists.size())
             {
-                throw std::runtime_error("Labels ("+std::to_string(hists.size())+") need to be of same size as tensor ("+std::to_string(label_length)+")");
+                context->CtxFailureWithWarning(__FILE__, __LINE__, Status(error::INVALID_ARGUMENT,
+                    "Labels ("+std::to_string(hists.size())+") need to be of same size as tensor ("+std::to_string(label_length)+")"
+                ));
+                return;
             }
 
             const Tensor& value_tensor = context->input(1);
             auto value = value_tensor.flat<float>();
-            long value_size = value_tensor.dim_size(1);
+            int64_t value_size = value_tensor.dim_size(1);
 
             Tensor* output_tensor = nullptr;
             TensorShape shape;
@@ -117,16 +143,15 @@ class ClassificationWeightsOp:
 
             for (unsigned int ibatch = 0; ibatch < num_batches; ++ibatch)
             {
-                int class_index = -1;
+                unsigned int class_index = 0;
                 for (unsigned int i = 0; i < label_length; ++i)
                 { 
-                    if (label(ibatch*label_length+i)>0.5)
+                    if (label(ibatch*label_length+i)>0.5f)
                     {
                         class_index = i;
                         break;
                     }
                 }
-                if (class_index<0) throw std::runtime_error("labels tensor needs to be one-hot encoded");
                 float varValue1 = value(ibatch*value_size+varIndex[0]);
                 float varValue2 = value(ibatch*value_size+varIndex[1]);
                 output(ibatch) = computeWeight(class_index,varValue1,varValue2);
@@ -135,5 +160,5 @@ class ClassificationWeightsOp:
 };
 
 
-REGISTER_KERNEL_BUILDER(Name("ClassificationWeights").Device(DEVICE_CPU),ClassificationWeightsOp);
+REGISTER_KERNEL_BUILDER(Name("ClassificationWeights").Device(DEVICE_CPU),ClassificationWeightsOp)
 

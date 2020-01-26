@@ -1146,6 +1146,13 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_displacement_z" , &jetorigin_displacement_z); 
                 tree_->SetBranchAddress("jetorigin_betagamma", &jetorigin_betagamma);
                 
+                tree_->SetBranchAddress("jetorigin_hadronFlavor", &jetorigin_hadronFlavor);
+                tree_->SetBranchAddress("jetorigin_partonFlavor", &jetorigin_partonFlavor);
+                
+                tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
+                tree_->SetBranchAddress("jetorigin_llp_pt", &jetorigin_llp_pt);
+                tree_->SetBranchAddress("jetorigin_llp_mass", &jetorigin_llp_mass);
+                
                 tree_->SetBranchAddress("jetorigin_partonFlavor", &jetorigin_partonFlavor);
                 tree_->SetBranchAddress("jetorigin_hadronFlavor", &jetorigin_hadronFlavor);
                 tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
@@ -1733,22 +1740,22 @@ class NanoXTree
             if  (jetorigin_isS[jet]>0.5) return 8;
             if  (jetorigin_isUD[jet]>0.5) return 9;
             if  (jetorigin_isG[jet]>0.5) return 10;
-            if  (jetorigin_isPU[jet]>0.5) return 12;
-            if  (jetorigin_isLLP_RAD[jet]>0.5) return 13;
-            if  (jetorigin_isLLP_MU[jet]>0.5) return 14;
-            if  (jetorigin_isLLP_E[jet]>0.5) return 15;
-            if  (jetorigin_isLLP_Q[jet]>0.5) return 16;
-            if  (jetorigin_isLLP_QMU[jet]>0.5) return 17;
-            if  (jetorigin_isLLP_QE[jet]>0.5) return 18;
-            if  (jetorigin_isLLP_QQ[jet]>0.5) return 19;
-            if  (jetorigin_isLLP_QQMU[jet]>0.5) return 20;
-            if  (jetorigin_isLLP_QQE[jet]>0.5) return 21;
-            if  (jetorigin_isLLP_B[jet]>0.5) return 22;
-            if  (jetorigin_isLLP_BMU[jet]>0.5) return 23;
-            if  (jetorigin_isLLP_BE[jet]>0.5) return 24;
-            if  (jetorigin_isLLP_BB[jet]>0.5) return 25;
-            if  (jetorigin_isLLP_BBMU[jet]>0.5) return 26;
-            if  (jetorigin_isLLP_BBE[jet]>0.5) return 27;
+            if  (jetorigin_isPU[jet]>0.5) return 11;
+            if  (jetorigin_isLLP_RAD[jet]>0.5) return 12;
+            if  (jetorigin_isLLP_MU[jet]>0.5) return 13;
+            if  (jetorigin_isLLP_E[jet]>0.5) return 14;
+            if  (jetorigin_isLLP_Q[jet]>0.5) return 15;
+            if  (jetorigin_isLLP_QMU[jet]>0.5) return 16;
+            if  (jetorigin_isLLP_QE[jet]>0.5) return 17;
+            if  (jetorigin_isLLP_QQ[jet]>0.5) return 18;
+            if  (jetorigin_isLLP_QQMU[jet]>0.5) return 19;
+            if  (jetorigin_isLLP_QQE[jet]>0.5) return 20;
+            if  (jetorigin_isLLP_B[jet]>0.5) return 21;
+            if  (jetorigin_isLLP_BMU[jet]>0.5) return 22;
+            if  (jetorigin_isLLP_BE[jet]>0.5) return 23;
+            if  (jetorigin_isLLP_BB[jet]>0.5) return 24;
+            if  (jetorigin_isLLP_BBMU[jet]>0.5) return 25;
+            if  (jetorigin_isLLP_BBE[jet]>0.5) return 26;
 
             return -1;
         }
@@ -1783,6 +1790,7 @@ class NanoXTree
                 unpackedTree.jetorigin_ctau = ctau;
                 unpackedTree.jetorigin_decay_angle = jetorigin_decay_angle[jet];
                 unpackedTree.jetorigin_betagamma = jetorigin_betagamma[jet];
+                
                 unpackedTree.jetorigin_partonFlavor = jetorigin_partonFlavor[jet];
                 unpackedTree.jetorigin_hadronFlavor = jetorigin_hadronFlavor[jet];
                 
@@ -2365,10 +2373,10 @@ int main(int argc, char **argv)
     std::cout<<"Number of independent inputs: "<<trees.size()<<std::endl;
     std::cout<<"Total number of events: "<<total_entries<<std::endl;
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTrain;
-    std::vector<std::vector<int>> eventsPerClassPerFileTrain(28,std::vector<int>(nOutputs,0));
+    std::vector<std::vector<int>> eventsPerClassPerFileTrain(27,std::vector<int>(nOutputs,0));
     
     std::vector<std::unique_ptr<UnpackedTree>> unpackedTreesTest;
-    std::vector<std::vector<int>> eventsPerClassPerFileTest(28,std::vector<int>(nOutputs,0));
+    std::vector<std::vector<int>> eventsPerClassPerFileTest(27,std::vector<int>(nOutputs,0));
 
     for (unsigned int i = 0; i < nOutputs; ++i)
     {

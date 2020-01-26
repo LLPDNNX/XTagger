@@ -22,6 +22,44 @@ from feature_dict import featureDict as featureDictTmpl
 from plot_macros import plot_resampled, make_plots, makePlot
 from style import ctauSymbol
 
+def get_model_memory_usage(batch_size, model):
+    import numpy as np
+    from keras import backend as K
+
+    shapes_mem_count = 0
+    internal_model_mem_count = 0
+    for l in model.layers:
+        layer_type = l.__class__.__name__
+        if layer_type == 'Model':
+            internal_model_mem_count += get_model_memory_usage(batch_size, l)
+        single_layer_mem = 1
+        i = 0
+        try:
+            print l.output_shape
+        except AttributeError:
+              print("An exception occurred")
+              continue
+
+        for s in l.output_shape:
+            if s is None:
+                continue
+            single_layer_mem *= s
+        shapes_mem_count += single_layer_mem
+
+
+    trainable_count = np.sum([K.count_params(p) for p in set(model.trainable_weights)])
+    non_trainable_count = np.sum([K.count_params(p) for p in set(model.non_trainable_weights)])
+
+    number_size = 4.0
+    if K.floatx() == 'float16':
+         number_size = 2.0
+    if K.floatx() == 'float64':
+         number_size = 8.0
+
+    total_memory = number_size*(batch_size*shapes_mem_count + trainable_count + non_trainable_count)
+    gbytes = np.round(total_memory / (1024.0 ** 3), 3) + internal_model_mem_count
+    return gbytes
+
 # tensorflow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
@@ -40,7 +78,7 @@ parser.add_argument('-b', '--batch', action='store', type=int,
 parser.add_argument('-c', action='store_true',
                     help='achieve class balance', default=False)
 parser.add_argument('-e', '--epoch', action='store', type=int,
-                    help='number of epochs', default=60)
+                    help='number of epochs', default=50)
 parser.add_argument('-o', '--overwrite', action='store_true',
                     dest='overwriteFlag',
                     help='overwrite output folder', default=False)
@@ -66,9 +104,11 @@ parser.add_argument('--bagging', action='store', type=float, help='bagging fract
 parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
                     default=-1,dest='resume')
 parser.add_argument('--lambda', type=float,help='domain loss weight',
-                    default=0.3,dest='lambda_val')
+                    default=30.,dest='lambda_val')
 parser.add_argument('--kappa', type=float,help='learning rate decay val',
                     default=0.1,dest='kappa')
+parser.add_argument('--gamma', type=float,help='domain loss weight',
+                    default=0.2,dest='gamma')
 
 arguments = parser.parse_args()
 
@@ -92,6 +132,7 @@ resumeTraining = arguments.resume
 bagging = arguments.bagging
 kappa = arguments.kappa
 lambda_val = arguments.lambda_val
+gamma = arguments.gamma
 
 modelPath = arguments.model
 import importlib
@@ -585,26 +626,16 @@ while (epoch < num_epochs):
     modelPreprocClass = modelDiscriminators["preprocClass"]
     modelPreprocDomain = modelDiscriminators["preprocDomain"]
     
-    #modelTrain = setupModelDiscriminator()
-    #modelTest = setupModelDiscriminator()
-    
     classLossWeight = 1.
-    domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/50.)**2.  #0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    domainLossWeight = lambda_val
-    #domainLossWeight = max(0,epoch-2)/25.+(max(0,epoch-2)/25.)**2.
-    
-    #classLossWeight = 0.3+0.7*math.exp(-0.03*max(0,epoch-2)**1.5)
-    #since learning rate is decreased increase DA weight at higher epochs
-    #domainLossWeight = 0.7-0.7*math.exp(-0.03*max(0,epoch-2)**1.5)+0.05*max(0,epoch-2) 
-    
+    domainLossWeight = lambda_val*(2./(1+math.exp(-gamma*epoch)) - 1.)
+
     if noDA:
         classLossWeight = 1.
-        domainLossWeight = 0
+        domainLossWeight = 0.
         
     lr_per_epoch.append(learning_rate_val)
     class_weight_per_epoch.append(classLossWeight)
     domain_weight_per_epoch.append(domainLossWeight)
-        
         
     def wasserstein_loss(x,y):
         return K.mean(x*y)
@@ -655,8 +686,10 @@ while (epoch < num_epochs):
     if epoch == 0:
         print "class network"
         modelClassDiscriminator.summary()
+        print get_model_memory_usage(batchSize, modelClassDiscriminator)
         print "domain network"
         modelDomainDiscriminator.summary()
+        print get_model_memory_usage(batchSize, modelDomainDiscriminator)
         print "domain network with frozen features"
         modelDomainDiscriminatorFrozen.summary()
     
@@ -667,6 +700,9 @@ while (epoch < num_epochs):
 
     sess = K.get_session()
     sess.run(init_op)
+
+    flops = tf.profiler.profile(sess.graph, options=tf.profiler.ProfileOptionBuilder.float_operation())
+    print('FLOP = ', flops.total_float_ops)
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
@@ -1204,7 +1240,7 @@ while (epoch < num_epochs):
     tight_WP_effs, M_score = make_plots(outputFolder, epoch, hists, truths, scores, featureDict)
     
     labels = ["B","C","UDS","G","LLP"]
-    JSD_scores = []
+    KS_scores = []
     
     if not noDA:
         for logctau in range(-2, 4):
@@ -1222,8 +1258,7 @@ while (epoch < num_epochs):
                 
                 statictics = ""
                 if daHists[logctau][idis][0].Integral()>0.:
-                    MCNorm = daHists[logctau][idis][0].Integral()
-                    dataNorm = daHists[logctau][idis][1].Integral()
+                    KS = daHists[logctau][idis][0].KolmogorovTest(daHists[logctau][idis][1], "M")
                     daHists[logctau][idis][0].Scale(daHists[logctau][idis][1].Integral()/daHists[logctau][idis][0].Integral())
                 
                     eventsAboveWp = {
@@ -1232,17 +1267,10 @@ while (epoch < num_epochs):
                         95: [0.,0.],
                     }
                     sumMC = 0.
-                    sumJSD = 0.
                     for ibin in range(daHists[logctau][idis][0].GetNbinsX()):
                         cMC = daHists[logctau][idis][0].GetBinContent(ibin+1)
                         sumMC += cMC
                         cData = daHists[logctau][idis][1].GetBinContent(ibin+1)
-                        # Calculate JSD
-                        MCProb = cMC/MCNorm
-                        dataProb = cData/dataNorm
-                        mean = 0.5*(MCProb+dataProb)
-                        if MCProb > 0 and dataProb > 0:
-                            sumJSD += 0.5*(MCProb*math.log(MCProb/mean)/math.log(2))+0.5*(dataProb*math.log(dataProb/mean)/math.log(2))
 
                         for wp in eventsAboveWp.keys():
                             if (sumMC/daHists[logctau][idis][0].Integral())>(wp*0.01):
@@ -1257,9 +1285,9 @@ while (epoch < num_epochs):
                         if iwp<(len(eventsAboveWp.keys())-1):
                             statictics+=","
                         statictics+="  "
-                    statictics+="JSD = %.7f" % sumJSD
+                    statictics+="D = %.7f" % KS
                     if idis == 4:
-                        JSD_scores.append(sumJSD)
+                        KS_scores.append(KS)
 
                 daHists[logctau][idis][0].Rebin(200)
                 daHists[logctau][idis][1].Rebin(200)
@@ -1311,10 +1339,9 @@ while (epoch < num_epochs):
         
     
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
-    tight_WP_effs = np.asarray(tight_WP_effs)
-    print JSD_scores
-    JSD_scores = np.asarray(JSD_scores)
-    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+np.array2string(tight_WP_effs,separator=';')+";"+np.array2string(JSD_scores,separator=';')+"\n")
+    tight_WP_eff = np.mean(np.asarray(tight_WP_effs))
+    KS_scores = np.asarray(KS_scores)
+    f.write(str(epoch)+";"+str(learning_rate_val)+";"+str(avgLoss_train)+";"+str(avgLoss_test)+";"+str(avgLoss_train_domain)+";"+str(avgLoss_test_domain)+";"+str(classLossWeight)+";"+str(domainLossWeight)+";"+str(tight_WP_eff)+";"+np.array2string(KS_scores,separator=';')+"\n")
     f.close()
     
     cv = ROOT.TCanvas("cv"+str(idis)+str(random.random()),"",800,750)

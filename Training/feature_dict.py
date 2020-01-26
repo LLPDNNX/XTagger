@@ -24,8 +24,8 @@ featureDict = {
     
     "gen": {
         "branches":[
-            "jetorigin_ctau",
-            #"jetorigin_displacement"
+            #"jetorigin_ctau",
+            "jetorigin_displacement"
         ]
     },
     
@@ -44,7 +44,7 @@ featureDict = {
             'csv_trackSip3dValAboveCharm', 
             'csv_trackSip3dSigAboveCharm', 
             'csv_jetNSelectedTracks', 
-            'csv_jetNTracksEtaRel',
+            'csv_jetNTracksEtaRel'
             #'legacyTag_median_dxy',
             #'legacyTag_median_trackSip2dSig',
             #'legacyTag_alpha'
@@ -81,12 +81,7 @@ featureDict = {
             'cpf_puppi_weight',
             'cpf_track_chi2',
             'cpf_track_ndof',
-            'cpf_track_quality',
-            #'cpf_jetmassdroprel',
-            #'cpf_relIso01',
-            #'cpf_isLepton',
-            #'cpf_lostInnerHits'
-
+            'cpf_track_quality'
         ],
         "preprocessing":{
             'cpf_trackEtaRel':lambda x: tf.log(1+tf.abs(x)),
@@ -114,10 +109,7 @@ featureDict = {
             'npf_isGamma',
             'npf_hcal_fraction',
             'npf_drminsv',
-            'npf_puppi_weight',
-            #'npf_jetmassdroprel',
-            #'npf_relIso01'
-
+            'npf_puppi_weight'
         ],
         "preprocessing":{
             'npf_ptrel':lambda x: tf.log(1e-6+tf.nn.relu(x)),
@@ -139,7 +131,7 @@ featureDict = {
             'sv_d3d',
             'sv_d3dsig',
             'sv_costhetasvpv',
-            'sv_enratio',
+            'sv_enratio'
         ],
         "preprocessing":{
             'sv_pt':lambda x: tf.log(tf.nn.relu(x)+1e-3),

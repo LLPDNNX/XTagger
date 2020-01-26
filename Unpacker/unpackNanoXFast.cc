@@ -15,59 +15,6 @@
 #include "cmdParser.hpp"
 #include "exprtk.hpp"
 
-
-/*template<class A, class ... ARGS>
-void print(A a, ARGS ... args)
-{
-   std::cout<<a;
-   print<ARGS>(args);	
-}
-
-template<class A>
-void print(A a) {std::cout<<a<<std::endl;}
-
-print(4543,"dfdg",5,1.0f,"cjdjsks") */
-
-/*template<size_t NINPUT, class IN, class OUT=IN>
-class FillerScalar 
-{
-	IN buffer[NINPUT];
-	OUT buffer;
-
-    public:
-	FillerScalar(const std::string& name, const std::string& inputLength)
-	{
-	}
-
-	void bookBranch(TTree* tree)
-	{
-	tree->TBranch(name.c_str()) ;
-	
-
-	}
-};
-
-
-template<size_t NINPUT, class IN, size_t NOUT, class OUT=IN>
-class FillerVector 
-{
-	IN buffer[NINPUT];
-	OUT buffer[NOUT];
-
-    public:
-	FillerVector(const std::string& name , const std::string& inputLength, const std::string& outputLength)
-	{
-	}
-
-	void bookBranch(TTree* tree)
-	{
-	    tree->TBranch(name.c_str()) ;
-	
-
-	}
-};
-Filler<1,int,float>
-Filler<1,float>*/
  
 class UnpackedTree
 {
@@ -77,63 +24,62 @@ class UnpackedTree
         TTree* tree_;
         
         
-        static constexpr int maxEntries = 25;
+        static constexpr int maxEntries_cpf = 25;
+        static constexpr int maxEntries_npf = 25;
+        static constexpr int maxEntries_sv = 4;
+        static constexpr int maxEntries_muon = 2;
+        static constexpr int maxEntries_electron = 2;
+        
         static constexpr int bufferSize = 64000; //default is 32kB
         
-        
-        
-        unsigned int jetorigin_isPU;
-        unsigned int jetorigin_isB;
-        unsigned int jetorigin_isBB;
-        unsigned int jetorigin_isGBB;
-        unsigned int jetorigin_isLeptonic_B;
-        unsigned int jetorigin_isLeptonic_C;
-        unsigned int jetorigin_isC;
-        unsigned int jetorigin_isCC;
-        unsigned int jetorigin_isGCC;
-        unsigned int jetorigin_isS;
-        unsigned int jetorigin_isUD;
-        unsigned int jetorigin_isG;
-        //unsigned int jetorigin_fromLLP;
+        float jetorigin_isPU;
+        float jetorigin_isB;
+        float jetorigin_isBB;
+        float jetorigin_isGBB;
+        float jetorigin_isLeptonic_B;
+        float jetorigin_isLeptonic_C;
+        float jetorigin_isC;
+        float jetorigin_isCC;
+        float jetorigin_isGCC;
+        float jetorigin_isS;
+        float jetorigin_isUD;
+        float jetorigin_isG;
         //Include LLP flavour : 
-        unsigned int jetorigin_isLLP_RAD; //no flavour match (likely from wide angle radiation)
-        unsigned int jetorigin_isLLP_MU; //prompt lepton
-        unsigned int jetorigin_isLLP_E; //prompt lepton
-        unsigned int jetorigin_isLLP_Q; //single light quark
-        unsigned int jetorigin_isLLP_QMU; //single light quark + prompt lepton
-        unsigned int jetorigin_isLLP_QE; //single light quark + prompt lepton
-        unsigned int jetorigin_isLLP_QQ; //double light quark
-        unsigned int jetorigin_isLLP_QQMU; //double light quark + prompt lepton
-        unsigned int jetorigin_isLLP_QQE; //double light quark + prompt lepton
-        unsigned int jetorigin_isLLP_B; //single b/c quark
-        unsigned int jetorigin_isLLP_BMU; //single b/c quark + prompt lepton
-        unsigned int jetorigin_isLLP_BE; //single b/c quark + prompt lepton
-        unsigned int jetorigin_isLLP_BB; //double b/c quark
-        unsigned int jetorigin_isLLP_BBMU; //double b/c quark + prompt lepton
-        unsigned int jetorigin_isLLP_BBE; //double b/c quark + prompt lepton
-        unsigned int jetorigin_isUndefined;
+        float jetorigin_isLLP_RAD; //no flavour match (likely from wide angle radiation)
+        float jetorigin_isLLP_MU; //prompt lepton
+        float jetorigin_isLLP_E; //prompt lepton
+        float jetorigin_isLLP_Q; //single light quark
+        float jetorigin_isLLP_QMU; //single light quark + prompt lepton
+        float jetorigin_isLLP_QE; //single light quark + prompt lepton
+        float jetorigin_isLLP_QQ; //double light quark
+        float jetorigin_isLLP_QQMU; //double light quark + prompt lepton
+        float jetorigin_isLLP_QQE; //double light quark + prompt lepton
+        float jetorigin_isLLP_B; //single b/c quark
+        float jetorigin_isLLP_BMU; //single b/c quark + prompt lepton
+        float jetorigin_isLLP_BE; //single b/c quark + prompt lepton
+        float jetorigin_isLLP_BB; //double b/c quark
+        float jetorigin_isLLP_BBMU; //double b/c quark + prompt lepton
+        float jetorigin_isLLP_BBE; //double b/c quark + prompt lepton
+        float jetorigin_isUndefined;
         
         float jetorigin_displacement;
-//      float jetorigin_ctau;
         float jetorigin_decay_angle;
-	float jetorigin_displacement_xy;
-	float jetorigin_displacement_z ; 
-	float jetorigin_betagamma;
-	int   jetorigin_jetIdx;
-	int   jetorigin_partonFlavor;
-	int   jetorigin_hadronFlavor;
-	int   jetorigin_llpId;
-	float jetorigin_llp_mass;
-	float jetorigin_llp_pt;
+        float jetorigin_displacement_xy;
+        float jetorigin_displacement_z ; 
+        float jetorigin_ctau;
+        float jetorigin_betagamma;
+        float jetorigin_partonFlavor;
+        float jetorigin_hadronFlavor;
+        float jetorigin_llpId;
+        float jetorigin_llp_mass;
+        float jetorigin_llp_pt;
 
         //unsigned int nglobal;
         float global_pt;
         float global_eta;
-        float global_rho;
-	float global_mass;
-//	float global_energy;
-	int   global_n60;
-	int   global_n90;
+        float global_mass;
+        float global_n60;
+        float global_n90;
         float global_chargedEmEnergyFraction;
         float global_chargedHadronEnergyFraction;
         float global_chargedMuEnergyFraction;
@@ -154,34 +100,6 @@ class UnpackedTree
         float global_isotropy;
         float global_eventShapeC;
         float global_eventShapeD;
-
-        float isData;
-        float xsecweight;
-        float processId;
-        
-        unsigned int ncpf;
-        float cpf_trackEtaRel[maxEntries];
-        float cpf_trackPtRel[maxEntries];
-        float cpf_trackPPar[maxEntries];
-        float cpf_trackDeltaR[maxEntries];
-        float cpf_trackPtRatio[maxEntries];
-        float cpf_trackPParRatio[maxEntries];
-        float cpf_trackSip2dVal[maxEntries];
-        float cpf_trackSip2dSig[maxEntries];
-        float cpf_trackSip3dVal[maxEntries];
-        float cpf_trackSip3dSig[maxEntries];
-        float cpf_trackJetDistVal[maxEntries];
-        float cpf_trackJetDistSig[maxEntries];
-        float cpf_ptrel[maxEntries];
-        float cpf_drminsv[maxEntries];
-        float cpf_vertex_association[maxEntries];
-        float cpf_fromPV[maxEntries];
-        float cpf_puppi_weight[maxEntries];
-        float cpf_track_chi2[maxEntries];
-        float cpf_track_ndof[maxEntries];
-        float cpf_track_quality[maxEntries];
-        float cpf_relmassdrop[maxEntries];
-//        float cpf_relIso01[maxEntries];
         
         float csv_trackSumJetEtRatio;
         float csv_trackSumJetDeltaR;
@@ -192,101 +110,125 @@ class UnpackedTree
         float csv_trackSip3dSigAboveCharm;
         float csv_jetNSelectedTracks;
         float csv_jetNTracksEtaRel;
+
+        float isData;
+        float xsecweight;
+        float processId;
+        
+        unsigned int ncpf;
+        float cpf_trackEtaRel[maxEntries_cpf];
+        float cpf_trackPtRel[maxEntries_cpf];
+        float cpf_trackPPar[maxEntries_cpf];
+        float cpf_trackDeltaR[maxEntries_cpf];
+        float cpf_trackPtRatio[maxEntries_cpf];
+        float cpf_trackPParRatio[maxEntries_cpf];
+        float cpf_trackSip2dVal[maxEntries_cpf];
+        float cpf_trackSip2dSig[maxEntries_cpf];
+        float cpf_trackSip3dVal[maxEntries_cpf];
+        float cpf_trackSip3dSig[maxEntries_cpf];
+        float cpf_trackJetDistVal[maxEntries_cpf];
+        float cpf_trackJetDistSig[maxEntries_cpf];
+        float cpf_ptrel[maxEntries_cpf];
+        float cpf_deta[maxEntries_cpf];
+        float cpf_dphi[maxEntries_cpf];
+        float cpf_drminsv[maxEntries_cpf];
+        float cpf_vertex_association[maxEntries_cpf];
+        float cpf_fromPV[maxEntries_cpf];
+        float cpf_puppi_weight[maxEntries_cpf];
+        float cpf_track_chi2[maxEntries_cpf];
+        float cpf_track_ndof[maxEntries_cpf];
+        float cpf_track_quality[maxEntries_cpf];
+        float cpf_relmassdrop[maxEntries_cpf];
+        
+        float cpf_matchedSV[maxEntries_cpf];
+        float cpf_matchedMuon[maxEntries_cpf];
+        float cpf_matchedElectron[maxEntries_cpf];
         
         unsigned int nnpf;
-        float npf_ptrel[maxEntries];
-        float npf_deltaR[maxEntries];
-        float npf_isGamma[maxEntries];
-        float npf_hcal_fraction[maxEntries];
-        float npf_drminsv[maxEntries];
-        float npf_puppi_weight[maxEntries];
-        float npf_relmassdrop[maxEntries];
-        float npf_relIso01[maxEntries];
+        float npf_ptrel[maxEntries_npf];
+        float npf_deta[maxEntries_npf];
+        float npf_dphi[maxEntries_npf];
+        float npf_deltaR[maxEntries_npf];
+        float npf_isGamma[maxEntries_npf];
+        float npf_hcal_fraction[maxEntries_npf];
+        float npf_drminsv[maxEntries_npf];
+        float npf_puppi_weight[maxEntries_npf];
+        float npf_relmassdrop[maxEntries_npf];
         
         unsigned int nsv;
-        float sv_pt[maxEntries];
-        float sv_mass[maxEntries];
-        float sv_deltaR[maxEntries];
-        float sv_ntracks[maxEntries];
-        float sv_chi2[maxEntries];
-        float sv_ndof[maxEntries];
-        float sv_dxy[maxEntries];
-        float sv_dxysig[maxEntries];
-        float sv_d3d[maxEntries];
-        float sv_d3dsig[maxEntries];
-        float sv_costhetasvpv[maxEntries];
-        float sv_enratio[maxEntries];
+        float sv_ptrel[maxEntries_sv];
+        float sv_deta[maxEntries_sv];
+        float sv_dphi[maxEntries_sv];
+        float sv_mass[maxEntries_sv];
+        float sv_deltaR[maxEntries_sv];
+        float sv_ntracks[maxEntries_sv];
+        float sv_chi2[maxEntries_sv];
+        float sv_ndof[maxEntries_sv];
+        float sv_dxy[maxEntries_sv];
+        float sv_dxysig[maxEntries_sv];
+        float sv_d3d[maxEntries_sv];
+        float sv_d3dsig[maxEntries_sv];
+        float sv_costhetasvpv[maxEntries_sv];
+        float sv_enratio[maxEntries_sv];
 
+        unsigned int nmuon;
+        float muon_isGlobal[maxEntries_muon] ; 
+        float muon_isTight[maxEntries_muon] ; 
+        float muon_isMedium[maxEntries_muon] ; 
+        float muon_isLoose[maxEntries_muon] ; 
+        float muon_isStandAlone[maxEntries_muon] ;
 
-// add muons variables : 
-//
+        float muon_ptrel [maxEntries_muon];
+        float muon_EtaRel[maxEntries_muon];
+        float muon_dphi[maxEntries_muon];
+        float muon_deta[maxEntries_muon];
+        float muon_charge [maxEntries_muon]; 
+        float muon_energy[maxEntries_muon];
+        float muon_jetDeltaR [maxEntries_muon]; 
+        float muon_numberOfMatchedStations [maxEntries_muon];
 
+        float muon_2dIp [maxEntries_muon]; 
+        float muon_2dIpSig [maxEntries_muon];
+        float muon_3dIp [maxEntries_muon]; 
+        float muon_3dIpSig [maxEntries_muon]; 
 
-        unsigned int nmu;
-   	float muon_jetIdx[maxEntries] ; 
-	float muon_isGlobal[maxEntries] ; 
-    	float muon_isTight[maxEntries] ; 
-   	float muon_isMedium[maxEntries] ; 
-   	float muon_isLoose[maxEntries] ; 
-    	float muon_isStandAlone[maxEntries] ;
+        float muon_dxy [maxEntries_muon]; 
+        float muon_dxyError [maxEntries_muon]; 
+        float muon_dxySig [maxEntries_muon]; 
+        float muon_dz [maxEntries_muon]; 
+        float muon_dzError [maxEntries_muon]; 
+        float muon_numberOfValidPixelHits[maxEntries_muon]; 
+        float muon_numberOfpixelLayersWithMeasurement [maxEntries_muon]; 
 
-    
-        float muon_ptrel [maxEntries];
-        float muon_EtaRel[maxEntries];
-        float muon_phi[maxEntries];
-        float muon_charge [maxEntries]; 
-        float muon_energy[maxEntries];
-//        float muon_et [maxEntries];
-        float muon_jetDeltaR [maxEntries]; 
-        float muon_numberOfMatchedStations [maxEntries];
+        float muon_chi2 [maxEntries_muon]; 
+        float muon_ndof [maxEntries_muon]; 
 
-        float muon_2dIp [maxEntries]; 
-        float muon_2dIpSig [maxEntries];
-        float muon_3dIp [maxEntries]; 
-        float muon_3dIpSig [maxEntries]; 
+        float muon_caloIso [maxEntries_muon]; 
+        float muon_ecalIso [maxEntries_muon]; 
+        float muon_hcalIso [maxEntries_muon];
 
-        float muon_dxy [maxEntries]; 
-        float muon_dxyError [maxEntries]; 
-        float muon_dxySig [maxEntries]; 
-        float muon_dz [maxEntries]; 
-        float muon_dzError [maxEntries]; 
-        float muon_numberOfValidPixelHits[maxEntries]; 
-        float muon_numberOfpixelLayersWithMeasurement [maxEntries]; 
-//        float muon_numberOfstripLayersWithMeasurement [maxEntries]; //that does not help. needs to be discussed.
+        float muon_sumPfChHadronPt [maxEntries_muon]; 
+        float muon_sumPfNeuHadronEt [maxEntries_muon]; 
+        float muon_Pfpileup [maxEntries_muon]; 
+        float muon_sumPfPhotonEt [maxEntries_muon]; 
 
-        float muon_chi2 [maxEntries]; 
-        float muon_ndof [maxEntries]; 
+        float muon_sumPfChHadronPt03 [maxEntries_muon]; 
+        float muon_sumPfNeuHadronEt03 [maxEntries_muon]; 
+        float muon_Pfpileup03 [maxEntries_muon]; 
+        float muon_sumPfPhotonEt03 [maxEntries_muon]; 
 
-        float muon_caloIso [maxEntries]; 
-        float muon_ecalIso [maxEntries]; 
-        float muon_hcalIso [maxEntries];
+        float muon_sumChHadronPt [maxEntries_muon]; 
+        float muon_sumNeuHadronEt [maxEntries_muon]; 
+        float muon_pileup [maxEntries_muon]; 
+        float muon_sumPhotonEt [maxEntries_muon]; 
 
-        float muon_sumPfChHadronPt [maxEntries]; 
-        float muon_sumPfNeuHadronEt [maxEntries]; 
-        float muon_Pfpileup [maxEntries]; 
-        float muon_sumPfPhotonEt [maxEntries]; 
-
-        float muon_sumPfChHadronPt03 [maxEntries]; 
-        float muon_sumPfNeuHadronEt03 [maxEntries]; 
-        float muon_Pfpileup03 [maxEntries]; 
-        float muon_sumPfPhotonEt03 [maxEntries]; 
-
-        float muon_sumChHadronPt [maxEntries]; 
-        float muon_sumNeuHadronEt [maxEntries]; 
-        float muon_pileup [maxEntries]; 
-        float muon_sumPhotonEt [maxEntries]; 
-
-        float muon_timeAtIpInOut [maxEntries]; 
-        float muon_timeAtIpInOutErr [maxEntries]; 
-        float muon_timeAtIpOutIn [maxEntries]; 
+        float muon_timeAtIpInOut [maxEntries_muon]; 
+        float muon_timeAtIpInOutErr [maxEntries_muon]; 
+        float muon_timeAtIpOutIn [maxEntries_muon];
 
         unsigned int nelec;
 	
-/*        unsigned int nlegacyTag;
-        float legacyTag_median_dxy;
-        float legacyTag_median_trackSip2dSig;
-        float legacyTag_alpha;*/
-	
+
     public:
         UnpackedTree(const std::string& fileName, bool addTruth=true):
             addTruth_(addTruth),
@@ -299,49 +241,49 @@ class UnpackedTree
             
             if (addTruth)
             {
-                tree_->Branch("jetorigin_isPU",&jetorigin_isPU,"jetorigin_isPU/I",bufferSize);
-                tree_->Branch("jetorigin_isB",&jetorigin_isB,"jetorigin_isB/I",bufferSize);
-                tree_->Branch("jetorigin_isBB",&jetorigin_isBB,"jetorigin_isBB/I",bufferSize);
-                tree_->Branch("jetorigin_isGBB",&jetorigin_isGBB,"jetorigin_isGBB/I",bufferSize);
-                tree_->Branch("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B,"jetorigin_isLeptonic_B/I",bufferSize);
-                tree_->Branch("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C,"jetorigin_isLeptonic_C/I",bufferSize);
-                tree_->Branch("jetorigin_isC",&jetorigin_isC,"jetorigin_isC/I",bufferSize);
-                tree_->Branch("jetorigin_isCC",&jetorigin_isCC,"jetorigin_isCC/I",bufferSize);
-                tree_->Branch("jetorigin_isGCC",&jetorigin_isGCC,"jetorigin_isGCC/I",bufferSize);
-                tree_->Branch("jetorigin_isS",&jetorigin_isS,"jetorigin_isS/I",bufferSize);
-                tree_->Branch("jetorigin_isUD",&jetorigin_isUD,"jetorigin_isUD/I",bufferSize);
-                tree_->Branch("jetorigin_isG",&jetorigin_isG,"jetorigin_isG/I",bufferSize);
-		//Add LLP flavour : 
-		tree_->Branch("jetorigin_isLLP_RAD",&jetorigin_isLLP_RAD , "jetorigin_isLLP_RAD/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_MU",&jetorigin_isLLP_MU , "jetorigin_isLLP_MU/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_E",&jetorigin_isLLP_E , "jetorigin_isLLP_E/I", bufferSize) ;
-		tree_->Branch("jetorigin_isLLP_Q",&jetorigin_isLLP_Q , "jetorigin_isLLP_Q/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QMU",&jetorigin_isLLP_QMU, "jetorigin_isLLP_QMU/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QE",&jetorigin_isLLP_QE , "jetorigin_isLLP_QE/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QQ",&jetorigin_isLLP_QQ , "jetorigin_isLLP_QQ/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ,"jetorigin_isLLP_QQMU/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE , "jetorigin_isLLP_QQE/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ,"jetorigin_isLLP_QQE/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU , "jetorigin_isLLP_BMU/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ,"jetorigin_isLLP_BE/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_BB",&jetorigin_isLLP_BB, "jetorigin_isLLP_BB/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_BBMU",&jetorigin_isLLP_BBMU , "jetorigin_isLLP_BBMU/I", bufferSize) ; 
-		tree_->Branch("jetorigin_isLLP_BBE",&jetorigin_isLLP_BBE , "jetorigin_isLLP_BBE", bufferSize) ; 
- 
-                //tree_->Branch("jetorigin_fromLLP",&jetorigin_fromLLP,"jetorigin_fromLLP/I",bufferSize);
-                tree_->Branch("jetorigin_isUndefined",&jetorigin_isUndefined,"jetorigin_isUndefined/I",bufferSize);
+                tree_->Branch("jetorigin_isPU",&jetorigin_isPU,"jetorigin_isPU/F",bufferSize);
+                tree_->Branch("jetorigin_isB",&jetorigin_isB,"jetorigin_isB/F",bufferSize);
+                tree_->Branch("jetorigin_isBB",&jetorigin_isBB,"jetorigin_isBB/F",bufferSize);
+                tree_->Branch("jetorigin_isGBB",&jetorigin_isGBB,"jetorigin_isGBB/F",bufferSize);
+                tree_->Branch("jetorigin_isLeptonic_B",&jetorigin_isLeptonic_B,"jetorigin_isLeptonic_B/F",bufferSize);
+                tree_->Branch("jetorigin_isLeptonic_C",&jetorigin_isLeptonic_C,"jetorigin_isLeptonic_C/F",bufferSize);
+                tree_->Branch("jetorigin_isC",&jetorigin_isC,"jetorigin_isC/F",bufferSize);
+                tree_->Branch("jetorigin_isCC",&jetorigin_isCC,"jetorigin_isCC/F",bufferSize);
+                tree_->Branch("jetorigin_isGCC",&jetorigin_isGCC,"jetorigin_isGCC/F",bufferSize);
+                tree_->Branch("jetorigin_isS",&jetorigin_isS,"jetorigin_isS/F",bufferSize);
+                tree_->Branch("jetorigin_isUD",&jetorigin_isUD,"jetorigin_isUD/F",bufferSize);
+                tree_->Branch("jetorigin_isG",&jetorigin_isG,"jetorigin_isG/F",bufferSize);
+                
+                //Add LLP flavour : 
+                tree_->Branch("jetorigin_isLLP_RAD",&jetorigin_isLLP_RAD , "jetorigin_isLLP_RAD/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_MU",&jetorigin_isLLP_MU , "jetorigin_isLLP_MU/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_E",&jetorigin_isLLP_E , "jetorigin_isLLP_E/F", bufferSize) ;
+                tree_->Branch("jetorigin_isLLP_Q",&jetorigin_isLLP_Q , "jetorigin_isLLP_Q/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QMU",&jetorigin_isLLP_QMU, "jetorigin_isLLP_QMU/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QE",&jetorigin_isLLP_QE , "jetorigin_isLLP_QE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QQ",&jetorigin_isLLP_QQ , "jetorigin_isLLP_QQ/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ,"jetorigin_isLLP_QQMU/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE , "jetorigin_isLLP_QQE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ,"jetorigin_isLLP_QQE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU , "jetorigin_isLLP_BMU/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ,"jetorigin_isLLP_BE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_BB",&jetorigin_isLLP_BB, "jetorigin_isLLP_BB/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_BBMU",&jetorigin_isLLP_BBMU , "jetorigin_isLLP_BBMU/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_BBE",&jetorigin_isLLP_BBE , "jetorigin_isLLP_BBE/F", bufferSize) ; 
+
+                tree_->Branch("jetorigin_isUndefined",&jetorigin_isUndefined,"jetorigin_isUndefined/F",bufferSize);
+                
                 tree_->Branch("jetorigin_displacement",&jetorigin_displacement,"jetorigin_displacement/F",bufferSize);
-                //tree_->Branch("jetorigin_ctau",&jetorigin_ctau,"jetorigin_ctau/F",bufferSize);
                 tree_->Branch("jetorigin_decay_angle",&jetorigin_decay_angle,"jetorigin_decay_angle/F",bufferSize);
-		tree_->Branch("jetorigin_displacement_xy" , &jetorigin_displacement_xy ,"jetorigin_decay_displacement_xy/F" , bufferSize); 
-		tree_->Branch("jetorigin_displacement_z" , &jetorigin_displacement_z ,"jetorigin_displacement_z/F" ,bufferSize); 
-		tree_->Branch("jetorigin_betagamma", &jetorigin_betagamma ,"jetorigin_betagamma/F" ,bufferSize); 
-		tree_->Branch("jetorigin_jetIdx", &jetorigin_jetIdx , "jetorigin_jetIdx/F" , bufferSize ) ; 
-		tree_->Branch("jetorigin_partonFlavor", &jetorigin_partonFlavor , "jetorigin_partonFlavor/I" , bufferSize ) ;
-		tree_->Branch("jetorigin_hadronFlavor", &jetorigin_hadronFlavor , "jetorigin_hadronFlavor/I" , bufferSize ) ;
-		tree_->Branch("jetorigin_llpId", &jetorigin_llpId , "jetorigin_llpId/I" , bufferSize ) ;
-		tree_->Branch("jetorigin_llp_mass", &jetorigin_llp_mass , "jetorigin_llp_mass/F" , bufferSize ) ;
-		tree_->Branch("jetorigin_llp_pt", &jetorigin_llp_pt , "jetorigin_llp_pt/F" , bufferSize ) ;
+                tree_->Branch("jetorigin_displacement_xy" , &jetorigin_displacement_xy ,"jetorigin_decay_displacement_xy/F" , bufferSize); 
+                tree_->Branch("jetorigin_displacement_z" , &jetorigin_displacement_z ,"jetorigin_displacement_z/F" ,bufferSize); 
+                tree_->Branch("jetorigin_ctau" , &jetorigin_ctau ,"jetorigin_ctau/F" ,bufferSize); 
+                tree_->Branch("jetorigin_betagamma", &jetorigin_betagamma ,"jetorigin_betagamma/F" ,bufferSize); 
+                tree_->Branch("jetorigin_partonFlavor", &jetorigin_partonFlavor , "jetorigin_partonFlavor/F" , bufferSize ) ;
+                tree_->Branch("jetorigin_hadronFlavor", &jetorigin_hadronFlavor , "jetorigin_hadronFlavor/F" , bufferSize ) ;
+                tree_->Branch("jetorigin_llpId", &jetorigin_llpId , "jetorigin_llpId/F" , bufferSize ) ;
+                tree_->Branch("jetorigin_llp_mass", &jetorigin_llp_mass , "jetorigin_llp_mass/F" , bufferSize ) ;
+                tree_->Branch("jetorigin_llp_pt", &jetorigin_llp_pt , "jetorigin_llp_pt/F" , bufferSize ) ;
             }
             else
             {
@@ -352,12 +294,10 @@ class UnpackedTree
             
             tree_->Branch("global_pt",&global_pt,"global_pt/F",bufferSize);
             tree_->Branch("global_eta",&global_eta,"global_eta/F",bufferSize);
-            tree_->Branch("global_rho",&global_rho,"global_rho/F",bufferSize);
 
-	    tree_->Branch("global_mass",&global_mass,"global_mass/F", bufferSize);
-//	    tree_->Branch("global_energy",&global_energy,"global_energy/F", bufferSize);
-	    tree_->Branch("global_n60",&global_n60,"global_n60/I", bufferSize);
-	    tree_->Branch("global_n90",&global_n90,"global_n90/I", bufferSize);
+            tree_->Branch("global_mass",&global_mass,"global_mass/F", bufferSize);
+            tree_->Branch("global_n60",&global_n60,"global_n60/F", bufferSize);
+            tree_->Branch("global_n90",&global_n90,"global_n90/F", bufferSize);
             tree_->Branch("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction,"global_chargedEmEnergyFraction/F", bufferSize);
             tree_->Branch("global_chargedHadronEnergyFraction",&global_chargedHadronEnergyFraction,"global_chargedHadronEnergyFraction/F", bufferSize);
             tree_->Branch("global_chargedMuEnergyFraction",&global_chargedMuEnergyFraction,"global_chargedMuEnergyFraction/F", bufferSize);
@@ -378,6 +318,18 @@ class UnpackedTree
             tree_->Branch("global_isotropy",&global_isotropy,"global_isotropy/F", bufferSize);
             tree_->Branch("global_eventShapeC",&global_eventShapeC,"global_eventShapeC/F", bufferSize);
             tree_->Branch("global_eventShapeD",&global_eventShapeD ,"global_eventShapeD/F", bufferSize);
+            
+            
+            tree_->Branch("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio,"csv_trackSumJetEtRatio/F",bufferSize);
+            tree_->Branch("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR,"csv_trackSumJetDeltaR/F",bufferSize);
+            tree_->Branch("csv_vertexCategory",&csv_vertexCategory,"csv_vertexCategory/F",bufferSize);
+            tree_->Branch("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm,"csv_trackSip2dValAboveCharm/F",bufferSize);
+            tree_->Branch("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm,"csv_trackSip2dSigAboveCharm/F",bufferSize);
+            tree_->Branch("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm,"csv_trackSip3dValAboveCharm/F",bufferSize);
+            tree_->Branch("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm,"csv_trackSip3dSigAboveCharm/F",bufferSize);
+            tree_->Branch("csv_jetNSelectedTracks",&csv_jetNSelectedTracks,"csv_jetNSelectedTracks/F",bufferSize);
+            tree_->Branch("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel,"csv_jetNTracksEtaRel/F",bufferSize);
+            
 
             tree_->Branch("ncpf",&ncpf,"ncpf/I",bufferSize);
             tree_->Branch("cpf_trackEtaRel",&cpf_trackEtaRel,"cpf_trackEtaRel[ncpf]/F",bufferSize);
@@ -393,6 +345,8 @@ class UnpackedTree
             tree_->Branch("cpf_trackJetDistVal",&cpf_trackJetDistVal,"cpf_trackJetDistVal[ncpf]/F",bufferSize);
             tree_->Branch("cpf_trackJetDistSig",&cpf_trackJetDistSig,"cpf_trackJetDistSig[ncpf]/F",bufferSize);
             tree_->Branch("cpf_ptrel",&cpf_ptrel,"cpf_ptrel[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_deta",&cpf_deta,"cpf_deta[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_dphi",&cpf_dphi,"cpf_dphi[ncpf]/F",bufferSize);
             tree_->Branch("cpf_drminsv",&cpf_drminsv,"cpf_drminsv[ncpf]/F",bufferSize);
             tree_->Branch("cpf_vertex_association",&cpf_vertex_association,"cpf_vertex_association[ncpf]/F",bufferSize);
             tree_->Branch("cpf_fromPV",&cpf_fromPV,"cpf_fromPV[ncpf]/F",bufferSize);
@@ -401,30 +355,27 @@ class UnpackedTree
             tree_->Branch("cpf_track_ndof",&cpf_track_ndof,"cpf_track_ndof[ncpf]/F",bufferSize);
             tree_->Branch("cpf_track_quality",&cpf_track_quality,"cpf_track_quality[ncpf]/F",bufferSize);
             tree_->Branch("cpf_relmassdrop",&cpf_relmassdrop,"cpf_relmassdrop[ncpf]/F",bufferSize);
-//            tree_->Branch("cpf_relIso01",&cpf_relIso01,"cpf_relIso01[ncpf]/F",bufferSize);
             
-            tree_->Branch("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio,"csv_trackSumJetEtRatio/F",bufferSize);
-            tree_->Branch("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR,"csv_trackSumJetDeltaR/F",bufferSize);
-            tree_->Branch("csv_vertexCategory",&csv_vertexCategory,"csv_vertexCategory/F",bufferSize);
-            tree_->Branch("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm,"csv_trackSip2dValAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm,"csv_trackSip2dSigAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm,"csv_trackSip3dValAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm,"csv_trackSip3dSigAboveCharm/F",bufferSize);
-            tree_->Branch("csv_jetNSelectedTracks",&csv_jetNSelectedTracks,"csv_jetNSelectedTracks/F",bufferSize);
-            tree_->Branch("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel,"csv_jetNTracksEtaRel/F",bufferSize);
+            tree_->Branch("cpf_matchedSV",&cpf_matchedSV,"cpf_matchedSV[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_matchedMuon",&cpf_matchedMuon,"cpf_matchedMuon[ncpf]/F",bufferSize);
+            tree_->Branch("cpf_matchedElectron",&cpf_matchedElectron,"cpf_matchedElectron[ncpf]/F",bufferSize);
+            
 
             tree_->Branch("nnpf",&nnpf,"nnpf/I",bufferSize);
             tree_->Branch("npf_ptrel",&npf_ptrel,"npf_ptrel[nnpf]/F",bufferSize);
+            tree_->Branch("npf_deta",&npf_deta,"npf_deta[nnpf]/F",bufferSize);
+            tree_->Branch("npf_dphi",&npf_dphi,"npf_dphi[nnpf]/F",bufferSize);
             tree_->Branch("npf_deltaR",&npf_deltaR,"npf_deltaR[nnpf]/F",bufferSize);
             tree_->Branch("npf_isGamma",&npf_isGamma,"npf_isGamma[nnpf]/F",bufferSize);
             tree_->Branch("npf_hcal_fraction",&npf_hcal_fraction,"npf_hcal_fraction[nnpf]/F",bufferSize);
             tree_->Branch("npf_drminsv",&npf_drminsv,"npf_drminsv[nnpf]/F",bufferSize);
             tree_->Branch("npf_puppi_weight",&npf_puppi_weight,"npf_puppi_weight[nnpf]/F",bufferSize);
             tree_->Branch("npf_relmassdrop",&npf_relmassdrop,"npf_relmassdrop[nnpf]/F",bufferSize);
-            tree_->Branch("npf_relIso01",&npf_relIso01,"npf_relIso01[nnpf]/F",bufferSize);
 
             tree_->Branch("nsv",&nsv,"nsv/I",bufferSize);
-            tree_->Branch("sv_pt",&sv_pt,"sv_pt[nsv]/F",bufferSize);
+            tree_->Branch("sv_ptrel",&sv_ptrel,"sv_ptrel[nsv]/F",bufferSize);
+            tree_->Branch("sv_deta",&sv_deta,"sv_deta[nsv]/F",bufferSize);
+            tree_->Branch("sv_dphi",&sv_dphi,"sv_dphi[nsv]/F",bufferSize);
             tree_->Branch("sv_mass",&sv_deltaR,"sv_mass[nsv]/F",bufferSize);
             tree_->Branch("sv_deltaR",&sv_deltaR,"sv_deltaR[nsv]/F",bufferSize);
             tree_->Branch("sv_ntracks",&sv_ntracks,"sv_ntracks[nsv]/F",bufferSize);
@@ -438,62 +389,56 @@ class UnpackedTree
             tree_->Branch("sv_enratio",&sv_enratio,"sv_enratio[nsv]/F",bufferSize);
 
 		
-    	    tree_->Branch("nmu",&nmu,"nmu/I",bufferSize); 
-    	    tree_->Branch("muon_jetIdx",&muon_jetIdx,"muon_jetIdx[nmu]/F",bufferSize); 
-            tree_->Branch("muon_isGlobal",&muon_isGlobal, "muon_isGlobal[nmu]/F",bufferSize); 
-            tree_->Branch("muon_isTight",&muon_isTight,"muon_isTight[nmu]/F",bufferSize); 
-            tree_->Branch("muon_isMedium",&muon_isMedium,"muon_isMedium[nmu]/F",bufferSize); 
-            tree_->Branch("muon_isLoose",&muon_isLoose,"muon_isLoose[nmu]/F",bufferSize); 
-            tree_->Branch("muon_isStandAlone",&muon_isStandAlone,"muon_isStandAlone[nmu]/F",bufferSize);
+    	    tree_->Branch("nmuon",&nmuon,"nmuon/I",bufferSize); 
+            tree_->Branch("muon_isGlobal",&muon_isGlobal, "muon_isGlobal[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_isTight",&muon_isTight,"muon_isTight[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_isMedium",&muon_isMedium,"muon_isMedium[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_isLoose",&muon_isLoose,"muon_isLoose[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_isStandAlone",&muon_isStandAlone,"muon_isStandAlone[nmuon]/F",bufferSize);
 
     
-            tree_->Branch("muon_ptrel", &muon_ptrel,"muon_ptrel[nmu]/F",bufferSize);
-            tree_->Branch("muon_EtaRel", &muon_EtaRel,"muon_EtaRel[nmu]/F",bufferSize);
-            tree_->Branch("muon_phi",&muon_phi,"muon_phi[nmu]/F",bufferSize);
-            tree_->Branch("muon_charge",&muon_charge,"muon_charge[nmu]/F",bufferSize); 
-            tree_->Branch("muon_energy",&muon_energy,"muon_energy[nmu]/F",bufferSize);
-//            tree_->Branch("muon_et",&muon_et, "muon_et[nmu]/F",bufferSize);
-            tree_->Branch("muon_jetDeltaR",&muon_jetDeltaR,"muon_jetDeltaR[nmu]/F",bufferSize); 
-            tree_->Branch("muon_numberOfMatchedStations",&muon_numberOfMatchedStations,"muon_numberOfMatchedStations[nmu]/F",bufferSize);
+            tree_->Branch("muon_ptrel", &muon_ptrel,"muon_ptrel[nmuon]/F",bufferSize);
+            tree_->Branch("muon_EtaRel", &muon_EtaRel,"muon_EtaRel[nmuon]/F",bufferSize);
+            tree_->Branch("muon_dphi",&muon_dphi,"muon_dphi[nmuon]/F",bufferSize);
+            tree_->Branch("muon_deta",&muon_dphi,"muon_deta[nmuon]/F",bufferSize);
+            tree_->Branch("muon_charge",&muon_charge,"muon_charge[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_energy",&muon_energy,"muon_energy[nmuon]/F",bufferSize);
+            tree_->Branch("muon_jetDeltaR",&muon_jetDeltaR,"muon_jetDeltaR[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_numberOfMatchedStations",&muon_numberOfMatchedStations,"muon_numberOfMatchedStations[nmuon]/F",bufferSize);
 
-            tree_->Branch("muon_2dIp", &muon_2dIp,"muon_2dIp[nmu]/F",bufferSize); 
-            tree_->Branch("muon_2dIpSig", &muon_2dIpSig, "muon_2dIpSi[nmu]/F",bufferSize);
-            tree_->Branch("muon_3dIp",&muon_3dIp,"muon_3dIp[nmu]/F",bufferSize); 
-            tree_->Branch("muon_3dIpSig",&muon_3dIpSig,"muon_3dIpSig[nmu]/F",bufferSize); 
+            tree_->Branch("muon_2dIp", &muon_2dIp,"muon_2dIp[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_2dIpSig", &muon_2dIpSig, "muon_2dIpSi[nmuon]/F",bufferSize);
+            tree_->Branch("muon_3dIp",&muon_3dIp,"muon_3dIp[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_3dIpSig",&muon_3dIpSig,"muon_3dIpSig[nmuon]/F",bufferSize); 
 
-            tree_->Branch("muon_dxy", &muon_dxy, "muon_dxy[nmu]/F",bufferSize); 
-            tree_->Branch("muon_dxyError", &muon_dxyError,"muon_dxyError[nmu]/F",bufferSize); 
-            tree_->Branch("muon_dxySig",&muon_dxySig,"muon_dxySig[nmu]/F",bufferSize); 
-            tree_->Branch("muon_dz",&muon_dz, "muon_dz[nmu]/F",bufferSize); 
-            tree_->Branch("muon_dzError", &muon_dzError,"muon_dzError[nmu]/F",bufferSize); 
-            tree_->Branch("muon_numberOfValidPixelHits",&muon_numberOfValidPixelHits, "muon_numberOfValidPixelHits[nmu]/F",bufferSize); 
-            tree_->Branch("muon_numberOfpixelLayersWithMeasurement", &muon_numberOfpixelLayersWithMeasurement, "muon_numberOfpixelLayersWithMeasurement[nmu]/F",bufferSize); 
-//            tree_->Branch("muon_numberOfstripLayersWithMeasurement", &muon_numberOfstripLayersWithMeasurement, "muon_numberOfstripLayersWithMeasurement[nmu]/F",bufferSize); //that does not help. needs to be discussed.
+            tree_->Branch("muon_dxy", &muon_dxy, "muon_dxy[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_dxyError", &muon_dxyError,"muon_dxyError[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_dxySig",&muon_dxySig,"muon_dxySig[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_dz",&muon_dz, "muon_dz[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_dzError", &muon_dzError,"muon_dzError[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_numberOfValidPixelHits",&muon_numberOfValidPixelHits, "muon_numberOfValidPixelHits[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_numberOfpixelLayersWithMeasurement", &muon_numberOfpixelLayersWithMeasurement, "muon_numberOfpixelLayersWithMeasurement[nmuon]/F",bufferSize); 
 
-            tree_->Branch("muon_chi2", &muon_chi2, "muon_chi2[nmu]/F",bufferSize); 
-            tree_->Branch("muon_ndof",&muon_ndof, "muon_ndof[nmu]/F",bufferSize); 
 
-            tree_->Branch("muon_caloIso",&muon_caloIso,"muon_caloIso[nmu]/F",bufferSize); 
-            tree_->Branch("muon_ecalIso",&muon_ecalIso,"muon_ecalIso[nmu]/F",bufferSize); 
-            tree_->Branch("muon_hcalIso",&muon_hcalIso,"muon_hcalIso[nmu]/F",bufferSize);
+            tree_->Branch("muon_chi2", &muon_chi2, "muon_chi2[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_ndof",&muon_ndof, "muon_ndof[nmuon]/F",bufferSize); 
 
-            tree_->Branch("muon_sumPfChHadronPt",&muon_sumPfChHadronPt,"muon_sumPfChHadronPt[nmu]/F",bufferSize); 
-            tree_->Branch("muon_sumPfNeuHadronEt",&muon_sumPfNeuHadronEt,"muon_sumPfNeuHadronEt[nmu]/F",bufferSize); 
-            tree_->Branch("muon_Pfpileup",&muon_Pfpileup,"muon_Pfpileup[nmu]/F",bufferSize); 
-            tree_->Branch("muon_sumPfPhotonEt",&muon_sumPfPhotonEt,"muon_sumPfPhotonEt[nmu]/F",bufferSize); 
+            tree_->Branch("muon_caloIso",&muon_caloIso,"muon_caloIso[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_ecalIso",&muon_ecalIso,"muon_ecalIso[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_hcalIso",&muon_hcalIso,"muon_hcalIso[nmuon]/F",bufferSize);
 
-            tree_->Branch("muon_sumPfChHadronPt03",&muon_sumPfChHadronPt03, "muon_sumPfChHadronPt03[nmu]/F",bufferSize); 
-            tree_->Branch("muon_sumPfNeuHadronEt03",&muon_sumPfNeuHadronEt03,"muon_sumPfNeuHadronEt03[nmu]/F",bufferSize); 
-            tree_->Branch("muon_Pfpileup03",&muon_Pfpileup03,"muon_Pfpileup03[nmu]/F",bufferSize); 
-            tree_->Branch("muon_sumPfPhotonEt03",&muon_sumPfPhotonEt03,"muon_sumPfPhotonEt03[nmu]/F",bufferSize); 
+            tree_->Branch("muon_sumPfChHadronPt",&muon_sumPfChHadronPt,"muon_sumPfChHadronPt[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_sumPfNeuHadronEt",&muon_sumPfNeuHadronEt,"muon_sumPfNeuHadronEt[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_Pfpileup",&muon_Pfpileup,"muon_Pfpileup[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_sumPfPhotonEt",&muon_sumPfPhotonEt,"muon_sumPfPhotonEt[nmuon]/F",bufferSize); 
 
-            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmu]/F",bufferSize); 
+            tree_->Branch("muon_sumPfChHadronPt03",&muon_sumPfChHadronPt03, "muon_sumPfChHadronPt03[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_sumPfNeuHadronEt03",&muon_sumPfNeuHadronEt03,"muon_sumPfNeuHadronEt03[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_Pfpileup03",&muon_Pfpileup03,"muon_Pfpileup03[nmuon]/F",bufferSize); 
+            tree_->Branch("muon_sumPfPhotonEt03",&muon_sumPfPhotonEt03,"muon_sumPfPhotonEt03[nmuon]/F",bufferSize); 
+
+            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmuon]/F",bufferSize); 
 		    
-/*            tree_->Branch("nlegacyTag",&nlegacyTag,"nlegacyTag/I",bufferSize);
-            tree_->Branch("legacyTag_median_dxy",&legacyTag_median_dxy,"legacyTag_median_dxy/F",bufferSize);
-            tree_->Branch("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig,"legacyTag_median_trackSip2dSig/F",bufferSize);
-            tree_->Branch("legacyTag_alpha",&legacyTag_alpha,"legacyTag_alpha/F",bufferSize);*/
-
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
         
@@ -550,59 +495,54 @@ class NanoXTree
         float GenJet_pt[maxEntries];
         
         unsigned int njetorigin;
-        float jetorigin_isPU[maxEntries];
-        float jetorigin_isB[maxEntries];
-        float jetorigin_isBB[maxEntries];
-        float jetorigin_isGBB[maxEntries];
-        float jetorigin_isLeptonic_B[maxEntries];
-        float jetorigin_isLeptonic_C[maxEntries];
-        float jetorigin_isC[maxEntries];
-        float jetorigin_isCC[maxEntries];
-        float jetorigin_isGCC[maxEntries];
-        float jetorigin_isS[maxEntries];
-        float jetorigin_isUD[maxEntries];
-        float jetorigin_isG[maxEntries];
-//      float jetorigin_fromLLP[maxEntries];
-        //Include LLP flavour : 
-        float jetorigin_isLLP_RAD[maxEntries]; 
-        float jetorigin_isLLP_MU[maxEntries]; 
-        float jetorigin_isLLP_E[maxEntries]; 
-        float jetorigin_isLLP_Q[maxEntries];
-        float jetorigin_isLLP_QMU[maxEntries]; 
-        float jetorigin_isLLP_QE[maxEntries]; 
-        float jetorigin_isLLP_QQ[maxEntries]; 
-        float jetorigin_isLLP_QQMU[maxEntries]; 
-        float jetorigin_isLLP_QQE[maxEntries]; 
-        float jetorigin_isLLP_B[maxEntries]; 
-        float jetorigin_isLLP_BMU[maxEntries];
-        float jetorigin_isLLP_BE[maxEntries]; 
-        float jetorigin_isLLP_BB[maxEntries]; 
-        float jetorigin_isLLP_BBMU[maxEntries]; 
-        float jetorigin_isLLP_BBE[maxEntries]; 
-        float jetorigin_isUndefined[maxEntries];
+        int jetorigin_isPU[maxEntries];
+        int jetorigin_isB[maxEntries];
+        int jetorigin_isBB[maxEntries];
+        int jetorigin_isGBB[maxEntries];
+        int jetorigin_isLeptonic_B[maxEntries];
+        int jetorigin_isLeptonic_C[maxEntries];
+        int jetorigin_isC[maxEntries];
+        int jetorigin_isCC[maxEntries];
+        int jetorigin_isGCC[maxEntries];
+        int jetorigin_isS[maxEntries];
+        int jetorigin_isUD[maxEntries];
+        int jetorigin_isG[maxEntries];
+
+        int jetorigin_isLLP_RAD[maxEntries]; 
+        int jetorigin_isLLP_MU[maxEntries]; 
+        int jetorigin_isLLP_E[maxEntries]; 
+        int jetorigin_isLLP_Q[maxEntries];
+        int jetorigin_isLLP_QMU[maxEntries]; 
+        int jetorigin_isLLP_QE[maxEntries]; 
+        int jetorigin_isLLP_QQ[maxEntries]; 
+        int jetorigin_isLLP_QQMU[maxEntries]; 
+        int jetorigin_isLLP_QQE[maxEntries]; 
+        int jetorigin_isLLP_B[maxEntries]; 
+        int jetorigin_isLLP_BMU[maxEntries];
+        int jetorigin_isLLP_BE[maxEntries]; 
+        int jetorigin_isLLP_BB[maxEntries]; 
+        int jetorigin_isLLP_BBMU[maxEntries]; 
+        int jetorigin_isLLP_BBE[maxEntries]; 
+        int jetorigin_isUndefined[maxEntries];
         
         float jetorigin_displacement[maxEntries];
-//      float jetorigin_ctau[maxEntries];
         float jetorigin_decay_angle[maxEntries];
-	float jetorigin_displacement_xy[maxEntries];
-	float jetorigin_displacement_z[maxEntries]; 
-	float jetorigin_betagamma[maxEntries];
-	int   jetorigin_jetIdx[maxEntries];
-	int   jetorigin_partonFlavor[maxEntries];
-	int   jetorigin_hadronFlavor[maxEntries];
-	int   jetorigin_llpId[maxEntries];
-	float jetorigin_llp_mass[maxEntries];
-	float jetorigin_llp_pt[maxEntries];
+        float jetorigin_displacement_xy[maxEntries];
+        float jetorigin_displacement_z[maxEntries]; 
+        float jetorigin_betagamma[maxEntries];
+        int   jetorigin_partonFlavor[maxEntries];
+        int   jetorigin_hadronFlavor[maxEntries];
+        int   jetorigin_llpId[maxEntries];
+        float jetorigin_llp_mass[maxEntries];
+        float jetorigin_llp_pt[maxEntries];
         
-        //float jetorigin_llpmass_reco[maxEntries];
-        
-        unsigned int   nglobal;
+
+        unsigned int nglobal;
         float global_pt[maxEntries];
         float global_eta[maxEntries];
-	float global_mass[maxEntries];
-//	float global_energy[maxEntries];
-	int   global_n60[maxEntries];
-	int   global_n90[maxEntries];
+        float global_mass[maxEntries];
+        int global_n60[maxEntries];
+        int global_n90[maxEntries];
         float global_chargedEmEnergyFraction[maxEntries];
         float global_chargedHadronEnergyFraction[maxEntries];
         float global_chargedMuEnergyFraction[maxEntries];
@@ -624,17 +564,18 @@ class NanoXTree
         float global_eventShapeC[maxEntries];
         float global_eventShapeD[maxEntries];
 
-        float global_rho;
         float xsecweight;
         float processId;
         float isData;
-// Not sure about this  2 lines. 
-//
-        Int_t length_cpf;
-        float cpf_length[maxEntries];
-/////////////////////////////
         
-        unsigned int ncpf[maxEntries];
+        unsigned int nlength;
+        int length_cpf[maxEntries];
+        int length_npf[maxEntries];
+        int length_sv[maxEntries];
+        int length_muon[maxEntries];
+        int length_electron[maxEntries];
+        
+        unsigned int ncpf;
         float cpf_trackEtaRel[maxEntries];
         float cpf_trackPtRel[maxEntries];
         float cpf_trackPPar[maxEntries];
@@ -648,6 +589,8 @@ class NanoXTree
         float cpf_trackJetDistVal[maxEntries];
         float cpf_trackJetDistSig[maxEntries];
         float cpf_ptrel[maxEntries];
+        float cpf_deta[maxEntries];
+        float cpf_dphi[maxEntries];
         float cpf_drminsv[maxEntries];
         float cpf_vertex_association[maxEntries];
         float cpf_fromPV[maxEntries];
@@ -656,9 +599,12 @@ class NanoXTree
         float cpf_track_ndof[maxEntries];
         float cpf_track_quality[maxEntries];
         float cpf_relmassdrop[maxEntries];
-//        float cpf_relIso01[maxEntries];
         
-        unsigned int ncsv[maxEntries];
+        int cpf_matchedSV[maxEntries];
+        int cpf_matchedMuon[maxEntries];
+        int cpf_matchedElectron[maxEntries];
+        
+        unsigned int ncsv;
         float csv_trackSumJetEtRatio[maxEntries];
         float csv_trackSumJetDeltaR[maxEntries];
         float csv_vertexCategory[maxEntries];
@@ -669,24 +615,22 @@ class NanoXTree
         float csv_jetNSelectedTracks[maxEntries];
         float csv_jetNTracksEtaRel[maxEntries];
         
-        unsigned int nnpflength;
-        float npflength_length[maxEntries];
-        
-        unsigned int nnpf[maxEntries];
+
+        unsigned int nnpf;
         float npf_ptrel[maxEntries];
+        float npf_deta[maxEntries];
+        float npf_dphi[maxEntries];
         float npf_deltaR[maxEntries];
         float npf_isGamma[maxEntries];
         float npf_hcal_fraction[maxEntries];
         float npf_drminsv[maxEntries];
         float npf_puppi_weight[maxEntries];
         float npf_relmassdrop[maxEntries];
-        float npf_relIso01[maxEntries];
         
-        unsigned int nsvlength;
-        float svlength_length[maxEntries];
-        
-        unsigned int nsv[maxEntries];
-        float sv_pt[maxEntries];
+        unsigned int nsv;
+        float sv_ptrel[maxEntries];
+        float sv_deta[maxEntries];
+        float sv_dphi[maxEntries];
         float sv_mass[maxEntries];
         float sv_deltaR[maxEntries];
         float sv_ntracks[maxEntries];
@@ -699,21 +643,19 @@ class NanoXTree
         float sv_costhetasvpv[maxEntries];
         float sv_enratio[maxEntries];
 
-        unsigned int nmu;
-   	int    muon_jetIdx[maxEntries] ; 
-	float  muon_isGlobal[maxEntries] ; 
-    	float  muon_isTight[maxEntries] ; 
-   	float  muon_isMedium[maxEntries] ; 
-   	float  muon_isLoose[maxEntries] ; 
-    	float  muon_isStandAlone[maxEntries] ;
+        unsigned int nmuon;
+        float muon_isGlobal[maxEntries] ; 
+        float muon_isTight[maxEntries] ; 
+        float muon_isMedium[maxEntries] ; 
+        float muon_isLoose[maxEntries] ; 
+        float muon_isStandAlone[maxEntries] ;
 
-    
         float muon_ptrel [maxEntries];
         float muon_EtaRel[maxEntries];
-        float muon_phi[maxEntries];
+        float muon_deta[maxEntries];
+        float muon_dphi[maxEntries];
         float muon_charge [maxEntries]; 
         float muon_energy[maxEntries];
-//        float muon_et [maxEntries];
         float muon_jetDeltaR [maxEntries]; 
         float muon_numberOfMatchedStations [maxEntries];
 
@@ -728,8 +670,7 @@ class NanoXTree
         float muon_dz [maxEntries]; 
         float muon_dzError [maxEntries]; 
         float muon_numberOfValidPixelHits[maxEntries]; 
-        float muon_numberOfpixelLayersWithMeasurement [maxEntries]; 
-//        float muon_numberOfstripLayersWithMeasurement [maxEntries]; 
+        float muon_numberOfpixelLayersWithMeasurement[maxEntries]; 
 
         float muon_chi2 [maxEntries]; 
         float muon_ndof [maxEntries]; 
@@ -757,13 +698,8 @@ class NanoXTree
         float muon_timeAtIpInOutErr [maxEntries]; 
         float muon_timeAtIpOutIn [maxEntries]; 
 
-        unsigned int nelec;
-/*        unsigned int nlegacyTag[maxEntries];
-        float legacyTag_median_dxy[maxEntries];
-        float legacyTag_median_trackSip2dSig[maxEntries];
-        float legacyTag_alpha[maxEntries];*/
-        
-        
+        unsigned int nelectron;
+
         std::mt19937 randomGenerator_;
         std::uniform_real_distribution<> uniform_dist_;
         
@@ -771,7 +707,7 @@ class NanoXTree
         typedef exprtk::expression<float> Expression;
         typedef exprtk::parser<float> Parser;
         
-        //for the symbol table
+
         float isB;
         float isBB;
         float isGBB;
@@ -783,7 +719,7 @@ class NanoXTree
         float isS;
         float isUD;
         float isG;
-// add here what you want 
+
         float isLLP_RAD;
         float isLLP_MU;
         float isLLP_E;
@@ -803,8 +739,8 @@ class NanoXTree
         float fromLLP;
         
         float rand;
-        float logpt;
-       // float ctau;
+        float pt;
+        float ctau;
         
         SymbolTable symbolTable_;
         std::vector<Expression> selections_;
@@ -836,11 +772,19 @@ class NanoXTree
             {
                 tree_->SetBranchAddress("njetorigin",&njetorigin);
                 
-                tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
-                
                 tree_->SetBranchAddress("jetorigin_displacement",&jetorigin_displacement);
                 tree_->SetBranchAddress("jetorigin_decay_angle",&jetorigin_decay_angle);
+                tree_->SetBranchAddress("jetorigin_displacement_xy" , &jetorigin_displacement_xy); 
+                tree_->SetBranchAddress("jetorigin_displacement_z" , &jetorigin_displacement_z); 
+                tree_->SetBranchAddress("jetorigin_betagamma", &jetorigin_betagamma);
                 
+                tree_->SetBranchAddress("jetorigin_partonFlavor", &jetorigin_partonFlavor);
+                tree_->SetBranchAddress("jetorigin_hadronFlavor", &jetorigin_hadronFlavor);
+                tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
+                tree_->SetBranchAddress("jetorigin_llp_mass", &jetorigin_llp_mass);
+                tree_->SetBranchAddress("jetorigin_llp_pt", &jetorigin_llp_pt);
+                
+                tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
                 tree_->SetBranchAddress("jetorigin_isB",&jetorigin_isB);
                 tree_->SetBranchAddress("jetorigin_isBB",&jetorigin_isBB);
                 tree_->SetBranchAddress("jetorigin_isGBB",&jetorigin_isGBB);
@@ -853,38 +797,24 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_isUD",&jetorigin_isUD);
                 tree_->SetBranchAddress("jetorigin_isG",&jetorigin_isG);
                 tree_->SetBranchAddress("jetorigin_isPU",&jetorigin_isPU);
-                //tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP);
-		
-		tree_->SetBranchAddress("jetorigin_isLLP_RAD",&jetorigin_isLLP_RAD ) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_MU",&jetorigin_isLLP_MU) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_E",&jetorigin_isLLP_E ) ;
-		tree_->SetBranchAddress("jetorigin_isLLP_Q",&jetorigin_isLLP_Q ) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_QMU",&jetorigin_isLLP_QMU) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_QE",&jetorigin_isLLP_QE) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_QQ",&jetorigin_isLLP_QQ ); 
-		tree_->SetBranchAddress("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ); 
-		tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_BB",&jetorigin_isLLP_BB) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_BBMU",&jetorigin_isLLP_BBMU) ; 
-		tree_->SetBranchAddress("jetorigin_isLLP_BBE",&jetorigin_isLLP_BBE ) ; 
- 
-                //tree_->SetBranchAddress("jetorigin_fromLLP",&jetorigin_fromLLP,"jetorigin_fromLLP/I",bufferSize);
-                tree_->SetBranchAddress("jetorigin_isUndefined",&jetorigin_isUndefined);
-                tree_->SetBranchAddress("jetorigin_displacement",&jetorigin_displacement);
-                //tree_->SetBranchAddress("jetorigin_ctau",&jetorigin_ctau,"jetorigin_ctau/F",bufferSize);
-                tree_->SetBranchAddress("jetorigin_decay_angle",&jetorigin_decay_angle);
-		tree_->SetBranchAddress("jetorigin_displacement_xy" , &jetorigin_displacement_xy); 
-		tree_->SetBranchAddress("jetorigin_displacement_z" , &jetorigin_displacement_z); 
-		tree_->SetBranchAddress("jetorigin_betagamma", &jetorigin_betagamma); 
-		tree_->SetBranchAddress("jetorigin_jetIdx", &jetorigin_jetIdx); 
-		tree_->SetBranchAddress("jetorigin_partonFlavor", &jetorigin_partonFlavor);
-		tree_->SetBranchAddress("jetorigin_hadronFlavor", &jetorigin_hadronFlavor);
-		tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
-		tree_->SetBranchAddress("jetorigin_llp_mass", &jetorigin_llp_mass);
-		tree_->SetBranchAddress("jetorigin_llp_pt", &jetorigin_llp_pt);
+
+                tree_->SetBranchAddress("jetorigin_isLLP_RAD",&jetorigin_isLLP_RAD ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_MU",&jetorigin_isLLP_MU) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_E",&jetorigin_isLLP_E ) ;
+                tree_->SetBranchAddress("jetorigin_isLLP_Q",&jetorigin_isLLP_Q ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_QMU",&jetorigin_isLLP_QMU) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_QE",&jetorigin_isLLP_QE) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_QQ",&jetorigin_isLLP_QQ ); 
+                tree_->SetBranchAddress("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ); 
+                tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_BB",&jetorigin_isLLP_BB) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_BBMU",&jetorigin_isLLP_BBMU) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_BBE",&jetorigin_isLLP_BBE ) ; 
+
+                
             }
             else
             {
@@ -893,18 +823,21 @@ class NanoXTree
                 tree_->SetBranchAddress("isData",&isData);
                 tree_->SetBranchAddress("processId",&processId);
             }
-
-            //tree_->SetBranchAddress("jetorigin_llpmass_reco",&jetorigin_llpmass_reco);
             
+            tree_->SetBranchAddress("nlength",&nlength);
+            tree_->SetBranchAddress("length_cpf",&length_cpf);
+            tree_->SetBranchAddress("length_npf",&length_npf);
+            tree_->SetBranchAddress("length_sv",&length_sv);
+            tree_->SetBranchAddress("length_mu",&length_muon);
+            tree_->SetBranchAddress("length_ele",&length_electron);
+
             tree_->SetBranchAddress("nglobal",&nglobal);
             tree_->SetBranchAddress("global_pt",&global_pt);
             tree_->SetBranchAddress("global_eta",&global_eta);
-            tree_->SetBranchAddress("fixedGridRhoFastjetAll",&global_rho);
             
-	    tree_->SetBranchAddress("global_mass",&global_mass);
-//	    tree_->SetBranchAddress("global_energy",&global_energy);
-	    tree_->SetBranchAddress("global_n60",&global_n60);
-	    tree_->SetBranchAddress("global_n90",&global_n90);
+            tree_->SetBranchAddress("global_mass",&global_mass);
+            tree_->SetBranchAddress("global_n60",&global_n60);
+            tree_->SetBranchAddress("global_n90",&global_n90);
             tree_->SetBranchAddress("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction);
             tree_->SetBranchAddress("global_chargedHadronEnergyFraction",&global_chargedHadronEnergyFraction);
             tree_->SetBranchAddress("global_chargedMuEnergyFraction",&global_chargedMuEnergyFraction);
@@ -925,12 +858,19 @@ class NanoXTree
             tree_->SetBranchAddress("global_isotropy",&global_isotropy);
             tree_->SetBranchAddress("global_eventShapeC",&global_eventShapeC);
             tree_->SetBranchAddress("global_eventShapeD",&global_eventShapeD);
-
-// Here also it is related. 
-//
-            tree_->SetBranchAddress("length_cpf",&length_cpf);
-            tree_->SetBranchAddress("cpf",&cpf_length);
             
+            tree_->SetBranchAddress("ncsv",&ncsv);
+            tree_->SetBranchAddress("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio);
+            tree_->SetBranchAddress("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR);
+            tree_->SetBranchAddress("csv_vertexCategory",&csv_vertexCategory);
+            tree_->SetBranchAddress("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm);
+            tree_->SetBranchAddress("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm);
+            tree_->SetBranchAddress("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm);
+            tree_->SetBranchAddress("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm);
+            tree_->SetBranchAddress("csv_jetNSelectedTracks",&csv_jetNSelectedTracks);
+            tree_->SetBranchAddress("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel);
+            
+
             tree_->SetBranchAddress("ncpf",&ncpf);
             tree_->SetBranchAddress("cpf_trackEtaRel",&cpf_trackEtaRel);
             tree_->SetBranchAddress("cpf_trackPtRel",&cpf_trackPtRel);
@@ -945,6 +885,8 @@ class NanoXTree
             tree_->SetBranchAddress("cpf_trackJetDistVal",&cpf_trackJetDistVal);
             tree_->SetBranchAddress("cpf_trackJetDistSig",&cpf_trackJetDistSig);
             tree_->SetBranchAddress("cpf_ptrel",&cpf_ptrel);
+            tree_->SetBranchAddress("cpf_deta",&cpf_deta);
+            tree_->SetBranchAddress("cpf_dphi",&cpf_dphi);
             tree_->SetBranchAddress("cpf_drminsv",&cpf_drminsv);
             tree_->SetBranchAddress("cpf_vertex_association",&cpf_vertex_association);
             tree_->SetBranchAddress("cpf_fromPV",&cpf_fromPV);
@@ -953,37 +895,27 @@ class NanoXTree
             tree_->SetBranchAddress("cpf_track_ndof",&cpf_track_ndof);
             tree_->SetBranchAddress("cpf_track_quality",&cpf_track_quality);
             tree_->SetBranchAddress("cpf_relmassdrop",&cpf_relmassdrop);
-//            tree_->SetBranchAddress("cpf_relIso01",&cpf_relIso01);
             
-            tree_->SetBranchAddress("ncsv",&ncsv);
-            tree_->SetBranchAddress("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio);
-            tree_->SetBranchAddress("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR);
-            tree_->SetBranchAddress("csv_vertexCategory",&csv_vertexCategory);
-            tree_->SetBranchAddress("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm);
-            tree_->SetBranchAddress("csv_jetNSelectedTracks",&csv_jetNSelectedTracks);
-            tree_->SetBranchAddress("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel);
-           
-            tree_->SetBranchAddress("nnpflength",&nnpflength);
-            tree_->SetBranchAddress("npflength_length",&npflength_length);
+            tree_->SetBranchAddress("cpf_matchedSV",&cpf_matchedSV);
+            tree_->SetBranchAddress("cpf_matchedMuon",&cpf_matchedMuon);
+            tree_->SetBranchAddress("cpf_matchedElectron",&cpf_matchedElectron);
             
+          
             tree_->SetBranchAddress("nnpf",&nnpf);
             tree_->SetBranchAddress("npf_ptrel",&npf_ptrel);
+            tree_->SetBranchAddress("npf_deta",&npf_deta);
+            tree_->SetBranchAddress("npf_dphi",&npf_dphi);
             tree_->SetBranchAddress("npf_deltaR",&npf_deltaR);
             tree_->SetBranchAddress("npf_isGamma",&npf_isGamma);
             tree_->SetBranchAddress("npf_hcal_fraction",&npf_hcal_fraction);
             tree_->SetBranchAddress("npf_drminsv",&npf_drminsv);
             tree_->SetBranchAddress("npf_puppi_weight",&npf_puppi_weight);
             tree_->SetBranchAddress("npf_relmassdrop",&npf_relmassdrop);
-            tree_->SetBranchAddress("npf_relIso01",&npf_relIso01);
-            
-            tree_->SetBranchAddress("nsvlength",&nsvlength);
-            tree_->SetBranchAddress("svlength_length",&svlength_length);
             
             tree_->SetBranchAddress("nsv",&nsv);
-            tree_->SetBranchAddress("sv_pt",&sv_pt);
+            tree_->SetBranchAddress("sv_ptrel",&sv_ptrel);
+            tree_->SetBranchAddress("sv_deta",&sv_deta);
+            tree_->SetBranchAddress("sv_dphi",&sv_dphi);
             tree_->SetBranchAddress("sv_mass",&sv_mass);
             tree_->SetBranchAddress("sv_deltaR",&sv_deltaR);
             tree_->SetBranchAddress("sv_ntracks",&sv_ntracks);
@@ -996,20 +928,19 @@ class NanoXTree
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
 		  
-    	    tree_->SetBranchAddress("muon_jetIdx",&muon_jetIdx); 
+		    tree_->SetBranchAddress("nmuon",&nmuon); 
             tree_->SetBranchAddress("muon_isGlobal",&muon_isGlobal); 
             tree_->SetBranchAddress("muon_isTight",&muon_isTight); 
             tree_->SetBranchAddress("muon_isMedium",&muon_isMedium); 
             tree_->SetBranchAddress("muon_isLoose",&muon_isLoose); 
             tree_->SetBranchAddress("muon_isStandAlone",&muon_isStandAlone);
 
-    
             tree_->SetBranchAddress("muon_ptrel", &muon_ptrel);
             tree_->SetBranchAddress("muon_EtaRel", &muon_EtaRel);
-            tree_->SetBranchAddress("muon_phi",&muon_phi);
+            tree_->SetBranchAddress("muon_dphi",&muon_dphi);
+            tree_->SetBranchAddress("muon_deta",&muon_deta);
             tree_->SetBranchAddress("muon_charge",&muon_charge); 
             tree_->SetBranchAddress("muon_energy",&muon_energy);
-//            tree_->SetBranchAddress("muon_et",&muon_et);
             tree_->SetBranchAddress("muon_jetDeltaR",&muon_jetDeltaR); 
             tree_->SetBranchAddress("muon_numberOfMatchedStations",&muon_numberOfMatchedStations);
 
@@ -1025,7 +956,6 @@ class NanoXTree
             tree_->SetBranchAddress("muon_dzError", &muon_dzError); 
             tree_->SetBranchAddress("muon_numberOfValidPixelHits",&muon_numberOfValidPixelHits); 
             tree_->SetBranchAddress("muon_numberOfpixelLayersWithMeasurement", &muon_numberOfpixelLayersWithMeasurement); 
-//            tree_->SetBranchAddress("muon_numberOfstripLayersWithMeasurement", &muon_numberOfstripLayersWithMeasurement); //that does not help. needs to be discussed.
 
             tree_->SetBranchAddress("muon_chi2", &muon_chi2); 
             tree_->SetBranchAddress("muon_ndof",&muon_ndof); 
@@ -1045,13 +975,10 @@ class NanoXTree
             tree_->SetBranchAddress("muon_sumPfPhotonEt03",&muon_sumPfPhotonEt03); 
             tree_->SetBranchAddress("muon_sumChHadronPt",&muon_sumChHadronPt);
  
-/*          tree_->SetBranchAddress("nlegacyTag",&nlegacyTag);
-            tree_->SetBranchAddress("legacyTag_median_dxy",&legacyTag_median_dxy);
-            tree_->SetBranchAddress("legacyTag_median_trackSip2dSig",&legacyTag_median_trackSip2dSig);
-            tree_->SetBranchAddress("legacyTag_alpha",&legacyTag_alpha);*/
-            
-            //getEvent(0,true);
-
+ 
+            tree_->SetBranchAddress("nelectron",&nelectron); 
+ 
+ 
             symbolTable_.add_variable("isB",isB);
             symbolTable_.add_variable("isBB",isBB);
             symbolTable_.add_variable("isGBB",isGBB);
@@ -1066,12 +993,10 @@ class NanoXTree
             symbolTable_.add_variable("isUD",isUD);
             symbolTable_.add_variable("isG",isG);
             
-//          symbolTable_.add_variable("fromLLP",fromLLP);
-            
-            //symbolTable_.add_variable("rand",rand);
-            //symbolTable_.add_variable("ctau",ctau);
+            symbolTable_.add_variable("rand",rand);
+            symbolTable_.add_variable("ctau",ctau);
 	    
-            symbolTable_.add_variable("logpt",logpt);
+            symbolTable_.add_variable("pt",pt);
             symbolTable_.add_variable("isLLP_RAD" ,isLLP_RAD) ; 
             symbolTable_.add_variable("isLLP_MU" ,isLLP_MU) ; 
             symbolTable_.add_variable("isLLP_E",isLLP_E) ; 
@@ -1087,7 +1012,7 @@ class NanoXTree
             symbolTable_.add_variable("isLLP_BB" ,isLLP_BB) ; 
             symbolTable_.add_variable("isLLP_BBMU" ,isLLP_BBMU) ; 
             symbolTable_.add_variable("isLLP_BBE" ,isLLP_BBE) ; 
-	    symbolTable_.add_variable("isPU",isPU);
+            symbolTable_.add_variable("isPU",isPU);
 
             
             for (auto selectstring: selectors)
@@ -1167,8 +1092,6 @@ class NanoXTree
             
                         
             //just a sanity check
-           // long  jetIndex = jetorigin_jetIdx[jet];
-           // std::cout<<"index is : "<<  jetorigin_jetIdx[jet] << "  jet eta is : "<< Jet_eta[jet] << "    global jet is : " <<global_eta[jet] << std::endl ; 
             if (std::fabs(Jet_eta[jet]/global_eta[jet]-1)>0.01)
             {
                 std::cout<<"Encountered mismatch between standard nanoaod jets and xtag info"<<std::endl;
@@ -1196,7 +1119,7 @@ class NanoXTree
             
             //do not apply jet ID; require at least 2 constituents & no overlap with leptons
             //garbage jets are anyway not considered since training is done on matched jets only
-            if (Jet_nConstituents[jet]<2 or Jet_cleanmask[jet]==0)
+            if (Jet_nConstituents[jet]<2)
             {
                 return false;
             }
@@ -1213,12 +1136,6 @@ class NanoXTree
                     return false;
                 }
 
-                if (jetorigin_isPU[jet]>0.5)
-                {
-                    return false;
-                }
-      
-                //setup variables for exp evaluation
                 isB = jetorigin_isB[jet];
                 isBB = jetorigin_isBB[jet];
                 isGBB = jetorigin_isGBB[jet];
@@ -1233,8 +1150,6 @@ class NanoXTree
                 isUD = jetorigin_isUD[jet];
                 isG = jetorigin_isG[jet];
  
-// Add here LLP flavour                
-		
                 isLLP_RAD= jetorigin_isLLP_RAD[jet];  
                 isLLP_MU= jetorigin_isLLP_MU[jet];  
                 isLLP_E= jetorigin_isLLP_E[jet];  
@@ -1250,6 +1165,7 @@ class NanoXTree
                 isLLP_BB= jetorigin_isLLP_BB[jet];  
                 isLLP_BBMU= jetorigin_isLLP_BBMU[jet];  
                 isLLP_BBE= jetorigin_isLLP_BBE[jet];  
+                
                 isPU = jetorigin_isPU[jet];
                
             }
@@ -1270,7 +1186,6 @@ class NanoXTree
                 isS = 0;
                 isUD = 0;
                 isG = 0;
-                //fromLLP = 0;
                 isLLP_RAD = 0;
                 isLLP_MU = 0;
                 isLLP_E = 0;
@@ -1292,7 +1207,7 @@ class NanoXTree
             
             rand = uniform_dist_(randomGenerator_);
             //ctau = 1e9;
-            logpt = std::log10(std::max(0.1f,global_pt[jet]));
+            pt = global_pt[jet];
             
             for (auto setter: setters_)
             {
@@ -1316,40 +1231,35 @@ class NanoXTree
         int getJetClass(unsigned int jet)
         {
             if (not addTruth_) return 0; //default class
-         //   if (jetorigin_fromLLP[jet]<0.5)
-           // {
-                if  (jetorigin_isB[jet]>0.5) return 0;
-                if  (jetorigin_isBB[jet]>0.5) return 1;
-                if  (jetorigin_isGBB[jet]>0.5) return 2;
-                if  (jetorigin_isLeptonic_B[jet]>0.5) return 3;
-                if  (jetorigin_isLeptonic_C[jet]>0.5) return 4;
-                if  (jetorigin_isC[jet]>0.5) return 5;
-                if  (jetorigin_isCC[jet]>0.5) return 6;
-                if  (jetorigin_isGCC[jet]>0.5) return 7;
-                if  (jetorigin_isS[jet]>0.5) return 8;
-                if  (jetorigin_isUD[jet]>0.5) return 9;
-                if  (jetorigin_isG[jet]>0.5) return 10;
-                if  (jetorigin_isPU[jet]>0.5) return 12;
-                if  (jetorigin_isLLP_RAD[jet]>0.5) return 13 ;
-                if  (jetorigin_isLLP_MU[jet]>0.5) return 14 ;
-                if  (jetorigin_isLLP_E[jet]>0.5) return 15;
-                if  (jetorigin_isLLP_Q[jet]>0.5) return 16;
-                if  (jetorigin_isLLP_QMU[jet]>0.5) return  17;
-                if  (jetorigin_isLLP_QE[jet]>0.5) return 18;
-                if  (jetorigin_isLLP_QQ[jet]>0.5) return 19;
-                if  (jetorigin_isLLP_QQMU[jet]>0.5) return 20;
-                if  (jetorigin_isLLP_QQE[jet]>0.5) return 21;
-                if  (jetorigin_isLLP_B[jet]>0.5) return 22;
-                if  (jetorigin_isLLP_BMU[jet]>0.5) return 23;
-                if  (jetorigin_isLLP_BE[jet]>0.5) return 24;
-                if  (jetorigin_isLLP_BB[jet]>0.5) return 25;
-                if  (jetorigin_isLLP_BBMU[jet]>0.5) return 26;
-                if  (jetorigin_isLLP_BBE[jet]>0.5) return 27;
-           // }
-           /* else
-            {
-                return 11;
-            }*/
+
+            if  (jetorigin_isB[jet]>0.5) return 0;
+            if  (jetorigin_isBB[jet]>0.5) return 1;
+            if  (jetorigin_isGBB[jet]>0.5) return 2;
+            if  (jetorigin_isLeptonic_B[jet]>0.5) return 3;
+            if  (jetorigin_isLeptonic_C[jet]>0.5) return 4;
+            if  (jetorigin_isC[jet]>0.5) return 5;
+            if  (jetorigin_isCC[jet]>0.5) return 6;
+            if  (jetorigin_isGCC[jet]>0.5) return 7;
+            if  (jetorigin_isS[jet]>0.5) return 8;
+            if  (jetorigin_isUD[jet]>0.5) return 9;
+            if  (jetorigin_isG[jet]>0.5) return 10;
+            if  (jetorigin_isPU[jet]>0.5) return 12;
+            if  (jetorigin_isLLP_RAD[jet]>0.5) return 13;
+            if  (jetorigin_isLLP_MU[jet]>0.5) return 14;
+            if  (jetorigin_isLLP_E[jet]>0.5) return 15;
+            if  (jetorigin_isLLP_Q[jet]>0.5) return 16;
+            if  (jetorigin_isLLP_QMU[jet]>0.5) return 17;
+            if  (jetorigin_isLLP_QE[jet]>0.5) return 18;
+            if  (jetorigin_isLLP_QQ[jet]>0.5) return 19;
+            if  (jetorigin_isLLP_QQMU[jet]>0.5) return 20;
+            if  (jetorigin_isLLP_QQE[jet]>0.5) return 21;
+            if  (jetorigin_isLLP_B[jet]>0.5) return 22;
+            if  (jetorigin_isLLP_BMU[jet]>0.5) return 23;
+            if  (jetorigin_isLLP_BE[jet]>0.5) return 24;
+            if  (jetorigin_isLLP_BB[jet]>0.5) return 25;
+            if  (jetorigin_isLLP_BBMU[jet]>0.5) return 26;
+            if  (jetorigin_isLLP_BBE[jet]>0.5) return 27;
+
             return -1;
         }
         
@@ -1358,16 +1268,15 @@ class NanoXTree
             UnpackedTree& unpackedTree
         )
         {
-            //tree_->GetEntry(entry);
-
-            if (this->njets()!=length_cpf or this->njets()!=nnpflength or this->njets()!=nsvlength)
+            if (this->njets()!=nglobal
+                or this->njets()!=nlength 
+                or this->njets()!=ncsv
+            )
             {
                 std::cout<<"Encountered weird event with unclear numbers of jets"<<std::endl;
                 std::cout<<"\tnjets = "<<this->njets()<<std::endl;
+                std::cout<<"\tnlength = "<<nlength<<std::endl;
                 std::cout<<"\tnglobal = "<<nglobal<<std::endl;
-                std::cout<<"\tcpf_length = "<<cpf_length<<std::endl;
-                std::cout<<"\tnnpflength = "<<nnpflength<<std::endl;
-                std::cout<<"\tnsvlength = "<<nsvlength<<std::endl;
                 if (addTruth_)
                 {
                     std::cout<<"\tnjetorigin = "<<njetorigin<<std::endl;
@@ -1379,42 +1288,37 @@ class NanoXTree
             if (addTruth_)
             {
                 unpackedTree.jetorigin_isUndefined = jetorigin_isUndefined[jet];
-                
                 unpackedTree.jetorigin_displacement = jetorigin_displacement[jet];
-          //      unpackedTree.jetorigin_ctau = ctau;
+                unpackedTree.jetorigin_ctau = ctau;
                 unpackedTree.jetorigin_decay_angle = jetorigin_decay_angle[jet];
                 
-                //make DJ and LLP categories exclusive
-                unpackedTree.jetorigin_isB = jetorigin_isB[jet]>0.5 ;
-                unpackedTree.jetorigin_isBB = jetorigin_isBB[jet]>0.5;
-                unpackedTree.jetorigin_isGBB = jetorigin_isGBB[jet]>0.5 ;
-                unpackedTree.jetorigin_isLeptonic_B = jetorigin_isLeptonic_B[jet]>0.5 ;
-                unpackedTree.jetorigin_isLeptonic_C = jetorigin_isLeptonic_C[jet]>0.5 ;
-                unpackedTree.jetorigin_isC = jetorigin_isC[jet]>0.5 ;
-                unpackedTree.jetorigin_isCC = jetorigin_isCC[jet]>0.5 ;
-                unpackedTree.jetorigin_isGCC = jetorigin_isGCC[jet]>0.5 ;
-                unpackedTree.jetorigin_isS = jetorigin_isS[jet]>0.5;
-                unpackedTree.jetorigin_isUD = jetorigin_isUD[jet]>0.5;
-                unpackedTree.jetorigin_isG = jetorigin_isG[jet]>0.5 ;
-                unpackedTree.jetorigin_isPU = jetorigin_isPU[jet]>0.5;
-		unpackedTree.jetorigin_isLLP_RAD= jetorigin_isLLP_RAD[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_MU= jetorigin_isLLP_MU[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_E= jetorigin_isLLP_E[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_Q= jetorigin_isLLP_Q[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_QMU= jetorigin_isLLP_QMU[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_QE= jetorigin_isLLP_QE[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_QQ= jetorigin_isLLP_QQ[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_QQMU= jetorigin_isLLP_QQMU[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_QQE= jetorigin_isLLP_QQE[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_B= jetorigin_isLLP_B[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_BMU= jetorigin_isLLP_BMU[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_BE= jetorigin_isLLP_BE[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_BB= jetorigin_isLLP_BB[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_BBMU= jetorigin_isLLP_BBMU[jet]>0.5;
-                unpackedTree.jetorigin_isLLP_BBE= jetorigin_isLLP_BBE[jet]>0.5;		
-             //   unpackedTree.jetorigin_fromLLP = jetorigin_fromLLP[jet]>0.5;
-             //
-             //   Add here LLP flavour 
+                unpackedTree.jetorigin_isB = jetorigin_isB[jet];
+                unpackedTree.jetorigin_isBB = jetorigin_isBB[jet];
+                unpackedTree.jetorigin_isGBB = jetorigin_isGBB[jet];
+                unpackedTree.jetorigin_isLeptonic_B = jetorigin_isLeptonic_B[jet];
+                unpackedTree.jetorigin_isLeptonic_C = jetorigin_isLeptonic_C[jet];
+                unpackedTree.jetorigin_isC = jetorigin_isC[jet];
+                unpackedTree.jetorigin_isCC = jetorigin_isCC[jet];
+                unpackedTree.jetorigin_isGCC = jetorigin_isGCC[jet];
+                unpackedTree.jetorigin_isS = jetorigin_isS[jet];
+                unpackedTree.jetorigin_isUD = jetorigin_isUD[jet];
+                unpackedTree.jetorigin_isG = jetorigin_isG[jet];
+                unpackedTree.jetorigin_isPU = jetorigin_isPU[jet];
+                unpackedTree.jetorigin_isLLP_RAD= jetorigin_isLLP_RAD[jet];
+                unpackedTree.jetorigin_isLLP_MU= jetorigin_isLLP_MU[jet];
+                unpackedTree.jetorigin_isLLP_E= jetorigin_isLLP_E[jet];
+                unpackedTree.jetorigin_isLLP_Q= jetorigin_isLLP_Q[jet];
+                unpackedTree.jetorigin_isLLP_QMU= jetorigin_isLLP_QMU[jet];
+                unpackedTree.jetorigin_isLLP_QE= jetorigin_isLLP_QE[jet];
+                unpackedTree.jetorigin_isLLP_QQ= jetorigin_isLLP_QQ[jet];
+                unpackedTree.jetorigin_isLLP_QQMU= jetorigin_isLLP_QQMU[jet];
+                unpackedTree.jetorigin_isLLP_QQE= jetorigin_isLLP_QQE[jet];
+                unpackedTree.jetorigin_isLLP_B= jetorigin_isLLP_B[jet];
+                unpackedTree.jetorigin_isLLP_BMU= jetorigin_isLLP_BMU[jet];
+                unpackedTree.jetorigin_isLLP_BE= jetorigin_isLLP_BE[jet];
+                unpackedTree.jetorigin_isLLP_BB= jetorigin_isLLP_BB[jet];
+                unpackedTree.jetorigin_isLLP_BBMU= jetorigin_isLLP_BBMU[jet];
+                unpackedTree.jetorigin_isLLP_BBE= jetorigin_isLLP_BBE[jet];		
             }
             else
             {
@@ -1424,13 +1328,11 @@ class NanoXTree
             }
             
             
-            unpackedTree.global_rho = global_rho;
             unpackedTree.global_pt = global_pt[jet];
             unpackedTree.global_eta = global_eta[jet];
-	    unpackedTree.global_mass= global_mass[jet];
-//	    unpackedTree.global_energy= global_energy[jet];
-	    unpackedTree.global_n60= global_n60[jet];
-	    unpackedTree.global_n90= global_n90[jet];
+            unpackedTree.global_mass= global_mass[jet];
+            unpackedTree.global_n60= global_n60[jet];
+            unpackedTree.global_n90= global_n90[jet];
             unpackedTree.global_chargedEmEnergyFraction= global_chargedEmEnergyFraction[jet];
             unpackedTree.global_chargedHadronEnergyFraction= global_chargedHadronEnergyFraction[jet];
             unpackedTree.global_chargedMuEnergyFraction= global_chargedMuEnergyFraction[jet];
@@ -1451,17 +1353,32 @@ class NanoXTree
             unpackedTree.global_isotropy= global_isotropy[jet];
             unpackedTree.global_eventShapeC= global_eventShapeC[jet];
             unpackedTree.global_eventShapeD= global_eventShapeD[jet];
+            
+            
+            unpackedTree.csv_trackSumJetEtRatio = csv_trackSumJetEtRatio[jet];
+            unpackedTree.csv_trackSumJetDeltaR = csv_trackSumJetDeltaR[jet];
+            unpackedTree.csv_vertexCategory = csv_vertexCategory[jet];
+            unpackedTree.csv_trackSip2dValAboveCharm = csv_trackSip2dValAboveCharm[jet];
+            unpackedTree.csv_trackSip2dSigAboveCharm = csv_trackSip2dSigAboveCharm[jet];
+            unpackedTree.csv_trackSip3dValAboveCharm = csv_trackSip3dValAboveCharm[jet];
+            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
+            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
+            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
+            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
+            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
+            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
 
             
             int cpf_offset = 0;
             for (size_t i = 0; i < jet; ++i)
             {
-                cpf_offset += cpf_length[i];
+                cpf_offset += length_cpf[i];
             }
             
-            unpackedTree.ncpf = cpf_length[jet];
-            int ncpf = std::min<int>(25,cpf_length[jet]);
-            for (size_t i = 0; i < ncpf; ++i)
+            int ncpf = std::min<int>(UnpackedTree::maxEntries_cpf,length_cpf[jet]);
+            unpackedTree.ncpf = ncpf;
+            
+            for (int i = 0; i < ncpf; ++i)
             {
                 unpackedTree.cpf_trackEtaRel[i] = cpf_trackEtaRel[cpf_offset+i];
                 unpackedTree.cpf_trackPtRel[i] = cpf_trackPtRel[cpf_offset+i];
@@ -1478,6 +1395,8 @@ class NanoXTree
                 unpackedTree.cpf_trackJetDistVal[i] = cpf_trackJetDistVal[cpf_offset+i];
                 unpackedTree.cpf_trackJetDistSig[i] = cpf_trackJetDistSig[cpf_offset+i];
                 unpackedTree.cpf_ptrel[i] = cpf_ptrel[cpf_offset+i];
+                unpackedTree.cpf_deta[i] = cpf_deta[cpf_offset+i];
+                unpackedTree.cpf_dphi[i] = cpf_dphi[cpf_offset+i];
                 unpackedTree.cpf_drminsv[i] = cpf_drminsv[cpf_offset+i];
                 unpackedTree.cpf_vertex_association[i] = cpf_vertex_association[cpf_offset+i];
                 unpackedTree.cpf_puppi_weight[i] = cpf_puppi_weight[cpf_offset+i];
@@ -1486,102 +1405,48 @@ class NanoXTree
                 unpackedTree.cpf_track_ndof[i] = cpf_track_ndof[cpf_offset+i];
                 unpackedTree.cpf_track_quality[i] = cpf_track_quality[cpf_offset+i];
                 unpackedTree.cpf_relmassdrop[i] = cpf_relmassdrop[cpf_offset+i];
-//                unpackedTree.cpf_relIso01[i] = cpf_relIso01[cpf_offset+i];
-            }
-            for (size_t i = ncpf; i < 25; ++i)
-            {
-                unpackedTree.cpf_trackEtaRel[i] = 0;
-                unpackedTree.cpf_trackPtRel[i] = 0;
-                unpackedTree.cpf_trackPPar[i] = 0;
-                unpackedTree.cpf_trackDeltaR[i] = 0;
-                unpackedTree.cpf_trackPtRatio[i] = 0;
-                unpackedTree.cpf_trackPParRatio[i] = 0;
-                unpackedTree.cpf_trackSip2dVal[i] = 0;
-                unpackedTree.cpf_trackSip2dSig[i] = 0;
-                unpackedTree.cpf_trackSip3dVal[i] = 0;
-                unpackedTree.cpf_trackSip3dSig[i] = 0;
-                unpackedTree.cpf_trackJetDistVal[i] = 0;
-                unpackedTree.cpf_trackJetDistSig[i] = 0;
-                unpackedTree.cpf_ptrel[i] = 0;
-                unpackedTree.cpf_drminsv[i] = 0;
-                unpackedTree.cpf_vertex_association[i] = 0;
-                unpackedTree.cpf_puppi_weight[i] = 0;
-                unpackedTree.cpf_fromPV[i] = 0;
-                unpackedTree.cpf_track_chi2[i] = 0;
-                unpackedTree.cpf_track_ndof[i] = 0;
-                unpackedTree.cpf_track_quality[i] = 0;
-                unpackedTree.cpf_relmassdrop[i] = 0;
-//                unpackedTree.cpf_relIso01[i] = 0;
+                
+                unpackedTree.cpf_matchedSV[i] = cpf_matchedSV[cpf_offset+i];
+                unpackedTree.cpf_matchedMuon[i] = cpf_matchedMuon[cpf_offset+i];
+                unpackedTree.cpf_matchedElectron[i] = cpf_matchedElectron[cpf_offset+i];
             }
             
-            unpackedTree.csv_trackSumJetEtRatio = csv_trackSumJetEtRatio[jet];
             
-            unpackedTree.csv_trackSumJetDeltaR = csv_trackSumJetDeltaR[jet];
-            unpackedTree.csv_vertexCategory = csv_vertexCategory[jet];
-            unpackedTree.csv_trackSip2dValAboveCharm = csv_trackSip2dValAboveCharm[jet];
-            unpackedTree.csv_trackSip2dSigAboveCharm = csv_trackSip2dSigAboveCharm[jet];
-            unpackedTree.csv_trackSip3dValAboveCharm = csv_trackSip3dValAboveCharm[jet];
-            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
-            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
-            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
-		
-            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
-            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
-            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
-		
-            /*unpackedTree.legacyTag_median_dxy = legacyTag_median_dxy[jet];
-            if (!isnan(legacyTag_median_trackSip2dSig[jet]) and !isinf(legacyTag_median_trackSip2dSig[jet])){
-	            unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
-            }
-            else{
-	            unpackedTree.legacyTag_median_trackSip2dSig = -6.;
-            }
-            unpackedTree.legacyTag_median_trackSip2dSig = legacyTag_median_trackSip2dSig[jet];
-            unpackedTree.legacyTag_alpha = legacyTag_alpha[jet];*/
-        
             int npf_offset = 0;
             for (size_t i = 0; i < jet; ++i)
             {
-                npf_offset += npflength_length[i];
+                npf_offset += length_npf[i];
             }
+            int nnpf = std::min<int>(UnpackedTree::maxEntries_npf,length_npf[jet]);
+            unpackedTree.nnpf = nnpf;
             
-            unpackedTree.nnpf = npflength_length[jet];
-            int nnpf = std::min<int>(25,npflength_length[jet]);
-            for (size_t i = 0; i < nnpf; ++i)
+            for (int i = 0; i < nnpf; ++i)
             {
                 unpackedTree.npf_ptrel[i] = npf_ptrel[npf_offset+i];
+                unpackedTree.npf_deta[i] = npf_deta[npf_offset+i];
+                unpackedTree.npf_dphi[i] = npf_dphi[npf_offset+i];
                 unpackedTree.npf_deltaR[i] = npf_deltaR[npf_offset+i];
                 unpackedTree.npf_isGamma[i] = npf_isGamma[npf_offset+i];
                 unpackedTree.npf_hcal_fraction[i] = npf_hcal_fraction[npf_offset+i];
                 unpackedTree.npf_drminsv[i] = npf_drminsv[npf_offset+i];
                 unpackedTree.npf_puppi_weight[i] = npf_puppi_weight[npf_offset+i];
                 unpackedTree.npf_relmassdrop[i] = npf_relmassdrop[npf_offset+i];
-                unpackedTree.npf_relIso01[i] = npf_relIso01[npf_offset+i];
             }
-            for (size_t i = nnpf; i < 25; ++i)
-            {
-                unpackedTree.npf_ptrel[i] = 0;
-                unpackedTree.npf_deltaR[i] = 0;
-                unpackedTree.npf_isGamma[i] = 0;
-                unpackedTree.npf_hcal_fraction[i] = 0;
-                unpackedTree.npf_drminsv[i] = 0;
-                unpackedTree.npf_puppi_weight[i] = 0;
-                unpackedTree.npf_relmassdrop[i] = 0;
-                unpackedTree.npf_relIso01[i] = 0;
-            }
-            
 
             int sv_offset = 0;
             for (size_t i = 0; i < jet; ++i)
             {
-                sv_offset += svlength_length[i];
+                sv_offset += length_sv[i];
             }
             
-            unpackedTree.nsv = svlength_length[jet];
-            int nsv = std::min<int>(4,svlength_length[jet]);
-            for (size_t i = 0; i < nsv; ++i)
+            int nsv = std::min<int>(UnpackedTree::maxEntries_sv,length_sv[jet]);
+            unpackedTree.nsv = nsv;
+            
+            for (int i = 0; i < nsv; ++i)
             {
-                unpackedTree.sv_pt[i] = sv_pt[sv_offset+i];
+                unpackedTree.sv_ptrel[i] = sv_ptrel[sv_offset+i];
+                unpackedTree.sv_deta[i] = sv_deta[sv_offset+i];
+                unpackedTree.sv_dphi[i] = sv_dphi[sv_offset+i];
                 unpackedTree.sv_mass[i] = sv_mass[sv_offset+i];
                 unpackedTree.sv_deltaR[i] = sv_deltaR[sv_offset+i];
                 unpackedTree.sv_ntracks[i] = sv_ntracks[sv_offset+i];
@@ -1595,33 +1460,79 @@ class NanoXTree
                 unpackedTree.sv_enratio[i] = sv_enratio[sv_offset+i];
             }
             
-            for (size_t i = nsv; i < 4; ++i)
+            
+            int muon_offset = 0;
+            for (size_t i = 0; i < jet; ++i)
             {
-                unpackedTree.sv_pt[i] = 0;
-                unpackedTree.sv_mass[i] = 0;
-                unpackedTree.sv_deltaR[i] = 0;
-                unpackedTree.sv_ntracks[i] = 0;
-                unpackedTree.sv_chi2[i] = 0;
-                unpackedTree.sv_ndof[i] = 0;
-                unpackedTree.sv_dxy[i] = 0;
-                unpackedTree.sv_dxysig[i] = 0;
-                unpackedTree.sv_d3d[i] = 0;
-                unpackedTree.sv_d3dsig[i] = 0;
-                unpackedTree.sv_costhetasvpv[i] = 0;
-                unpackedTree.sv_enratio[i] = 0;
+                muon_offset += length_muon[i];
             }
+            
+            int nmuon = std::min<int>(UnpackedTree::maxEntries_muon,length_muon[jet]);
+            unpackedTree.nmuon = nmuon;
+            
+            for (int i = 0; i < nmuon; ++i)
+            {
+                unpackedTree.muon_isGlobal[i] = muon_isGlobal[muon_offset+i];
+                unpackedTree.muon_isTight[i] = muon_isTight[muon_offset+i];
+                unpackedTree.muon_isMedium[i] = muon_isMedium[muon_offset+i]; 
+                unpackedTree.muon_isLoose[i] = muon_isLoose[muon_offset+i];
+                unpackedTree.muon_isStandAlone[i] = muon_isStandAlone[muon_offset+i];
+
+                unpackedTree.muon_ptrel[i] = muon_ptrel[muon_offset+i];
+                unpackedTree.muon_EtaRel[i] = muon_EtaRel[muon_offset+i];
+                unpackedTree.muon_dphi[i] = muon_dphi[muon_offset+i];
+                unpackedTree.muon_deta[i] = muon_deta[muon_offset+i];
+                unpackedTree.muon_charge[i] = muon_charge[muon_offset+i];
+                unpackedTree.muon_energy[i] = muon_energy[muon_offset+i];
+                unpackedTree.muon_jetDeltaR[i] = muon_jetDeltaR[muon_offset+i]; 
+                unpackedTree.muon_numberOfMatchedStations[i] = muon_numberOfMatchedStations[muon_offset+i];
+
+                unpackedTree.muon_2dIp[i] = muon_2dIp[muon_offset+i];
+                unpackedTree.muon_2dIpSig[i] = muon_2dIpSig[muon_offset+i];
+                unpackedTree.muon_3dIp[i] = muon_3dIp[muon_offset+i];
+                unpackedTree.muon_3dIpSig[i] = muon_3dIpSig[muon_offset+i];
+
+                unpackedTree.muon_dxy[i] = muon_dxy[muon_offset+i];
+                unpackedTree.muon_dxyError[i] = muon_dxyError[muon_offset+i];
+                unpackedTree.muon_dxySig[i] = muon_dxySig[muon_offset+i]; 
+                unpackedTree.muon_dz[i] = muon_dz[muon_offset+i];
+                unpackedTree.muon_dzError[i] = muon_dzError[muon_offset+i];
+                unpackedTree.muon_numberOfValidPixelHits[i] = muon_numberOfValidPixelHits[muon_offset+i]; 
+                unpackedTree.muon_numberOfpixelLayersWithMeasurement[i] = muon_numberOfpixelLayersWithMeasurement[muon_offset+i];
+
+                unpackedTree.muon_chi2[i] = muon_chi2[muon_offset+i];
+                unpackedTree.muon_ndof[i] = muon_ndof[muon_offset+i];
+
+                unpackedTree.muon_caloIso[i] = muon_caloIso[muon_offset+i];
+                unpackedTree.muon_ecalIso[i] = muon_ecalIso[muon_offset+i];
+                unpackedTree.muon_hcalIso[i] = muon_hcalIso[muon_offset+i];
+
+                unpackedTree.muon_sumPfChHadronPt[i] = muon_sumPfChHadronPt[muon_offset+i];
+                unpackedTree.muon_sumPfNeuHadronEt[i] = muon_sumPfNeuHadronEt[muon_offset+i];
+                unpackedTree.muon_Pfpileup[i] = muon_Pfpileup[muon_offset+i];
+                unpackedTree.muon_sumPfPhotonEt[i] = muon_sumPfPhotonEt[muon_offset+i];
+
+                unpackedTree.muon_sumPfChHadronPt03[i] = muon_sumPfChHadronPt03[muon_offset+i];
+                unpackedTree.muon_sumPfNeuHadronEt03[i] = muon_sumPfNeuHadronEt03[muon_offset+i];
+                unpackedTree.muon_Pfpileup03[i] = muon_Pfpileup03[muon_offset+i];
+                unpackedTree.muon_sumPfPhotonEt03[i] = muon_sumPfPhotonEt03[muon_offset+i];
+
+                unpackedTree.muon_sumChHadronPt[i] = muon_sumChHadronPt[muon_offset+i];
+                unpackedTree.muon_sumNeuHadronEt[i] = muon_sumNeuHadronEt[muon_offset+i];
+                unpackedTree.muon_pileup[i] = muon_pileup[muon_offset+i];
+                unpackedTree.muon_sumPhotonEt[i] = muon_sumPhotonEt[muon_offset+i];
+
+                unpackedTree.muon_timeAtIpInOut[i] = muon_timeAtIpInOut[muon_offset+i];
+                unpackedTree.muon_timeAtIpInOutErr[i] = muon_timeAtIpInOutErr[muon_offset+i];
+                unpackedTree.muon_timeAtIpOutIn[i] = muon_timeAtIpOutIn[muon_offset+i];
+            }
+
             
             unpackedTree.fill();
             return true;
         }
        
 };
-
-void printSyntax()
-{
-    std::cout<<"Syntax: "<<std::endl;
-    std::cout<<"          unpackNanoX outputfile N testPercentage Nsplit isplit infile [infile [infile ...]]"<<std::endl<<std::endl;
-}
 
 inline bool ends_with(std::string const & value, std::string const & ending)
 {

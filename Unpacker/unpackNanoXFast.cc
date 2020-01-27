@@ -1104,8 +1104,11 @@ class NanoXTree
         float isLLP_BB;
         float isLLP_BBMU;
         float isLLP_BBE;
-        float isLLP_ANY;
         float isPU;
+        
+        float isB_ANY;
+        float isC_ANY;
+        float isLLP_ANY;
         
         
         float rand;
@@ -1115,6 +1118,7 @@ class NanoXTree
         
         float ctau;
         
+        Parser parser_;
         SymbolTable symbolTable_;
         std::vector<Expression> selections_;
         std::vector<Expression> setters_;
@@ -1478,7 +1482,7 @@ class NanoXTree
             tree_->SetBranchAddress("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt);
             tree_->SetBranchAddress("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc);
 
- 
+            
             symbolTable_.add_variable("isB",isB);
             symbolTable_.add_variable("isBB",isBB);
             symbolTable_.add_variable("isGBB",isGBB);
@@ -1510,6 +1514,9 @@ class NanoXTree
             symbolTable_.add_variable("isLLP_BB" ,isLLP_BB) ; 
             symbolTable_.add_variable("isLLP_BBMU" ,isLLP_BBMU) ; 
             symbolTable_.add_variable("isLLP_BBE" ,isLLP_BBE) ; 
+            
+            symbolTable_.add_variable("isB_ANY",isB_ANY);
+            symbolTable_.add_variable("isC_ANY",isC_ANY);
             symbolTable_.add_variable("isLLP_ANY",isLLP_ANY);
 
             symbolTable_.add_variable("rand",rand);
@@ -1518,15 +1525,29 @@ class NanoXTree
             symbolTable_.add_variable("pt",pt);
             symbolTable_.add_variable("eta",eta);
             symbolTable_.add_variable("phi",phi);
+            
            
             for (auto selectstring: selectors)
             {
                 std::cout<<"register selection: "<<selectstring<<std::endl;
                 Expression exp;
                 exp.register_symbol_table(symbolTable_);
-                Parser parser;
-                parser.compile(selectstring,exp);
-                selections_.emplace_back(std::move(exp));
+                if (not parser_.compile(selectstring,exp))
+                {
+                    for (std::size_t i = 0; i < parser_.error_count(); ++i)
+                    {
+                        auto error = parser_.get_error(i);
+                        std::cout<<"Expression compilation error #"<<i<<std::endl;
+                        std::cout<<" -> Position: "<<error.token.position;
+                        std::cout<<", Type: "<<exprtk::parser_error::to_str(error.mode);
+                        std::cout<<", Msg: "<<error.diagnostic<<std::endl<<std::endl;
+                    }
+                    throw std::runtime_error("Compilation error");
+                }
+                else
+                {
+                    selections_.emplace_back(std::move(exp));
+                }
             }
             
             for (auto setstring: setters)
@@ -1534,9 +1555,23 @@ class NanoXTree
                 std::cout<<"register setter: "<<setstring<<std::endl;
                 Expression exp;
                 exp.register_symbol_table(symbolTable_);
-                Parser parser;
-                parser.compile(setstring,exp);
-                setters_.emplace_back(std::move(exp));
+                if (not parser_.compile(setstring,exp))
+                {
+                    for (std::size_t i = 0; i < parser_.error_count(); ++i)
+                    {
+                        auto error = parser_.get_error(i);
+                        std::cout<<"Expression compilation error #"<<i<<std::endl;
+                        std::cout<<" -> Position: "<<error.token.position;
+                        std::cout<<", Type: "<<exprtk::parser_error::to_str(error.mode);
+                        std::cout<<", Msg: "<<error.diagnostic<<std::endl<<std::endl;
+                    }
+                    throw std::runtime_error("Compilation error");
+                }
+                else
+                {
+                    setters_.emplace_back(std::move(exp));
+                }
+                
             }
  
         }
@@ -1676,11 +1711,12 @@ class NanoXTree
                 
                 isPU = jetorigin_isPU[jet];
                 
+                isB_ANY = isB+isBB+isGBB+isLeptonic_B+isLeptonic_C;
+                isC_ANY = isC+isCC+isGCC;
                 isLLP_ANY = isLLP_RAD+isLLP_MU+isLLP_E+isLLP_Q+isLLP_QMU+isLLP_QE+isLLP_QQ+isLLP_QQMU+isLLP_QQE
                             +isLLP_B+isLLP_BMU+isLLP_BE+isLLP_BB+isLLP_BBMU+isLLP_BBE;
                
-                if ((isB+isBB+isGBB+isLeptonic_B+isLeptonic_C
-                    +isC+isCC+isGCC+
+                if ((isB_ANY+isC_ANY+
                     +isS+isUD+isG+isPU
                     +isLLP_ANY+jetorigin_isUndefined[jet])!=1)
                 {

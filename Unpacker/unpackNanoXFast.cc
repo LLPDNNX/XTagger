@@ -74,12 +74,12 @@ class UnpackedTree
         float jetorigin_llp_mass;
         float jetorigin_llp_pt;
 
-        //unsigned int nglobal;
         float global_pt;
         float global_eta;
         float global_phi;
 
         float global_mass;
+        float global_area;
         float global_n60;
         float global_n90;
         float global_chargedEmEnergyFraction;
@@ -381,6 +381,7 @@ class UnpackedTree
                 tree_->Branch("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ,"jetorigin_isLLP_QQMU/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE , "jetorigin_isLLP_QQE/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ,"jetorigin_isLLP_QQE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_B",&jetorigin_isLLP_B , "jetorigin_isLLP_B/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU , "jetorigin_isLLP_BMU/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ,"jetorigin_isLLP_BE/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BB",&jetorigin_isLLP_BB, "jetorigin_isLLP_BB/F", bufferSize) ; 
@@ -413,6 +414,7 @@ class UnpackedTree
             tree_->Branch("global_phi",&global_phi,"global_phi/F",bufferSize);
 
             tree_->Branch("global_mass",&global_mass,"global_mass/F", bufferSize);
+            tree_->Branch("global_area",&global_area,"global_area/F", bufferSize);
             tree_->Branch("global_n60",&global_n60,"global_n60/F", bufferSize);
             tree_->Branch("global_n90",&global_n90,"global_n90/F", bufferSize);
             tree_->Branch("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction,"global_chargedEmEnergyFraction/F", bufferSize);
@@ -674,7 +676,6 @@ class UnpackedTree
             tree_->Branch("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc,"electron_dr04HcalDepth2TowerSumEtBc[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt,"electron_dr04HcalTowerSumEt[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc,"electron_dr04HcalTowerSumEtBc[nelectron]/F",bufferSize);
-            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmuon]/F",bufferSize); 
 		    
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
@@ -718,7 +719,7 @@ class NanoXTree
         
         int ientry_;
         
-        static constexpr int maxJets = 20; //20 -> allows for a maximum of 20 jets per event
+        static constexpr int maxJets = 30; //allows for a maximum of 30 jets per event
         static constexpr int maxEntries_global = maxJets;
         static constexpr int maxEntries_cpf = UnpackedTree::maxEntries_cpf*maxJets;
         static constexpr int maxEntries_npf = UnpackedTree::maxEntries_npf*maxJets;
@@ -786,6 +787,7 @@ class NanoXTree
         float global_eta[maxEntries_global];
         float global_phi[maxEntries_global];
         float global_mass[maxEntries_global];
+        float global_area[maxEntries_global];
         int global_n60[maxEntries_global];
         int global_n90[maxEntries_global];
         float global_chargedEmEnergyFraction[maxEntries_global];
@@ -1102,8 +1104,9 @@ class NanoXTree
         float isLLP_BB;
         float isLLP_BBMU;
         float isLLP_BBE;
+        float isLLP_ANY;
         float isPU;
-        float fromLLP;
+        
         
         float rand;
         float pt;
@@ -1186,6 +1189,7 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ); 
                 tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_B",&jetorigin_isLLP_B) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BB",&jetorigin_isLLP_BB) ; 
@@ -1215,6 +1219,7 @@ class NanoXTree
             tree_->SetBranchAddress("global_phi",&global_phi);
 
             tree_->SetBranchAddress("global_mass",&global_mass);
+            tree_->SetBranchAddress("global_area",&global_area);
             tree_->SetBranchAddress("global_n60",&global_n60);
             tree_->SetBranchAddress("global_n90",&global_n90);
             tree_->SetBranchAddress("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction);
@@ -1488,6 +1493,8 @@ class NanoXTree
             symbolTable_.add_variable("isUD",isUD);
             symbolTable_.add_variable("isG",isG);
             
+            symbolTable_.add_variable("isPU",isPU);
+            
             symbolTable_.add_variable("isLLP_RAD" ,isLLP_RAD) ; 
             symbolTable_.add_variable("isLLP_MU" ,isLLP_MU) ; 
             symbolTable_.add_variable("isLLP_E",isLLP_E) ; 
@@ -1503,7 +1510,7 @@ class NanoXTree
             symbolTable_.add_variable("isLLP_BB" ,isLLP_BB) ; 
             symbolTable_.add_variable("isLLP_BBMU" ,isLLP_BBMU) ; 
             symbolTable_.add_variable("isLLP_BBE" ,isLLP_BBE) ; 
-            symbolTable_.add_variable("isPU",isPU);
+            symbolTable_.add_variable("isLLP_ANY",isLLP_ANY);
 
             symbolTable_.add_variable("rand",rand);
             symbolTable_.add_variable("ctau",ctau);
@@ -1586,19 +1593,25 @@ class NanoXTree
             {
                 return false;
             }
-            
-                        
+          
             //just a sanity check
             if (std::fabs(Jet_eta[jet]/global_eta[jet]-1)>0.01 or std::fabs(Jet_phi[jet]/global_phi[jet]-1)>0.01)
             {
                 std::cout<<"Encountered mismatch between standard nanoaod jets and xtag info"<<std::endl;
                 return false;
             }
+            
+            //at least 10 GeV uncorrected
+            if (global_pt[jet]<10.)
+            {
+                return false;
+            }
 
             //ignore jet if reco/gen pt largely disagree -> likely random PU match
-            if (addTruth_ and Jet_genJetIdx[jet] > -1 and Jet_genJetIdx[jet]<maxJets)
+            //require minimum of genjet pt of 5 GeV
+            if (addTruth_ and Jet_genJetIdx[jet]>-1 and Jet_genJetIdx[jet]<maxJets)
             {
-                if ((GenJet_pt[Jet_genJetIdx[jet]]<1.) or ((Jet_pt[jet]/GenJet_pt[Jet_genJetIdx[jet]]) < 0.2))
+                if ((GenJet_pt[Jet_genJetIdx[jet]]<5.) or ((Jet_pt[jet]/GenJet_pt[Jet_genJetIdx[jet]]) < 0.5))
                 {
                     //std::cout << "Skipping jet with mismatched genpt: reco pt="<<Jet_pt[jet] << ", genpt="<<GenJet_pt[Jet_genJetIdx[jet]] << std::endl;
                     return false;
@@ -1613,9 +1626,8 @@ class NanoXTree
             }
             
             
-            //do not apply jet ID; require at least 2 constituents & no overlap with leptons
-            //garbage jets are anyway not considered since training is done on matched jets only
-            if (Jet_nConstituents[jet]<2)
+            //do not apply jet ID; require at least 4 constituents
+            if (Jet_nConstituents[jet]<4)
             {
                 return false;
             }
@@ -1663,6 +1675,25 @@ class NanoXTree
                 isLLP_BBE= jetorigin_isLLP_BBE[jet];  
                 
                 isPU = jetorigin_isPU[jet];
+                
+                isLLP_ANY = isLLP_RAD+isLLP_MU+isLLP_E+isLLP_Q+isLLP_QMU+isLLP_QE+isLLP_QQ+isLLP_QQMU+isLLP_QQE
+                            +isLLP_B+isLLP_BMU+isLLP_BE+isLLP_BB+isLLP_BBMU+isLLP_BBE;
+               
+                if ((isB+isBB+isGBB+isLeptonic_B+isLeptonic_C
+                    +isC+isCC+isGCC+
+                    +isS+isUD+isG+isPU
+                    +isLLP_ANY+jetorigin_isUndefined[jet])!=1)
+                {
+                    std::cout<<"Error - label sum is not 1"<<std::endl;
+                    std::cout<<"isB: "<<isB<<", isBB: "<<isBB<<", isGBB: "<<isGBB<<", isLeptonic_B: "<<isLeptonic_B<<", isLeptonic_C: "<<isLeptonic_C;
+                    std::cout<<", isC: "<<isC<<", isCC: "<<isCC<<", isGCC: "<<isGCC<<", isS: "<<isS<<", isUD: "<<isUD<<", isG: "<<isG<<", isPU: "<<isPU;
+                    std::cout<<", isLLP_RAD: "<<isLLP_RAD<<", isLLP_MU: "<<isLLP_MU<<", isLLP_E: "<<isLLP_E<<", isLLP_Q: "<<isLLP_Q;
+                    std::cout<<", isLLP_QMU: "<<isLLP_QMU<<", isLLP_QE: "<<isLLP_QE<<", isLLP_QQ: "<<isLLP_QQ<<", isLLP_QQMU: "<<isLLP_QQMU;
+                    std::cout<<", isLLP_QQE: "<<isLLP_QQE<<", isLLP_B: "<<isLLP_B<<", isLLP_BMU: "<<isLLP_BMU<<", isLLP_BE: "<<isLLP_BE;
+                    std::cout<<", isLLP_BB: "<<isLLP_BB<<", isLLP_BBMU: "<<isLLP_BBMU<<", isLLP_BBE: "<<isLLP_BBE;
+                    std::cout<<", isLLP_ANY: "<<isLLP_ANY<<", isUndefined: "<<jetorigin_isUndefined[jet]<<std::endl;
+                    return false;
+                }
                
             }
             else
@@ -1841,6 +1872,7 @@ class NanoXTree
             unpackedTree.global_phi = global_phi[jet];
 
             unpackedTree.global_mass= global_mass[jet];
+            unpackedTree.global_area= global_area[jet];
             unpackedTree.global_n60= global_n60[jet];
             unpackedTree.global_n90= global_n90[jet];
             unpackedTree.global_chargedEmEnergyFraction= global_chargedEmEnergyFraction[jet];
@@ -2429,12 +2461,13 @@ int main(int argc, char **argv)
         
         readEvents[ifile]+=1;
         
-        for (size_t j = 0; j < std::min<int>(NanoXTree::maxJets,trees[ifile]->njets()); ++j)
+        //take only the 6 hardest jets
+        for (size_t j = 0; j < std::min<size_t>(6,trees[ifile]->njets()); ++j)
         {
             if (trees[ifile]->isSelected(j))
             {
                 int jet_class = trees[ifile]->getJetClass(j);
-                long hashTest = calcHash(11*trees[ifile]->entry()+23*j)%100;
+                long hashTest = calcHash(97*trees[ifile]->entry()+79*j)%100;
                 if (hashTest<nTestFrac)
                 {
                     if (jet_class>=0 and jet_class<eventsPerClassPerFileTest.size())

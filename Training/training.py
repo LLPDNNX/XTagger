@@ -622,12 +622,10 @@ while (epoch < num_epochs):
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
-    
-    
+
     modelPreprocClass = modelDiscriminators["preprocClass"]
     modelPreprocDomain = modelDiscriminators["preprocDomain"]
     
-
     classLossWeight = 1.
     domainLossWeight = lambda_val*(2./(1+math.exp(-gamma*epoch)) - 1.)
 
@@ -1134,7 +1132,7 @@ while (epoch < num_epochs):
 
                         for idis in range(len(featureDict["truth"]["branches"])):
                             daHists[logctau][idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
-<<<<<<< HEAD
+
 
                 if isParametric:
                     #ctau = 0.#np.random.randint(-3, 5)
@@ -1184,13 +1182,7 @@ while (epoch < num_epochs):
                 for ibatch in range(test_batch_value_domain["isData"].shape[0]):
                     isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
                     sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
->>>>>>> added preprocessing
 
-                    
-
-=======
-                   
->>>>>>> fix pre-processing nad merge
                     if logctau == 0:
          
                         if epoch==0:

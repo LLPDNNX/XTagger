@@ -78,6 +78,7 @@ class UnpackedTree
         float global_pt;
         float global_eta;
         float global_phi;
+
         float global_mass;
         float global_n60;
         float global_n90;
@@ -342,7 +343,6 @@ class UnpackedTree
         float electron_dr04HcalDepth2TowerSumEtBc [maxEntries_electron];
         float electron_dr04HcalTowerSumEt[maxEntries_electron];
         float electron_dr04HcalTowerSumEtBc[maxEntries_electron];
-
 	
 
     public:
@@ -674,6 +674,7 @@ class UnpackedTree
             tree_->Branch("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc,"electron_dr04HcalDepth2TowerSumEtBc[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt,"electron_dr04HcalTowerSumEt[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc,"electron_dr04HcalTowerSumEtBc[nelectron]/F",bufferSize);
+            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmuon]/F",bufferSize); 
 		    
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
@@ -779,7 +780,6 @@ class NanoXTree
         int   jetorigin_llpId[maxEntries_global];
         float jetorigin_llp_mass[maxEntries_global];
         float jetorigin_llp_pt[maxEntries_global];
-        
 
         unsigned int nglobal;
         float global_pt[maxEntries_global];
@@ -796,12 +796,14 @@ class NanoXTree
         float global_tau1[maxEntries_global];
         float global_tau2[maxEntries_global];
         float global_tau3[maxEntries_global];
+
     
         float global_relMassDropMassAK[maxEntries_global];
         float global_relMassDropMassCA[maxEntries_global];
         float global_relSoftDropMassAK[maxEntries_global];
         float global_relSoftDropMassCA[maxEntries_global];
     
+
         float global_thrust[maxEntries_global];
         float global_sphericity[maxEntries_global];
         float global_circularity[maxEntries_global];
@@ -1064,6 +1066,7 @@ class NanoXTree
         float electron_dr04HcalTowerSumEt[maxEntries_electron];
         float electron_dr04HcalTowerSumEtBc[maxEntries_electron];
 	
+
         std::mt19937 randomGenerator_;
         std::uniform_real_distribution<> uniform_dist_;
         
@@ -1152,7 +1155,7 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
                 tree_->SetBranchAddress("jetorigin_llp_pt", &jetorigin_llp_pt);
                 tree_->SetBranchAddress("jetorigin_llp_mass", &jetorigin_llp_mass);
-                
+     
                 tree_->SetBranchAddress("jetorigin_partonFlavor", &jetorigin_partonFlavor);
                 tree_->SetBranchAddress("jetorigin_hadronFlavor", &jetorigin_hadronFlavor);
                 tree_->SetBranchAddress("jetorigin_llpId", &jetorigin_llpId);
@@ -1210,7 +1213,7 @@ class NanoXTree
             tree_->SetBranchAddress("global_pt",&global_pt);
             tree_->SetBranchAddress("global_eta",&global_eta);
             tree_->SetBranchAddress("global_phi",&global_phi);
-            
+
             tree_->SetBranchAddress("global_mass",&global_mass);
             tree_->SetBranchAddress("global_n60",&global_n60);
             tree_->SetBranchAddress("global_n90",&global_n90);
@@ -1304,7 +1307,7 @@ class NanoXTree
             tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
             tree_->SetBranchAddress("sv_enratio",&sv_enratio);
 		  
-            tree_->SetBranchAddress("nmuon",&nmuon); 
+		    tree_->SetBranchAddress("nmuon",&nmuon); 
             tree_->SetBranchAddress("muon_isGlobal",&muon_isGlobal); 
             tree_->SetBranchAddress("muon_isTight",&muon_isTight); 
             tree_->SetBranchAddress("muon_isMedium",&muon_isMedium); 
@@ -1469,6 +1472,7 @@ class NanoXTree
             tree_->SetBranchAddress("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc);
             tree_->SetBranchAddress("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt);
             tree_->SetBranchAddress("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc);
+
  
             symbolTable_.add_variable("isB",isB);
             symbolTable_.add_variable("isBB",isBB);
@@ -1500,17 +1504,14 @@ class NanoXTree
             symbolTable_.add_variable("isLLP_BBMU" ,isLLP_BBMU) ; 
             symbolTable_.add_variable("isLLP_BBE" ,isLLP_BBE) ; 
             symbolTable_.add_variable("isPU",isPU);
-            
+
             symbolTable_.add_variable("rand",rand);
             symbolTable_.add_variable("ctau",ctau);
 	    
             symbolTable_.add_variable("pt",pt);
             symbolTable_.add_variable("eta",eta);
             symbolTable_.add_variable("phi",phi);
-            
-            
-
-            
+           
             for (auto selectstring: selectors)
             {
                 std::cout<<"register selection: "<<selectstring<<std::endl;
@@ -1838,6 +1839,7 @@ class NanoXTree
             unpackedTree.global_pt = global_pt[jet];
             unpackedTree.global_eta = global_eta[jet];
             unpackedTree.global_phi = global_phi[jet];
+
             unpackedTree.global_mass= global_mass[jet];
             unpackedTree.global_n60= global_n60[jet];
             unpackedTree.global_n90= global_n90[jet];

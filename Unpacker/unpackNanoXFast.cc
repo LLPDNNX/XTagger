@@ -381,6 +381,7 @@ class UnpackedTree
                 tree_->Branch("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ,"jetorigin_isLLP_QQMU/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE , "jetorigin_isLLP_QQE/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ,"jetorigin_isLLP_QQE/F", bufferSize) ; 
+                tree_->Branch("jetorigin_isLLP_B",&jetorigin_isLLP_B , "jetorigin_isLLP_B/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU , "jetorigin_isLLP_BMU/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ,"jetorigin_isLLP_BE/F", bufferSize) ; 
                 tree_->Branch("jetorigin_isLLP_BB",&jetorigin_isLLP_BB, "jetorigin_isLLP_BB/F", bufferSize) ; 
@@ -1103,8 +1104,9 @@ class NanoXTree
         float isLLP_BB;
         float isLLP_BBMU;
         float isLLP_BBE;
+        float isLLP_ANY;
         float isPU;
-        float fromLLP;
+        
         
         float rand;
         float pt;
@@ -1187,6 +1189,7 @@ class NanoXTree
                 tree_->SetBranchAddress("jetorigin_isLLP_QQMU",&jetorigin_isLLP_QQMU ); 
                 tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_QQE",&jetorigin_isLLP_QQE ) ; 
+                tree_->SetBranchAddress("jetorigin_isLLP_B",&jetorigin_isLLP_B) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BMU",&jetorigin_isLLP_BMU) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BE",&jetorigin_isLLP_BE ) ; 
                 tree_->SetBranchAddress("jetorigin_isLLP_BB",&jetorigin_isLLP_BB) ; 
@@ -1490,6 +1493,8 @@ class NanoXTree
             symbolTable_.add_variable("isUD",isUD);
             symbolTable_.add_variable("isG",isG);
             
+            symbolTable_.add_variable("isPU",isPU);
+            
             symbolTable_.add_variable("isLLP_RAD" ,isLLP_RAD) ; 
             symbolTable_.add_variable("isLLP_MU" ,isLLP_MU) ; 
             symbolTable_.add_variable("isLLP_E",isLLP_E) ; 
@@ -1505,7 +1510,7 @@ class NanoXTree
             symbolTable_.add_variable("isLLP_BB" ,isLLP_BB) ; 
             symbolTable_.add_variable("isLLP_BBMU" ,isLLP_BBMU) ; 
             symbolTable_.add_variable("isLLP_BBE" ,isLLP_BBE) ; 
-            symbolTable_.add_variable("isPU",isPU);
+            symbolTable_.add_variable("isLLP_ANY",isLLP_ANY);
 
             symbolTable_.add_variable("rand",rand);
             symbolTable_.add_variable("ctau",ctau);
@@ -1670,6 +1675,25 @@ class NanoXTree
                 isLLP_BBE= jetorigin_isLLP_BBE[jet];  
                 
                 isPU = jetorigin_isPU[jet];
+                
+                isLLP_ANY = isLLP_RAD+isLLP_MU+isLLP_E+isLLP_Q+isLLP_QMU+isLLP_QE+isLLP_QQ+isLLP_QQMU+isLLP_QQE
+                            +isLLP_B+isLLP_BMU+isLLP_BE+isLLP_BB+isLLP_BBMU+isLLP_BBE;
+               
+                if ((isB+isBB+isGBB+isLeptonic_B+isLeptonic_C
+                    +isC+isCC+isGCC+
+                    +isS+isUD+isG+isPU
+                    +isLLP_ANY+jetorigin_isUndefined[jet])!=1)
+                {
+                    std::cout<<"Error - label sum is not 1"<<std::endl;
+                    std::cout<<"isB: "<<isB<<", isBB: "<<isBB<<", isGBB: "<<isGBB<<", isLeptonic_B: "<<isLeptonic_B<<", isLeptonic_C: "<<isLeptonic_C;
+                    std::cout<<", isC: "<<isC<<", isCC: "<<isCC<<", isGCC: "<<isGCC<<", isS: "<<isS<<", isUD: "<<isUD<<", isG: "<<isG<<", isPU: "<<isPU;
+                    std::cout<<", isLLP_RAD: "<<isLLP_RAD<<", isLLP_MU: "<<isLLP_MU<<", isLLP_E: "<<isLLP_E<<", isLLP_Q: "<<isLLP_Q;
+                    std::cout<<", isLLP_QMU: "<<isLLP_QMU<<", isLLP_QE: "<<isLLP_QE<<", isLLP_QQ: "<<isLLP_QQ<<", isLLP_QQMU: "<<isLLP_QQMU;
+                    std::cout<<", isLLP_QQE: "<<isLLP_QQE<<", isLLP_B: "<<isLLP_B<<", isLLP_BMU: "<<isLLP_BMU<<", isLLP_BE: "<<isLLP_BE;
+                    std::cout<<", isLLP_BB: "<<isLLP_BB<<", isLLP_BBMU: "<<isLLP_BBMU<<", isLLP_BBE: "<<isLLP_BBE;
+                    std::cout<<", isLLP_ANY: "<<isLLP_ANY<<", isUndefined: "<<jetorigin_isUndefined[jet]<<std::endl;
+                    return false;
+                }
                
             }
             else

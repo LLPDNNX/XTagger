@@ -622,7 +622,7 @@ while (epoch < num_epochs):
     modelClassDiscriminator = modelDiscriminators["class"]
     modelDomainDiscriminator = modelDiscriminators["domain"]
     modelFusedDiscriminator = modelDiscriminators["fused"]
-    
+
     modelPreprocClass = modelDiscriminators["preprocClass"]
     modelPreprocDomain = modelDiscriminators["preprocDomain"]
     
@@ -1132,7 +1132,57 @@ while (epoch < num_epochs):
 
                         for idis in range(len(featureDict["truth"]["branches"])):
                             daHists[logctau][idis][isData].Fill(test_daprediction_class[ibatch][idis],sample_weight)
-                   
+
+
+                if isParametric:
+                    #ctau = 0.#np.random.randint(-3, 5)
+                    test_inputs_domain = [np.zeros((test_batch_value_domain['num'].shape[0],1)),
+                                    test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
+                else:
+                    test_inputs_domain = [test_batch_value_domain['globalvars'],
+                                    test_batch_value_domain['cpf'],
+                                    test_batch_value_domain['npf'],
+                                    test_batch_value_domain['sv']]
+
+                test_outputs_domain = modelDomainDiscriminator.test_on_batch(
+                        test_inputs_domain,
+                        (2.*test_batch_value_domain["isData"]-1) if useWasserstein else test_batch_value_domain["isData"],
+                        sample_weight=test_batch_value_domain["xsecweight"][:,0]
+                )
+                test_daprediction_class = modelClassDiscriminator.predict_on_batch(
+                        test_inputs_domain
+                )
+                
+                if epoch==0:
+                    preprocDomainVal = modelPreprocDomain.predict_on_batch(test_inputs_domain)
+                    for igroup,featureGroup in enumerate(["globalvars","cpf","npf","sv"]):
+                        groupValues = preprocDomainVal[igroup]
+                        if len(groupValues.shape)==3:
+                            groupValues = groupValues[:,0,:]
+                            #groupValues = np.mean(groupValues,axis=1)
+                        for ifeature,featureName in enumerate(featureDict[featureGroup]['branches']):
+                            values = groupValues[:,ifeature]
+                                 
+                            for ival in range(len(values)):
+                                if test_batch_value_domain["isData"][ival,0]>0.5:
+                                    preprocHists[featureGroup][featureName]["domain_data"].Fill(
+                                        values[ival],
+                                        test_batch_value_domain["xsecweight"][ival,0]
+                                    )
+                                else:
+                                    preprocHists[featureGroup][featureName]["domain_mc"].Fill(
+                                        values[ival],
+                                        test_batch_value_domain["xsecweight"][ival,0]
+                                    )
+                    
+                
+                for ibatch in range(test_batch_value_domain["isData"].shape[0]):
+                    isData = int(round(test_batch_value_domain["isData"][ibatch][0]))
+                    sample_weight=test_batch_value_domain["xsecweight"][ibatch][0]
+
                     if logctau == 0:
          
                         if epoch==0:

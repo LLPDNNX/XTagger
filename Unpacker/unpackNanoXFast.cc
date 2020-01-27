@@ -74,12 +74,12 @@ class UnpackedTree
         float jetorigin_llp_mass;
         float jetorigin_llp_pt;
 
-        //unsigned int nglobal;
         float global_pt;
         float global_eta;
         float global_phi;
 
         float global_mass;
+        float global_area;
         float global_n60;
         float global_n90;
         float global_chargedEmEnergyFraction;
@@ -413,6 +413,7 @@ class UnpackedTree
             tree_->Branch("global_phi",&global_phi,"global_phi/F",bufferSize);
 
             tree_->Branch("global_mass",&global_mass,"global_mass/F", bufferSize);
+            tree_->Branch("global_area",&global_area,"global_area/F", bufferSize);
             tree_->Branch("global_n60",&global_n60,"global_n60/F", bufferSize);
             tree_->Branch("global_n90",&global_n90,"global_n90/F", bufferSize);
             tree_->Branch("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction,"global_chargedEmEnergyFraction/F", bufferSize);
@@ -674,7 +675,6 @@ class UnpackedTree
             tree_->Branch("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc,"electron_dr04HcalDepth2TowerSumEtBc[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt,"electron_dr04HcalTowerSumEt[nelectron]/F",bufferSize);
             tree_->Branch("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc,"electron_dr04HcalTowerSumEtBc[nelectron]/F",bufferSize);
-            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmuon]/F",bufferSize); 
 		    
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
@@ -718,7 +718,7 @@ class NanoXTree
         
         int ientry_;
         
-        static constexpr int maxJets = 20; //20 -> allows for a maximum of 20 jets per event
+        static constexpr int maxJets = 30; //allows for a maximum of 30 jets per event
         static constexpr int maxEntries_global = maxJets;
         static constexpr int maxEntries_cpf = UnpackedTree::maxEntries_cpf*maxJets;
         static constexpr int maxEntries_npf = UnpackedTree::maxEntries_npf*maxJets;
@@ -786,6 +786,7 @@ class NanoXTree
         float global_eta[maxEntries_global];
         float global_phi[maxEntries_global];
         float global_mass[maxEntries_global];
+        float global_area[maxEntries_global];
         int global_n60[maxEntries_global];
         int global_n90[maxEntries_global];
         float global_chargedEmEnergyFraction[maxEntries_global];
@@ -1215,6 +1216,7 @@ class NanoXTree
             tree_->SetBranchAddress("global_phi",&global_phi);
 
             tree_->SetBranchAddress("global_mass",&global_mass);
+            tree_->SetBranchAddress("global_area",&global_area);
             tree_->SetBranchAddress("global_n60",&global_n60);
             tree_->SetBranchAddress("global_n90",&global_n90);
             tree_->SetBranchAddress("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction);
@@ -1586,19 +1588,25 @@ class NanoXTree
             {
                 return false;
             }
-            
-                        
+          
             //just a sanity check
             if (std::fabs(Jet_eta[jet]/global_eta[jet]-1)>0.01 or std::fabs(Jet_phi[jet]/global_phi[jet]-1)>0.01)
             {
                 std::cout<<"Encountered mismatch between standard nanoaod jets and xtag info"<<std::endl;
                 return false;
             }
+            
+            //at least 10 GeV uncorrected
+            if (global_pt[jet]<10.)
+            {
+                return false;
+            }
 
             //ignore jet if reco/gen pt largely disagree -> likely random PU match
-            if (addTruth_ and Jet_genJetIdx[jet] > -1 and Jet_genJetIdx[jet]<maxJets)
+            //require minimum of genjet pt of 5 GeV
+            if (addTruth_ and Jet_genJetIdx[jet]>-1 and Jet_genJetIdx[jet]<maxJets)
             {
-                if ((GenJet_pt[Jet_genJetIdx[jet]]<1.) or ((Jet_pt[jet]/GenJet_pt[Jet_genJetIdx[jet]]) < 0.2))
+                if ((GenJet_pt[Jet_genJetIdx[jet]]<5.) or ((Jet_pt[jet]/GenJet_pt[Jet_genJetIdx[jet]]) < 0.5))
                 {
                     //std::cout << "Skipping jet with mismatched genpt: reco pt="<<Jet_pt[jet] << ", genpt="<<GenJet_pt[Jet_genJetIdx[jet]] << std::endl;
                     return false;
@@ -1613,9 +1621,8 @@ class NanoXTree
             }
             
             
-            //do not apply jet ID; require at least 2 constituents & no overlap with leptons
-            //garbage jets are anyway not considered since training is done on matched jets only
-            if (Jet_nConstituents[jet]<2)
+            //do not apply jet ID; require at least 4 constituents
+            if (Jet_nConstituents[jet]<4)
             {
                 return false;
             }
@@ -1841,6 +1848,7 @@ class NanoXTree
             unpackedTree.global_phi = global_phi[jet];
 
             unpackedTree.global_mass= global_mass[jet];
+            unpackedTree.global_area= global_area[jet];
             unpackedTree.global_n60= global_n60[jet];
             unpackedTree.global_n90= global_n90[jet];
             unpackedTree.global_chargedEmEnergyFraction= global_chargedEmEnergyFraction[jet];
@@ -2429,12 +2437,13 @@ int main(int argc, char **argv)
         
         readEvents[ifile]+=1;
         
-        for (size_t j = 0; j < std::min<int>(NanoXTree::maxJets,trees[ifile]->njets()); ++j)
+        //take only the 6 hardest jets
+        for (size_t j = 0; j < std::min<size_t>(6,trees[ifile]->njets()); ++j)
         {
             if (trees[ifile]->isSelected(j))
             {
                 int jet_class = trees[ifile]->getJetClass(j);
-                long hashTest = calcHash(11*trees[ifile]->entry()+23*j)%100;
+                long hashTest = calcHash(97*trees[ifile]->entry()+79*j)%100;
                 if (hashTest<nTestFrac)
                 {
                     if (jet_class>=0 and jet_class<eventsPerClassPerFileTest.size())

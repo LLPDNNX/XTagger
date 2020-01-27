@@ -1644,7 +1644,7 @@ class NanoXTree
 
             //ignore jet if reco/gen pt largely disagree -> likely random PU match
             //require minimum of genjet pt of 5 GeV
-            if (addTruth_ and Jet_genJetIdx[jet]>-1 and Jet_genJetIdx[jet]<maxJets)
+            if (addTruth_ and jetorigin_isPU[jet]==0 and Jet_genJetIdx[jet]>-1 and Jet_genJetIdx[jet]<maxJets)
             {
                 if ((GenJet_pt[Jet_genJetIdx[jet]]<5.) or ((Jet_pt[jet]/GenJet_pt[Jet_genJetIdx[jet]]) < 0.5))
                 {

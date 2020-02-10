@@ -6,7 +6,7 @@ import keras
 import numpy
 from keras import backend as K
 from feature_dict import featureDict
-import nominal_model
+import xtools
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--parametric', action='store_true',
@@ -32,42 +32,33 @@ tf_npf = tf.placeholder('float32',shape=(None,featureDict["npf"]["max"],len(feat
 npf = keras.layers.Input(tensor=tf_npf)
 tf_sv = tf.placeholder('float32',shape=(None,featureDict["sv"]["max"],len(featureDict["sv"]["branches"])),name="sv")
 sv = keras.layers.Input(tensor=tf_sv)
+tf_muon = tf.placeholder('float32',shape=(None,featureDict["muon"]["max"],len(featureDict["muon"]["branches"])),name="muon")
+muon = keras.layers.Input(tensor=tf_muon)
 tf_globalvars = tf.placeholder('float32',shape=(None,len(featureDict["globalvars"]["branches"])),name="globalvars")
 globalvars = keras.layers.Input(tensor=tf_globalvars)
-if arguments.parametric:
-    tf_gen = tf.placeholder('float32',shape=(None,1),name="gen")
-    gen = keras.layers.Input(tensor=tf_gen)
-else:
-    gen = None
+
+tf_gen = tf.placeholder('float32',shape=(None,1),name="gen")
+gen = keras.layers.Input(tensor=tf_gen)
+
 
 print "cpf shape: ",cpf.shape.as_list()
 print "npf shape: ",npf.shape.as_list()
 print "sv shape: ",sv.shape.as_list()
+print "muon shape: ",muon.shape.as_list()
 print "globalvars shape: ",globalvars.shape.as_list()
-if arguments.parametric:
-    print "gen shape: ",gen.shape.as_list()
+print "gen shape: ",gen.shape.as_list()
 
-modelDA = nominal_model.ModelDA(
-    featureDict,
-    isParametric=arguments.parametric,
-    useLSTM=False
+network = xtools.NominalNetwork(
+    featureDict
 )
-
 
 print "learning phase: ",sess.run(keras.backend.learning_phase())
 
-if arguments.parametric:
-    class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv,gen=gen)
-else:
-    class_prediction = modelDA.predictClass(globalvars,cpf,npf,sv)
+class_prediction = network.predictClass(globalvars,cpf,npf,sv,muon,gen)
     
 prediction = tf.identity(class_prediction,name="prediction")
 
-if arguments.parametric:
-    model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv], outputs=class_prediction)
-else:
-    model = keras.Model(inputs=[globalvars, cpf, npf, sv], outputs=class_prediction)
-
+model = keras.Model(inputs=[gen, globalvars, cpf, npf, sv, muon], outputs=class_prediction)
 
 train_writer = tf.summary.FileWriter("graph",sess.graph)
 init_op = tf.group(tf.global_variables_initializer(), tf.local_variables_initializer())
@@ -86,27 +77,27 @@ model.load_weights(arguments.weightfile[0])
 
 #test if graph can be executed
 feed_dict={
+    tf_gen:numpy.zeros(shape(tf_gen)),
     tf_globalvars:numpy.zeros(shape(tf_globalvars)),
     tf_cpf:numpy.zeros(shape(tf_cpf)),
     tf_npf:numpy.zeros(shape(tf_npf)),
     tf_sv:numpy.zeros(shape(tf_sv)),
+    tf_muon:numpy.zeros(shape(tf_muon)),
 }
-if arguments.parametric:
-    feed_dict[tf_gen] = numpy.zeros(shape(tf_gen))
 
 prediction_val = sess.run(
     prediction,
     feed_dict=feed_dict
 )
 
-
+print [n.name for n in sess.graph.as_graph_def().node]
 
 const_graph = tf.graph_util.convert_variables_to_constants(
     sess,
     sess.graph.as_graph_def(),
     ["prediction"]
 )
-#print [n.name for n in const_graph.node]
+
 tf.train.write_graph(const_graph,"",arguments.weightfile[0].replace("hdf5","pb"),as_text=False)
 
 print "Sucessfully saved graph and weights into '%s'"%arguments.weightfile[0].replace("hdf5","pb")

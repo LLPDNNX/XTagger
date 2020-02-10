@@ -1,4 +1,5 @@
 import sys
+import signal
 import datetime
 import numpy as np
 import copy
@@ -20,13 +21,14 @@ xtools.setupLogging(level=logging.INFO)
 # tensorflow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--train', dest="trainFiles", default=[], action='append', help='input file list')
 parser.add_argument('--test', dest="testFiles", default=[], action='append', help='input file list')
 parser.add_argument('--trainDA', dest="trainFilesDA", default=[], action='append', help='input file list')
 parser.add_argument('--testDA', dest="testFilesDA", default=[], action='append', help='input file list')
 parser.add_argument('-o', '--output', action='store', help='job name', dest='outputFolder', default='')
-parser.add_argument('-n', action='store', type=int,
+parser.add_argument('-n', action='store', type=int, dest='maxFiles',
                     help='number of files to be processed')
 parser.add_argument('--gpu', action='store_true', dest='forceGPU',
                     help='try to use gpu', default=False)
@@ -79,10 +81,10 @@ if arguments.forceGPU and devices.nGPU==0:
     logging.critical("Enforcing GPU usage but no GPU found!")
     sys.exit(1)
 
-trainInputs = xtools.InputFiles()
+trainInputs = xtools.InputFiles(maxFiles=arguments.maxFiles)
 for f in arguments.trainFiles: 
     trainInputs.addFileList(f) 
-testInputs = xtools.InputFiles()
+testInputs = xtools.InputFiles(maxFiles=arguments.maxFiles)
 for f in arguments.testFiles: 
     testInputs.addFileList(f) 
     
@@ -91,7 +93,7 @@ logging.info("Training files %i"%trainInputs.nFiles())
 logging.info("Testing files %i"%testInputs.nFiles())
 
 resampleWeights = xtools.ResampleWeights(
-    trainInputs.getFileList(),
+    trainInputs.getFileList()[0:10],
     featureDict['truth']['names'],
     featureDict['truth']['weights'],
     targetWeight='jetorigin_isLLP_QMU||jetorigin_isLLP_QQMU||jetorigin_isLLP_QQ||jetorigin_isLLP_Q',
@@ -120,6 +122,16 @@ pipelineTest = xtools.Pipeline(
     os.path.join(outputFolder,"weights.root"),
     arguments.batch_size
 ) 
+
+coord = None
+def resetSession():
+    if coord:
+        logging.info("Stopping threads and resetting session")
+        coord.request_stop()
+        coord.join(threads)
+        K.clear_session()
+
+signal.signal(signal.SIGINT, lambda signum, frame: [resetSession(),sys.exit(1)])
 
 for epoch in range(100):
     start_time = time.time()
@@ -241,8 +253,6 @@ for epoch in range(100):
     ))
     f.close()
     
-    coord.request_stop()
-    coord.join(threads)
-    K.clear_session()
+    resetSession()
     
 

@@ -2,7 +2,8 @@ import logging
 import os
 
 class InputFiles():
-    def __init__(self):
+    def __init__(self, maxFiles=-1):
+        self.maxFiles = maxFiles
         self.fileList = []
         
     
@@ -22,7 +23,12 @@ class InputFiles():
             logging.warning("file '"+path+"' does not exists -> skip!")
         
     def nFiles(self):
-        return len(self.fileList)
+        if self.maxFiles>0:
+            return min(self.maxFiles,len(self.fileList))
+        else:
+            return len(self.fileList)
         
     def getFileList(self):
-        return self.fileList
+        return self.fileList[0:self.nFiles()]
+            
+            

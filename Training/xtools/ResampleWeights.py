@@ -20,12 +20,12 @@ class Weights():
         self.etaBinning = etaBinning
         
     def plot(self,path):
-        cv = ROOT.TCanvas("cv"+str(random.random()),"",800,700)
+        cv = ROOT.TCanvas("cv"+str(random.random()),"",800,900)
         cv.Divide(1,2)
-        cv.GetPad(1).SetMargin(0.13,0.03,0.17,0.1)
-        cv.GetPad(2).SetMargin(0.13,0.03,0.17,0.1)
+        cv.GetPad(1).SetMargin(0.13,0.25,0.17,0.05)
+        cv.GetPad(2).SetMargin(0.13,0.25,0.17,0.05)
         
-        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
+        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kMagenta, ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
         
         ptNumeratorHists = {k: v['numerator'].ProjectionX() for k,v in self.weightHistsPerLabel.items()}
         ptDenominatorHists = {k: v['denominator'].ProjectionX() for k,v in self.weightHistsPerLabel.items()}
@@ -114,15 +114,16 @@ class ResampledDistribution():
             self.paramHists[labelIndices[i]].Fill(paramValues[i])
             
     def plot(self,path):
-        cv = ROOT.TCanvas("cv"+str(random.random()),"",800,900)
-        cv.Divide(1,3)
-        cv.GetPad(1).SetMargin(0.13,0.03,0.17,0.1)
-        cv.GetPad(2).SetMargin(0.13,0.03,0.17,0.1)
-        cv.GetPad(3).SetMargin(0.13,0.03,0.17,0.1)
+        cv = xtools.style.makeCanvas("cv"+str(random.random()))
+        #cv.Divide(1,3)
+        #cv.GetPad(1).SetMargin(0.13,0.25,0.17,0.05)
+        #cv.GetPad(2).SetMargin(0.13,0.25,0.17,0.05)
+        #cv.GetPad(3).SetMargin(0.13,0.25,0.17,0.05)
+        cv.SetMargin(0.13,0.25,0.17,0.05)
         
-        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
+        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kMagenta, ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
         
-        cv.cd(1)
+        #cv.cd(1)
         axisPt = ROOT.TH2F(
             "axispt"+str(random.random()),";Jet p#lower[0.2]{#scale[0.8]{T}} (GeV); #Jets",
             len(self.ptBinning)-1,self.ptBinning,
@@ -132,9 +133,10 @@ class ResampledDistribution():
 
         for i,k in enumerate(self.labelNameList):
             self.ptHists[i].SetLineColor(color[i])
-            self.ptHists[i].SetLineWidth(2)
+            self.ptHists[i].SetLineWidth(2+i%2)
+            self.ptHists[i].SetLineStyle(1+i%2)
             self.ptHists[i].Draw("SameHIST")
-        
+        '''
         cv.cd(2)
         axisEta = ROOT.TH2F(
             "axiseta"+str(random.random()),";Jet #eta; #Jets",
@@ -144,7 +146,8 @@ class ResampledDistribution():
         axisEta.Draw("AXIS")
         for i,k in enumerate(self.labelNameList):
             self.etaHists[i].SetLineColor(color[i])
-            self.etaHists[i].SetLineWidth(2)
+            self.etaHists[i].SetLineWidth(2+i%2)
+            self.etaHists[i].SetLineStyle(1+i%2)
             self.etaHists[i].Draw("SameHIST")
         
         cv.cd(3)
@@ -156,9 +159,10 @@ class ResampledDistribution():
         axisParam.Draw("AXIS")
         for i,k in enumerate(self.labelNameList):
             self.paramHists[i].SetLineColor(color[i])
-            self.paramHists[i].SetLineWidth(2)
+            self.paramHists[i].SetLineWidth(2+i%2)
+            self.paramHists[i].SetLineStyle(1+i%2)
             self.paramHists[i].Draw("SameHIST")
-        
+        '''
         cv.Print(path)
 
 class ResampleWeights():
@@ -306,17 +310,29 @@ class ResampleWeights():
         
     def plot(self,path):
         cv = xtools.style.makeCanvas(name="cv"+str(random.random()))
+        cv.SetMargin(0.13,0.25,0.17,0.05)
         ptHists = {k: v.ProjectionX() for k,v in self.histPerLabel.items()}
-        axisPt = ROOT.TH2F("axisPt"+str(random.random()),";pT bin;Weight",
+        axisPt = ROOT.TH2F("axisPt"+str(random.random()),";Jet p#lower[0.2]{#scale[0.8]{T}} (GeV);#Jets",
             len(self.ptBinning)-1,self.ptBinning,
             50,np.linspace(0,1.1*max(map(lambda x: x.GetMaximum(),ptHists.values())),51)
         )
         axisPt.Draw("AXIS")
-        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
+        
+        legend = ROOT.TLegend(1-cv.GetRightMargin(),1-cv.GetTopMargin(),0.99,1-cv.GetTopMargin()-0.06*len(ptHists))
+        legend.SetTextFont(43)
+        legend.SetBorderSize(0)
+        legend.SetFillStyle(0)
+        legend.SetTextSize(30)
+        
+        color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kMagenta, ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
         for i,k in enumerate(self.labelNameList):
             ptHists[k].SetLineColor(color[i])
-            ptHists[k].SetLineWidth(2)
+            ptHists[k].SetLineWidth(2+i%2)
+            ptHists[k].SetLineStyle(1+i%2)
             ptHists[k].Draw("SameHIST")
+            legend.AddEntry(ptHists[k],k,"L")
+        legend.Draw("Same")
+            
         cv.Print(path)
             
         

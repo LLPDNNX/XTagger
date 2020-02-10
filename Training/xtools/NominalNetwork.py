@@ -165,7 +165,7 @@ class NominalNetwork():
                 bias_initializer='zeros',
                 kernel_regularizer=keras.regularizers.l1(1e-6)
             ),
-            keras.layers.Softmax(name="prediction")
+            keras.layers.Softmax()
         ])
 
     def preprocessingFct(self,featureNames,preprocDict):

@@ -4,11 +4,12 @@ from keras import backend as K
 import os
 import sys
 import logging
+import keras
+from NominalNetwork import NominalNetwork
     
-class NominalNetwork():
+class BigConvNetwork(NominalNetwork):
     def __init__(self,featureDict):
-        self.featureDict = featureDict
-        self.nclasses = len(self.featureDict["truth"]["branches"])
+        NominalNetwork.__init__(self,featureDict)
         
         #### inputs #####
         
@@ -215,65 +216,31 @@ class NominalNetwork():
             keras.layers.Softmax(name="class_softmax")
         ])
 
-    def preprocessingFct(self,featureNames,preprocDict):
-        def applyPreproc(inputFeatures):
-            unstackFeatures = tf.unstack(inputFeatures,axis=-1)
-            if len(unstackFeatures)!=len(featureNames):
-                logging.critical("Number of features ("+str(len(unstackFeatures))+") does not match given list of names ("+str(len(featureNames))+"): "+str(featureNames))
-                sys.exit(1)
-            unusedPreproc = preprocDict.keys()
-            if len(unusedPreproc)==0:
-                return inputFeatures
-            for i,featureName in enumerate(featureNames):
-                if featureName in unusedPreproc:
-                    unusedPreproc.remove(featureName)
-                if featureName in preprocDict.keys():
-                    unstackFeatures[i] = preprocDict[featureName](unstackFeatures[i])
-                   
-            if len(unusedPreproc)>0:
-                logging.warning("Following preprocessing not applied: "+str(unusedPreproc))
-            return tf.stack(unstackFeatures,axis=-1)
-        return applyPreproc
         
         
-    def applyLayers(self,inputTensor,layerList):
-        output = layerList[0](inputTensor)
-        for layer in layerList[1:]:
-            output = layer(output)
-        return output
-        
-    def makePreprocessingModel(self):
-
-        model = keras.models.Model(
-            inputs=[
-                self.input_gen,
-                self.input_globalvars,
-                self.input_cpf,
-                self.input_npf,
-                self.input_sv,
-                self.input_muon,
-                self.input_electron
-            ],
-            outputs=[
-                gen,
-                self.global_preproc(self.input_globalvars),
-                self.cpf_preprocself.input_(cpf),
-                self.npf_preproc(self.input_npf),
-                self.sv_preproc(self.input_sv),
-                self.muon_preproc(self.input_muon),
-                self.electron_preproc(self.input_electron)
-            ])
-        return model
+    def addToConvFeatures(self,conv,features):
+        def tileFeatures(x):
+            x = tf.reshape(tf.tile(features,[1,conv.shape[1]]),[-1,conv.shape[1],x.shape[1]])
+            return x
+            
+        tiled = keras.layers.Lambda(tileFeatures)(features)
+        return keras.layers.Concatenate(axis=2)([conv,tiled])
+            
+        #print conv,tileFeatures(features)
+        #return conv
+   
         
  
     def extractFeatures(self,globalvars,cpf,npf,sv,muon,electron,gen=None):
         globalvars_preproc = self.global_preproc(globalvars)
         
-        cpf_conv = self.applyLayers(self.cpf_preproc(cpf),self.cpf_conv)
-        npf_conv = self.applyLayers(self.npf_preproc(npf),self.npf_conv)
-        sv_conv = self.applyLayers(self.sv_preproc(sv),self.sv_conv)
-        muon_conv = self.applyLayers(self.muon_preproc(muon),self.muon_conv)
-        electron_conv = self.applyLayers(self.electron_preproc(electron),self.electron_conv)
+        addConvFeatures = keras.layers.Concatenate()([globalvars_preproc,gen])
+        
+        cpf_conv = self.applyLayers(self.addToConvFeatures(self.cpf_preproc(cpf),addConvFeatures),self.cpf_conv)
+        npf_conv = self.applyLayers(self.addToConvFeatures(self.npf_preproc(npf),addConvFeatures),self.npf_conv)
+        sv_conv = self.applyLayers(self.addToConvFeatures(self.sv_preproc(sv),addConvFeatures),self.sv_conv)
+        muon_conv = self.applyLayers(self.addToConvFeatures(self.muon_preproc(muon),addConvFeatures),self.muon_conv)
+        electron_conv = self.applyLayers(self.addToConvFeatures(self.electron_preproc(electron),addConvFeatures),self.electron_conv)
         
         full_features = self.applyLayers([globalvars_preproc,cpf_conv,npf_conv,sv_conv,muon_conv,electron_conv,gen], self.full_features)
         #full_features = self.applyLayers([globalvars_preproc,cpf_conv,npf_conv,sv_conv,muon_conv,gen], self.full_features)
@@ -281,35 +248,5 @@ class NominalNetwork():
         
         return full_features
     
-    def predictClass(self,globalvars,cpf,npf,sv,muon,electron,gen):
-        full_features = self.extractFeatures(globalvars,cpf,npf,sv,muon,electron,gen)
-        class_prediction = self.applyLayers(full_features,self.class_prediction)
-        return class_prediction
-        
-    def makeClassModel(self):         
-        predictedClass = self.predictClass(
-            self.input_globalvars,
-            self.input_cpf,
-            self.input_npf,
-            self.input_sv,
-            self.input_muon,
-            self.input_electron,
-            self.input_gen
-        )
-        model = keras.models.Model(
-            inputs=[
-                self.input_gen,
-                self.input_globalvars,
-                self.input_cpf,
-                self.input_npf,
-                self.input_sv,
-                self.input_muon,
-                self.input_electron
-            ],
-            outputs=[
-                predictedClass
-            ]
-        )
-        return model
         
     

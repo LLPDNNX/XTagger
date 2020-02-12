@@ -25,7 +25,7 @@ class Pipeline():
         self.bagging = bagging
     
 
-    def init(self,isLLPFct = lambda batch: (batch["truth"][:, 5]+batch["truth"][:, 6]) > 0.5):
+    def init(self,isLLPFct):
         with tf.device('/cpu:0'):
             if self.bagging>0. and self.bagging<1.:
                 inputFileList = random.sample(self.files,int(max(1,round(len(self.files)*self.bagging))))

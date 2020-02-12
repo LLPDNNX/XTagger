@@ -115,15 +115,15 @@ class ResampledDistribution():
             
     def plot(self,path):
         cv = xtools.style.makeCanvas("cv"+str(random.random()))
-        #cv.Divide(1,3)
-        #cv.GetPad(1).SetMargin(0.13,0.25,0.17,0.05)
-        #cv.GetPad(2).SetMargin(0.13,0.25,0.17,0.05)
-        #cv.GetPad(3).SetMargin(0.13,0.25,0.17,0.05)
-        cv.SetMargin(0.13,0.25,0.17,0.05)
+        cv.Divide(1,3)
+        cv.GetPad(1).SetMargin(0.13,0.25,0.17,0.05)
+        cv.GetPad(2).SetMargin(0.13,0.25,0.17,0.05)
+        cv.GetPad(3).SetMargin(0.13,0.25,0.17,0.05)
+        #cv.SetMargin(0.13,0.25,0.17,0.05)
         
         color=[ROOT.kAzure-4,ROOT.kOrange+7,ROOT.kGreen+1,ROOT.kBlue+1,ROOT.kMagenta, ROOT.kGray,ROOT.kGray+1,ROOT.kGray+2,ROOT.kBlack]
         
-        #cv.cd(1)
+        cv.cd(1)
         axisPt = ROOT.TH2F(
             "axispt"+str(random.random()),";Jet p#lower[0.2]{#scale[0.8]{T}} (GeV); #Jets",
             len(self.ptBinning)-1,self.ptBinning,
@@ -136,7 +136,7 @@ class ResampledDistribution():
             self.ptHists[i].SetLineWidth(2+i%2)
             self.ptHists[i].SetLineStyle(1+i%2)
             self.ptHists[i].Draw("SameHIST")
-        '''
+        
         cv.cd(2)
         axisEta = ROOT.TH2F(
             "axiseta"+str(random.random()),";Jet #eta; #Jets",
@@ -162,7 +162,7 @@ class ResampledDistribution():
             self.paramHists[i].SetLineWidth(2+i%2)
             self.paramHists[i].SetLineStyle(1+i%2)
             self.paramHists[i].Draw("SameHIST")
-        '''
+        
         cv.Print(path)
 
 class ResampleWeights():

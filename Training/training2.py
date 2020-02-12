@@ -36,7 +36,7 @@ parser.add_argument('-b', '--batch', action='store', type=int,
                     help='batch_size', dest='batch_size', default=10000)
 parser.add_argument('-c', action='store_true',
                     help='achieve class balance', default=False)
-parser.add_argument('-e', '--epoch', action='store', type=int,
+parser.add_argument('-e', '--epoch', action='store', type=int, dest='nepochs',
                     help='number of epochs', default=60)
 parser.add_argument('-f', '--force', action='store_true',
                     dest='overwriteFlag',
@@ -93,7 +93,7 @@ logging.info("Training files %i"%trainInputs.nFiles())
 logging.info("Testing files %i"%testInputs.nFiles())
 
 resampleWeights = xtools.ResampleWeights(
-    trainInputs.getFileList()[0:10],
+    trainInputs.getFileList(),
     featureDict['truth']['names'],
     featureDict['truth']['weights'],
     targetWeight='jetorigin_isLLP_QMU||jetorigin_isLLP_QQMU||jetorigin_isLLP_QQ||jetorigin_isLLP_Q',
@@ -102,7 +102,7 @@ resampleWeights = xtools.ResampleWeights(
 )
 
 resampleWeights.plot(os.path.join(outputFolder,"hists.pdf"))
-weights = resampleWeights.reweight(classBalance=True)
+weights = resampleWeights.reweight(classBalance=True,oversampling=3)
 weights.plot(os.path.join(outputFolder,"weights.pdf"))
 weights.save(os.path.join(outputFolder,"weights.root"))
 
@@ -121,7 +121,7 @@ pipelineTest = xtools.Pipeline(
     resampleWeights.getLabelNameList(),
     os.path.join(outputFolder,"weights.root"),
     arguments.batch_size
-) 
+)
 
 coord = None
 def resetSession():
@@ -133,27 +133,29 @@ def resetSession():
 
 signal.signal(signal.SIGINT, lambda signum, frame: [resetSession(),sys.exit(1)])
 
-for epoch in range(100):
-    start_time = time.time()
+for epoch in range(arguments.nepochs):
+    start_time_epoch = time.time()
     
-    network = xtools.NominalNetwork(featureDict)
+    network = xtools.AttentionNetwork(featureDict)
     modelClass = network.makeClassModel()
     learningRate = 0.01/(1+arguments.kappa*epoch)
     optClass = keras.optimizers.Adam(lr=learningRate, beta_1=0.9, beta_2=0.999)
     modelClass.compile(
         optClass,
         loss=keras.losses.categorical_crossentropy,
-        metrics=['accuracy'],
+        metrics=[keras.metrics.categorical_accuracy],
         loss_weights=[1.]
     )
     if epoch==0:
         modelClass.summary()
 
-    train_batch = pipelineTrain.init()
-    test_batch = pipelineTest.init()
+    train_batch = pipelineTrain.init(isLLPFct = lambda batch: (batch["truth"][:, 5]) > 0.5)
+    test_batch = pipelineTest.init(isLLPFct = lambda batch: (batch["truth"][:, 5]) > 0.5)
     
     if epoch==0:
         distributions = resampleWeights.makeDistribution(np.linspace(-4,6,21))
+        #featurePlotter = xtools.FeaturePlotter(featureDict)
+        #preprocessingModel = network.makePreprocessingModel()
 
     init_op = tf.group(
         tf.global_variables_initializer(),
@@ -175,14 +177,36 @@ for epoch in range(100):
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
-    train_loss = 0
-    
+    train_loss = 0    
+    time_train = time.time()
     try:
         step = 0
         while not coord.should_stop():
             step += 1
             train_batch_value = sess.run(train_batch)
             if epoch==0:
+                #featurePlotter.fill(train_batch_value)
+                '''
+                train_batch_value_preproc = preprocessingModel.predict_on_batch([
+                    train_batch_value['gen'],
+                    train_batch_value['globalvars'],
+                    train_batch_value['cpf'],
+                    train_batch_value['npf'],#
+                    train_batch_value['sv'],
+                    train_batch_value['muon'],
+                    train_batch_value['electron'],
+                ])
+                featurePlotter.fill({
+                    "truth":train_batch_value['truth'],
+                    "gen":train_batch_value_preproc[0],
+                    "globalvars":train_batch_value_preproc[1],
+                    "cpf":train_batch_value_preproc[2],
+                    "npf":train_batch_value_preproc[3],
+                    "sv":train_batch_value_preproc[4],
+                    "muon":train_batch_value_preproc[5],
+                    "electron":train_batch_value_preproc[6]
+                })
+                '''
                 distributions.fill(
                     train_batch_value['truth'],
                     train_batch_value['globalvars'][:,0],
@@ -197,25 +221,29 @@ for epoch in range(100):
                 train_batch_value['npf'],
                 train_batch_value['sv'],
                 train_batch_value['muon'],
+                train_batch_value['electron'],
             ]
             train_outputs = modelClass.train_on_batch(train_inputs_class,train_batch_value['truth'])
             train_loss+=train_outputs[0]
             if step%10==0:
-                logging.info("Training step %i/%i: loss=%.3e, accuracy=%.2f%%"%(step,epoch,train_outputs[0],100.*train_outputs[1]))
+                logging.info("Training step %i-%i: loss=%.4f, accuracy=%.2f%%"%(epoch,step,train_outputs[0],100.*train_outputs[1]))
             
             
     except tf.errors.OutOfRangeError:
         pass
         
     train_loss = train_loss/step
-    logging.info('Done training for %i steps of epoch %i and learning rate %.3e: loss=%.3e'%(step,epoch,learningRate,train_loss))
+    time_train = (time.time()-time_train)/step
+    logging.info('Done training for %i steps of epoch %i and learning rate %.4f: loss=%.3e, %.1fms/step'%(step,epoch,learningRate,train_loss,time_train*1000.))
          
     if epoch==0:   
+        #featurePlotter.plot(outputFolder)
         distributions.plot(os.path.join(outputFolder,"resampled.pdf"))
     modelClass.save_weights(os.path.join(outputFolder,'weight_%i.hdf5'%epoch))
     
     
     test_loss = 0
+    time_test = time.time()
     try:
         step = 0
         while not coord.should_stop():
@@ -229,20 +257,22 @@ for epoch in range(100):
                 test_batch_value['npf'],
                 test_batch_value['sv'],
                 test_batch_value['muon'],
+                test_batch_value['electron'],
             ]
             test_outputs = modelClass.test_on_batch(test_inputs_class,test_batch_value['truth'])
             test_loss+=test_outputs[0]
             if step%10==0:
-                logging.info("Testing step %i/%i: loss=%.3e, accuracy=%.2f%%"%(step,epoch,test_outputs[0],100.*test_outputs[1]))
+                logging.info("Testing step %i-%i: loss=%.4f, accuracy=%.2f%%"%(epoch,step,test_outputs[0],100.*test_outputs[1]))
             
             
     except tf.errors.OutOfRangeError:
         pass
         
     test_loss = test_loss/step
-    logging.info('Done testing for %i steps of epoch %i: loss=%.3e'%(step,epoch,test_loss))
+    time_test = (time.time()-time_test)/step
+    logging.info('Done testing for %i steps of epoch %i: loss=%.4f, %.1fms/step'%(step,epoch,test_loss,time_test*1000.))
     
-    logging.info("Epoch duration: %.1fmin"%((time.time() - start_time)/60.))
+    logging.info("Epoch duration: %.1fmin"%((time.time() - start_time_epoch)/60.))
     
     f = open(os.path.join(outputFolder, "model_epoch.stat"), "a")
     f.write("%i;%.3e;%.3e;%.3e\n"%(

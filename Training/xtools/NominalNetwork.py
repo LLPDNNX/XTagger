@@ -312,4 +312,4 @@ class NominalNetwork():
         )
         return model
         
-    
+network = NominalNetwork

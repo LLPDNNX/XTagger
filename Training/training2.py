@@ -14,6 +14,10 @@ import xtools
 import os
 import argparse
 import time
+import shutil
+import imp
+import random
+import inspect
 
 from feature_dict import featureDict
 
@@ -23,17 +27,18 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--train', dest="trainFiles", default=[], action='append', help='input file list')
-parser.add_argument('--test', dest="testFiles", default=[], action='append', help='input file list')
-parser.add_argument('--trainDA', dest="trainFilesDA", default=[], action='append', help='input file list')
-parser.add_argument('--testDA', dest="testFilesDA", default=[], action='append', help='input file list')
+parser.add_argument('--train', dest="trainFiles", default=[], action='append', help='input file list for training jet class')
+parser.add_argument('--test', dest="testFiles", default=[], action='append', help='input file list for testing jet class')
+parser.add_argument('--trainDA', dest="trainFilesDA", default=[], action='append', help='input file list for training jet domain')
+parser.add_argument('--testDA', dest="testFilesDA", default=[], action='append', help='input file list for testing jet domain')
+parser.add_argument('--perf', dest="perfList", default=[], action='append', help='input file list for testing jet domain')
 parser.add_argument('-o', '--output', action='store', help='job name', dest='outputFolder', default='')
 parser.add_argument('-n', action='store', type=int, dest='maxFiles',
                     help='number of files to be processed')
 parser.add_argument('--gpu', action='store_true', dest='forceGPU',
                     help='try to use gpu', default=False)
 parser.add_argument('-b', '--batch', action='store', type=int,
-                    help='batch_size', dest='batch_size', default=10000)
+                    help='batchSize', dest='batchSize', default=10000)
 parser.add_argument('-c', action='store_true',
                     help='achieve class balance', default=False)
 parser.add_argument('-e', '--epoch', action='store', type=int, dest='nepochs',
@@ -44,50 +49,66 @@ parser.add_argument('-f', '--force', action='store_true',
 parser.add_argument('-p', '--parametric', action='store_true',
                     dest='parametric',
                     help='train a parametric model', default=False)
-parser.add_argument('--opt', action='store_true',default=False,
-                    dest='opt',
-                    help='optimize training through back stepping on class loss')
-parser.add_argument('--optDomain', action='store_true',default=False,
-                    dest='optDomain',
-                    help='optimize training through forward stepping on domain loss')
 parser.add_argument('--noda', action='store_true',
                     dest='noda',
                     help='deactivate DA', default=False)
-parser.add_argument('--wasserstein', action='store_true',
-                    dest='wasserstein',
-                    help='uses wasserstein distance instead', default=False)
+parser.add_argument('--seed', dest='seed', default=int(time.time()), type=int,
+                    help='Random seed')
 parser.add_argument('-m', '--model', action='store', help='model file',
                     default='nominal_model')
-parser.add_argument('--bagging', action='store', type=float, help='bagging fraction (default: 1. = no bagging)',
-                    default=1., dest='bagging')
-parser.add_argument('-r', '--resume', type=int,help='resume training at given epoch',
-                    default=-1,dest='resume')
+parser.add_argument('-r', '--resume', type=int, help='resume training at given epoch',
+                    default=0, dest='resume')
 parser.add_argument('--lambda', type=float,help='domain loss weight',
-                    default=0.3,dest='lambda_val')
+                    default=0.3,dest='lambda')
 parser.add_argument('--kappa', type=float,help='learning rate decay val',
                     default=0.1,dest='kappa')
 
-arguments = parser.parse_args()
+args = parser.parse_args()
 
-outputFolder = arguments.outputFolder
-if (os.path.exists(outputFolder) and arguments.overwriteFlag):
+
+outputFolder = args.outputFolder
+if (os.path.exists(outputFolder) and args.overwriteFlag):
     logging.warning( "Overwriting output folder!")
 else:
     logging.info( "Creating output folder '%s'!" % outputFolder)
     os.makedirs(outputFolder)
+    
+from xtools import BigAttentionNetwork as Network
+shutil.copyfile(inspect.getsourcefile(Network),os.path.join(args.outputFolder,"Network.py"))  
+
+
+logging.info("Python: %s (%s)"%(sys.version_info,sys.executable))
+logging.info("Keras: %s (%s)"%(keras.__version__,os.path.dirname(keras.__file__)))
+logging.info("TensorFlow: %s (%s)"%(tf.__version__,os.path.dirname(tf.__file__)))
+logging.info("Network: "+str(inspect.getsourcefile(Network)))
 
 devices = xtools.Devices()
-if arguments.forceGPU and devices.nGPU==0:
+if args.forceGPU and devices.nGPU==0:
     logging.critical("Enforcing GPU usage but no GPU found!")
     sys.exit(1)
-
-trainInputs = xtools.InputFiles(maxFiles=arguments.maxFiles)
-for f in arguments.trainFiles: 
-    trainInputs.addFileList(f) 
-testInputs = xtools.InputFiles(maxFiles=arguments.maxFiles)
-for f in arguments.testFiles: 
-    testInputs.addFileList(f) 
     
+logging.info("Output folder: %s"%args.outputFolder)
+logging.info("Epochs: %i"%args.nepochs)
+logging.info("Batch size: %i"%args.batchSize)
+logging.info("Random seed: %i"%args.seed)
+
+random.seed(args.seed)
+np.random.seed(args.seed)
+tf.set_random_seed(args.seed)
+
+trainInputs = xtools.InputFiles(maxFiles=args.maxFiles)
+for f in args.trainFiles: 
+    trainInputs.addFileList(f) 
+testInputs = xtools.InputFiles(maxFiles=args.maxFiles)
+for f in args.testFiles: 
+    testInputs.addFileList(f) 
+
+#TODO make dict and read title/name from file saved as comments
+perfInputList = []
+for perfFile in args.perfList:
+    perfInputs = xtools.InputFiles(maxFiles=args.maxFiles)
+    perfInputs.addFileList(perfFile)
+    perfInputList.append(perfInputs)
     
 logging.info("Training files %i"%trainInputs.nFiles())
 logging.info("Testing files %i"%testInputs.nFiles())
@@ -112,16 +133,29 @@ pipelineTrain = xtools.Pipeline(
     featureDict, 
     resampleWeights.getLabelNameList(),
     os.path.join(outputFolder,"weights.root"),
-    arguments.batch_size
-) 
+    args.batchSize
+)
 
 pipelineTest = xtools.Pipeline(
     testInputs.getFileList(), 
     featureDict, 
     resampleWeights.getLabelNameList(),
     os.path.join(outputFolder,"weights.root"),
-    arguments.batch_size
+    args.batchSize
 )
+
+perfPipelines = []
+for perfInputs in perfInputList:
+    perfPipelines.append(xtools.Pipeline(
+        perfInputList[0].getFileList(), 
+        featureDict, 
+        resampleWeights.getLabelNameList(),
+        os.path.join(outputFolder,"weights.root"),
+        args.batchSize,
+        resample=False,
+        maxThreads=1
+    ))
+
 
 coord = None
 def resetSession():
@@ -133,12 +167,16 @@ def resetSession():
 
 signal.signal(signal.SIGINT, lambda signum, frame: [resetSession(),sys.exit(1)])
 
-for epoch in range(arguments.nepochs):
+
+
+for epoch in range(args.resume, args.nepochs):
     start_time_epoch = time.time()
     
-    network = xtools.AttentionNetwork(featureDict)
+    Network = imp.load_source('Network', os.path.join(args.outputFolder,"Network.py")).network
+
+    network = Network(featureDict)
     modelClass = network.makeClassModel()
-    learningRate = 0.01/(1+arguments.kappa*epoch)
+    learningRate = 0.01/(1+args.kappa*epoch)
     optClass = keras.optimizers.Adam(lr=learningRate, beta_1=0.9, beta_2=0.999)
     modelClass.compile(
         optClass,
@@ -151,11 +189,12 @@ for epoch in range(arguments.nepochs):
 
     train_batch = pipelineTrain.init(isLLPFct = lambda batch: (batch["truth"][:, 5]) > 0.5)
     test_batch = pipelineTest.init(isLLPFct = lambda batch: (batch["truth"][:, 5]) > 0.5)
+    perf_batches = []
+    for perfPipeline in perfPipelines:
+        perf_batches.append(perfPipeline.init(isLLPFct = lambda batch: (batch["truth"][:, 5]) > 0.5))
     
     if epoch==0:
         distributions = resampleWeights.makeDistribution(np.linspace(-4,6,21))
-        #featurePlotter = xtools.FeaturePlotter(featureDict)
-        #preprocessingModel = network.makePreprocessingModel()
 
     init_op = tf.group(
         tf.global_variables_initializer(),
@@ -186,27 +225,7 @@ for epoch in range(arguments.nepochs):
             train_batch_value = sess.run(train_batch)
             if epoch==0:
                 #featurePlotter.fill(train_batch_value)
-                '''
-                train_batch_value_preproc = preprocessingModel.predict_on_batch([
-                    train_batch_value['gen'],
-                    train_batch_value['globalvars'],
-                    train_batch_value['cpf'],
-                    train_batch_value['npf'],#
-                    train_batch_value['sv'],
-                    train_batch_value['muon'],
-                    train_batch_value['electron'],
-                ])
-                featurePlotter.fill({
-                    "truth":train_batch_value['truth'],
-                    "gen":train_batch_value_preproc[0],
-                    "globalvars":train_batch_value_preproc[1],
-                    "cpf":train_batch_value_preproc[2],
-                    "npf":train_batch_value_preproc[3],
-                    "sv":train_batch_value_preproc[4],
-                    "muon":train_batch_value_preproc[5],
-                    "electron":train_batch_value_preproc[6]
-                })
-                '''
+
                 distributions.fill(
                     train_batch_value['truth'],
                     train_batch_value['globalvars'][:,0],
@@ -283,6 +302,40 @@ for epoch in range(arguments.nepochs):
     ))
     f.close()
     
+    if epoch%5==0:
+        for iperf,perf_batch in enumerate(perf_batches):
+            perfMonitor = xtools.PerformanceMonitor(featureDict)
+            try:
+                step = 0
+                while not coord.should_stop():
+                    step += 1
+                    perf_batch_value = sess.run(perf_batch)
+                    #TODO: read this value from the file
+                    gen_dxy = np.ones(perf_batch_value['gen'].shape)*(-0.4)
+                    perf_inputs_class = [
+                        gen_dxy, 
+                        perf_batch_value['globalvars'],
+                        perf_batch_value['cpf'],
+                        perf_batch_value['npf'],
+                        perf_batch_value['sv'],
+                        perf_batch_value['muon'],
+                        perf_batch_value['electron'],
+                    ]
+                    perf_batch_prediction = modelClass.predict_on_batch(perf_inputs_class)
+                    perfMonitor.analyze_batch(perf_batch_value,perf_batch_prediction)                
+
+                    if step%10==0:
+                        logging.info("Perf %i step %i-%i"%(iperf,epoch,step))
+                    
+                        
+            except tf.errors.OutOfRangeError:
+                pass
+                
+            auc = perfMonitor.auc()
+            logging.info("Done perf %i for %i steps of epoch %i: auc=%.2f%%"%(iperf,step,epoch,100.*auc))
+            
+            perfMonitor.save(os.path.join(outputFolder,'perf_%i.hdf5'%epoch))
+            perfMonitor.plot(os.path.join(outputFolder,'roc_%i.ps'%epoch))
     resetSession()
     
 

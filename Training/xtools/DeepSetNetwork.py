@@ -110,11 +110,11 @@ class DeepSetNetwork(NominalNetwork):
         for i,nodes in enumerate([200]):
             self.full_features.extend([
                 keras.layers.Dense(
-                    200,
+                    nodes,
                     kernel_initializer='lecun_normal',
                     bias_initializer='zeros',
                     kernel_regularizer=keras.regularizers.l1(1e-6),
-                    name="features_dense"+str(i)
+                    name="features_dense"+str(i+1)
                 ),
                 keras.layers.LeakyReLU(alpha=0.1,name="features_activation"+str(i+1))
             ])

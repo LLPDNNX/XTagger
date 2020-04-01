@@ -13,7 +13,8 @@ class Pipeline():
         batchSize, 
         resample=True,
         repeat=1,
-        bagging=1.
+        bagging=1.,
+        maxThreads = 6
     ):
         self.files = files
         self.features = features
@@ -23,6 +24,7 @@ class Pipeline():
         self.resample = resample
         self.repeat = repeat
         self.bagging = bagging
+        self.maxThreads = maxThreads
     
 
     def init(self,isLLPFct):
@@ -36,16 +38,17 @@ class Pipeline():
 
             rootreader_op = []
             resamplers = []
-            maxThreads = 6
             OMP_NUM_THREADS = -1
             if os.environ.has_key('OMP_NUM_THREADS'):
                 try:
                     OMP_NUM_THREADS = int(os.environ["OMP_NUM_THREADS"])
                 except Exception:
                     pass
+            if OMP_NUM_THREADS>0:
+                self.maxThreads = min(OMP_NUM_THREADS,self.maxThreads)
             
-            for _ in range(min(1+int(len(inputFileList)/2.), maxThreads)):
-                reader_batch = max(10,int(self.batchSize/20.))
+            for _ in range(min(1+int(len(inputFileList)/2.), self.maxThreads)):
+                reader_batch = max(10,int(self.batchSize/(2.5*self.maxThreads)))
                 reader = xtagger.root_reader(fileListQueue, self.features, "jets", batch=reader_batch).batch()
                 rootreader_op.append(reader)
                 if self.resample:

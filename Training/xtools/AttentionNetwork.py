@@ -4,11 +4,11 @@ from keras import backend as K
 import os
 import sys
 import logging
-from NominalNetwork import NominalNetwork
+import xtools
     
-class AttentionNetwork(NominalNetwork):
+class AttentionNetwork(xtools.NominalNetwork):
     def __init__(self,featureDict):
-        NominalNetwork.__init__(self,featureDict)
+        xtools.NominalNetwork.__init__(self,featureDict)
         
         
         #### CPF ####
@@ -30,7 +30,7 @@ class AttentionNetwork(NominalNetwork):
             ])
             
         self.cpf_attention = []#keras.layers.Lambda(lambda x: tf.transpose(x,[0,2,1]))]
-        for i,filters in enumerate([64,32,32,16]):
+        for i,filters in enumerate([64,32,32,10]):
             self.cpf_attention.extend([
                 keras.layers.Conv1D(
                     filters,1,
@@ -49,8 +49,10 @@ class AttentionNetwork(NominalNetwork):
                     keras.layers.Dropout(0.1,name='cpf_attention_dropout'+str(i+1)),
                 ])
             else:
-                keras.layers.Activation('tanh',name="cpf_attention_activation"+str(i+1)),
-        
+                self.cpf_attention.extend([
+                    #keras.layers.Activation('sigmoid',name="cpf_attention_activation"+str(i+1)),
+                    keras.layers.Dropout(0.1,name='cpf_attention_dropout'+str(i+1)),
+                ])
 
         #### NPF ####
         self.npf_conv = []
@@ -70,7 +72,7 @@ class AttentionNetwork(NominalNetwork):
             ])
 
         self.npf_attention = []#keras.layers.Lambda(lambda x: tf.transpose(x,[0,2,1]))]
-        for i,filters in enumerate([64,32,32,16]):
+        for i,filters in enumerate([64,32,32,10]):
             self.npf_attention.extend([keras.layers.Conv1D(
                     filters,1,
                     strides=1,
@@ -88,8 +90,10 @@ class AttentionNetwork(NominalNetwork):
                     keras.layers.Dropout(0.1,name="npf_attention_droupout"+str(i+1)),
                 ])
             else:
-                keras.layers.Activation('tanh',name="npf_attention_activation"+str(i+1)),
-
+                self.npf_attention.extend([
+                    #keras.layers.Activation('sigmoid',name="npf_attention_activation"+str(i+1)),
+                    keras.layers.Dropout(0.1,name="npf_attention_droupout"+str(i+1)),
+                ])
         
         #### Global ####
         self.global_preproc = \
@@ -104,11 +108,11 @@ class AttentionNetwork(NominalNetwork):
         for i,nodes in enumerate([200]):
             self.full_features.extend([
                 keras.layers.Dense(
-                    200,
+                    nodes,
                     kernel_initializer='lecun_normal',
                     bias_initializer='zeros',
                     kernel_regularizer=keras.regularizers.l1(1e-6),
-                    name="features_dense"+str(i)
+                    name="features_dense"+str(i+1)
                 ),
                 keras.layers.LeakyReLU(alpha=0.1,name="features_activation"+str(i+1))
             ])
@@ -169,5 +173,5 @@ class AttentionNetwork(NominalNetwork):
         
         return full_features
     
-    
+network = AttentionNetwork
     

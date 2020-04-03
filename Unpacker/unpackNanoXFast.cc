@@ -15,6 +15,398 @@
 #include "cmdParser.hpp"
 #include "exprtk.hpp"
 
+class Feature
+{
+    public:
+        enum Type
+        {
+            Float,
+            Int,
+            Double,
+            Bool,
+            Short,
+            Char
+        };
+        
+    protected:
+        std::string name_;
+        Type type_;
+        
+    public:
+        Feature(const std::string name, const Type& type = Float):
+            name_(name),
+            type_(type)
+        {
+        }
+        
+        inline std::string name() const
+        {
+            return name_;
+        }
+        
+        inline std::string rootTypeId() const
+        {
+            //https://root.cern.ch/doc/master/classTTree.html
+            switch (type_)
+            {
+                case Float: return "F";
+                case Int: return "I";
+                case Double: return "D";
+                case Bool: return "O";
+                case Short: return "S";
+                case Char: return "C";
+            }
+        }
+        
+        inline Type type() const
+        {
+            return type_;
+        }
+};
+
+class BranchData
+{
+    public:
+        virtual void setFloat(size_t index, float value) = 0;
+        virtual float getFloat(size_t index) = 0;
+        template<class TYPE, size_t N> static std::shared_ptr<BranchData> makeBranch(TTree* tree, const std::string& branchName, const std::string& branchType, long bufferSize);
+        template<class TYPE, size_t N> static std::shared_ptr<BranchData> branchAddress(TTree* tree, const std::string& branchName);
+        
+        template<size_t N> static std::shared_ptr<BranchData> makeBranch(Feature::Type type, TTree* tree, const std::string& branchName, const std::string& branchType, long bufferSize)
+        {
+            switch (type)
+            {
+                case Feature::Float: return makeBranch<float,N>(tree,branchName,branchType,bufferSize);
+                case Feature::Int: return makeBranch<int,N>(tree,branchName,branchType,bufferSize);
+                case Feature::Double: return makeBranch<double,N>(tree,branchName,branchType,bufferSize);
+                case Feature::Bool: return makeBranch<bool,N>(tree,branchName,branchType,bufferSize);
+                case Feature::Short: return makeBranch<short,N>(tree,branchName,branchType,bufferSize);
+                case Feature::Char: return makeBranch<char,N>(tree,branchName,branchType,bufferSize);
+            }
+        }
+        
+        template<size_t N> static std::shared_ptr<BranchData> branchAddress(Feature::Type type, TTree* tree, const std::string& branchName)
+        {
+            switch (type)
+            {
+                case Feature::Float: return branchAddress<float,N>(tree,branchName);
+                case Feature::Int: return branchAddress<int,N>(tree,branchName);
+                case Feature::Double: return branchAddress<double,N>(tree,branchName);
+                case Feature::Bool: return branchAddress<bool,N>(tree,branchName);
+                case Feature::Short: return branchAddress<short,N>(tree,branchName);
+                case Feature::Char: return branchAddress<char,N>(tree,branchName);
+            }
+        }
+};
+
+template<class TYPE, size_t N>
+class BranchDataTmpl:
+    public BranchData
+{
+    protected:
+        TYPE buffer_[N];
+    public:
+    
+        virtual void setFloat(size_t index, float value)
+        {
+            buffer_[index] = TYPE(value);
+        }
+        virtual float getFloat(size_t index)
+        {
+            return buffer_[index];
+        }
+        
+        inline TYPE* buffer()
+        {
+            return buffer_;
+        }
+};
+
+//scalar specialization
+template<class TYPE>
+class BranchDataTmpl<TYPE,0>:
+    public BranchData
+{
+    protected:
+        TYPE buffer_;
+    public:
+    
+        virtual void setFloat(size_t index, float value)
+        {
+            buffer_ = TYPE(value);
+        }
+        virtual float getFloat(size_t index)
+        {
+            return buffer_;
+        }
+        
+        inline TYPE* buffer()
+        {
+            return &buffer_;
+        }
+};
+
+
+
+template<class TYPE, size_t N> 
+std::shared_ptr<BranchData> BranchData::makeBranch(TTree* tree, const std::string& branchName, const std::string& branchType, long bufferSize)
+{
+    std::shared_ptr<BranchDataTmpl<TYPE,N>> branchData(new BranchDataTmpl<TYPE,N>());
+    tree->Branch(branchName.c_str(),branchData->buffer(),branchType.c_str(),bufferSize);
+    return branchData;
+}
+
+template<class TYPE, size_t N> 
+std::shared_ptr<BranchData> BranchData::branchAddress(TTree* tree, const std::string& branchName)
+{
+    std::shared_ptr<BranchDataTmpl<TYPE,N>> branchData(new BranchDataTmpl<TYPE,N>());
+    tree->SetBranchAddress(branchName.c_str(),branchData->buffer());
+    return branchData;
+}
+
+static const std::vector<Feature> globalFeatures{
+    Feature("global_mass"),
+    Feature("global_area"),
+    Feature("global_n60",Feature::Int),
+    Feature("global_n90",Feature::Int),
+    Feature("global_chargedEmEnergyFraction"),
+    Feature("global_chargedHadronEnergyFraction"),
+    Feature("global_chargedMuEnergyFraction"),
+    Feature("global_electronEnergyFraction"),
+
+    Feature("global_tau1"),
+    Feature("global_tau2"),
+    Feature("global_tau3"),
+    
+    Feature("global_relMassDropMassAK"),
+    Feature("global_relMassDropMassCA"),
+    Feature("global_relSoftDropMassAK"),
+    Feature("global_relSoftDropMassCA"),
+    
+    Feature("global_thrust"),
+    Feature("global_sphericity"),
+    Feature("global_circularity"),
+    Feature("global_isotropy"),
+    Feature("global_eventShapeC"),
+    Feature("global_eventShapeD")
+};
+
+static const std::vector<Feature> csvFeatures{ 
+    Feature("csv_trackSumJetEtRatio"),
+    Feature("csv_trackSumJetDeltaR"),
+    Feature("csv_vertexCategory"),
+    Feature("csv_trackSip2dValAboveCharm"),
+    Feature("csv_trackSip2dSigAboveCharm"),
+    Feature("csv_trackSip3dValAboveCharm"),
+    Feature("csv_trackSip3dSigAboveCharm"),
+    Feature("csv_jetNSelectedTracks",Feature::Int),
+    Feature("csv_jetNTracksEtaRel",Feature::Int)
+};
+
+
+static const std::vector<Feature> cpfFeatures{
+    Feature("cpf_trackEtaRel"),
+    Feature("cpf_trackPtRel"),
+    Feature("cpf_trackPPar"),
+    Feature("cpf_trackDeltaR"),
+    Feature("cpf_trackPParRatio"),
+    Feature("cpf_trackPtRatio"),
+    Feature("cpf_trackSip2dVal"),
+    Feature("cpf_trackSip2dSig"),
+    Feature("cpf_trackSip3dVal"),
+    Feature("cpf_trackSip3dSig"),
+    Feature("cpf_trackJetDistVal"),
+    Feature("cpf_trackJetDistSig"),
+    Feature("cpf_ptrel"),
+    Feature("cpf_drminsv"),
+    Feature("cpf_vertex_association"),
+    Feature("cpf_fromPV"),
+    Feature("cpf_puppi_weight"),
+    Feature("cpf_track_chi2"),
+    Feature("cpf_track_quality"),
+    Feature("cpf_track_ndof", Feature::Int),
+    Feature("cpf_matchedMuon", Feature::Int),
+    Feature("cpf_matchedElectron", Feature::Int),
+    Feature("cpf_matchedSV", Feature::Int),
+    Feature("cpf_numberOfValidPixelHits", Feature::Int),
+    Feature("cpf_pixelLayersWithMeasurement",Feature::Int),
+    Feature("cpf_numberOfValidStripHits" , Feature::Int),
+    Feature("cpf_stripLayersWithMeasurement" , Feature::Int),
+    Feature("cpf_relmassdrop"),
+    Feature("cpf_dzMin")
+    //Feature("cpf_deta"),
+    //Feature("cpf_dphi")
+};
+
+static const std::vector<Feature> npfFeatures{
+    Feature("npf_ptrel"),
+    Feature("npf_deta"),
+    Feature("npf_dphi"),
+    Feature("npf_deltaR"),
+    Feature("npf_isGamma"),
+    Feature("npf_hcal_fraction"),
+    Feature("npf_drminsv"),
+    Feature("npf_puppi_weight"),
+    Feature("npf_relmassdrop")
+};
+
+
+static const std::vector<Feature> svFeatures{
+    Feature("sv_ptrel"),
+    Feature("sv_deta"),
+    Feature("sv_dphi"),
+    Feature("sv_deltaR"),
+    Feature("sv_mass"),
+    Feature("sv_ntracks"),
+    Feature("sv_chi2"),
+    Feature("sv_ndof",Feature::Int),
+    Feature("sv_dxy"),
+    Feature("sv_dxysig"),
+    Feature("sv_d3d"),
+    Feature("sv_d3dsig"),
+    Feature("sv_costhetasvpv"),
+    Feature("sv_enratio")
+};
+
+static const std::vector<Feature> muonFeatures{
+    Feature("muon_isGlobal",Feature::Int),
+    Feature("muon_isTight",Feature::Int),
+    Feature("muon_isMedium",Feature::Int),
+    Feature("muon_isLoose",Feature::Int),
+    Feature("muon_isStandAlone",Feature::Int),
+
+    Feature("muon_ptrel"),
+    Feature("muon_EtaRel"),
+    Feature("muon_dphi"),
+    Feature("muon_deta"),
+    Feature("muon_charge"),
+    Feature("muon_energy"),
+    Feature("muon_jetDeltaR"),
+    Feature("muon_numberOfMatchedStations"),
+
+    Feature("muon_2dIP"),
+    Feature("muon_2dIPSig"),
+    Feature("muon_3dIP"),
+    Feature("muon_3dIPSig"),
+
+    Feature("muon_dxy"),
+    Feature("muon_dxyError"),
+    Feature("muon_dxySig"),
+    Feature("muon_dz"),
+    Feature("muon_dzError"),
+    Feature("muon_numberOfValidPixelHits",Feature::Int),
+    Feature("muon_numberOfpixelLayersWithMeasurement",Feature::Int),
+    Feature("muon_numberOfstripLayersWithMeasurement",Feature::Int),
+
+    Feature("muon_chi2"),
+    Feature("muon_ndof",Feature::Int),
+
+    Feature("muon_caloIso"),
+    Feature("muon_ecalIso"),
+    Feature("muon_hcalIso"),
+
+    Feature("muon_sumPfChHadronPt"),
+    Feature("muon_sumPfNeuHadronEt"),
+    Feature("muon_Pfpileup"),
+    Feature("muon_sumPfPhotonEt"),
+
+    Feature("muon_sumPfChHadronPt03"),
+    Feature("muon_sumPfNeuHadronEt03"),
+    Feature("muon_Pfpileup03"),
+    Feature("muon_sumPfPhotonEt03"),
+
+    Feature("muon_timeAtIpInOut"),
+    Feature("muon_timeAtIpInOutErr"),
+    Feature("muon_timeAtIpOutIn")
+};
+
+static const std::vector<Feature> electronFeatures{
+    Feature("electron_ptrel"),
+    Feature("electron_jetDeltaR"),
+    Feature("electron_deta"),
+    Feature("electron_dphi"),
+    Feature("electron_charge"),
+    Feature("electron_energy"),
+    Feature("electron_EtFromCaloEn"),
+    Feature("electron_isEB"),
+    Feature("electron_isEE"),
+    Feature("electron_ecalEnergy"),
+    Feature("electron_isPassConversionVeto"),
+    Feature("electron_convDist"),
+    Feature("electron_convFlags",Feature::Int),
+
+    Feature("electron_convRadius"),
+    Feature("electron_hadronicOverEm"),
+    Feature("electron_ecalDrivenSeed"),
+
+
+    Feature("electron_SC_energy"),
+    Feature("electron_SC_deta"),
+    Feature("electron_SC_dphi"),
+    Feature("electron_SC_et"),
+    Feature("electron_SC_eSuperClusterOverP"),
+    Feature("electron_scPixCharge"),
+    Feature("electron_sigmaEtaEta"),
+    Feature("electron_sigmaIetaIeta"),
+    Feature("electron_sigmaIphiIphi"),
+    Feature("electron_r9"),
+    Feature("electron_superClusterFbrem"),
+
+    Feature("electron_2dIP"),
+    Feature("electron_2dIPSig"),
+    Feature("electron_3dIP"),
+    Feature("electron_3dIPSig"),
+    Feature("electron_eSeedClusterOverP"),
+    Feature("electron_eSeedClusterOverPout"),
+    Feature("electron_eSuperClusterOverP"),
+
+    Feature("electron_deltaEtaEleClusterTrackAtCalo"),
+    Feature("electron_deltaEtaSeedClusterTrackAtCalo"),
+    Feature("electron_deltaPhiSeedClusterTrackAtCalo"),
+    Feature("electron_deltaEtaSeedClusterTrackAtVtx"),
+    Feature("electron_deltaEtaSuperClusterTrackAtVtx"),
+    Feature("electron_deltaPhiEleClusterTrackAtCalo"),
+    Feature("electron_deltaPhiSuperClusterTrackAtVtx"),
+    Feature("electron_sCseedEta"),
+
+    Feature("electron_EtaRel"),
+    Feature("electron_dxy"),
+    Feature("electron_dz"),
+    Feature("electron_nbOfMissingHits"),
+    Feature("electron_gsfCharge"),
+    Feature("electron_ndof",Feature::Int),
+    Feature("electron_chi2"),
+
+    Feature("electron_numberOfBrems",Feature::Int),
+    Feature("electron_fbrem"),
+
+    Feature("electron_e5x5"),
+    Feature("electron_e5x5Rel"),
+    Feature("electron_e2x5MaxOvere5x5"),
+    Feature("electron_e1x5Overe5x5"),
+
+    Feature("electron_neutralHadronIso"),
+    Feature("electron_particleIso"),
+    Feature("electron_photonIso"),
+    Feature("electron_puChargedHadronIso"),
+    Feature("electron_trackIso"),
+    Feature("electron_hcalDepth1OverEcal"),
+    Feature("electron_hcalDepth2OverEcal"),
+    Feature("electron_ecalPFClusterIso"),
+    Feature("electron_hcalPFClusterIso"),
+    Feature("electron_pfSumPhotonEt"),
+    Feature("electron_pfSumChargedHadronPt"),
+    Feature("electron_pfSumNeutralHadronEt"),
+    Feature("electron_pfSumPUPt"),
+    Feature("electron_dr04TkSumPt"),
+    Feature("electron_dr04EcalRecHitSumEt"),
+    Feature("electron_dr04HcalDepth1TowerSumEt"),
+    Feature("electron_dr04HcalDepth1TowerSumEtBc"),
+    Feature("electron_dr04HcalDepth2TowerSumEt"),
+    Feature("electron_dr04HcalDepth2TowerSumEtBc"),
+    Feature("electron_dr04HcalTowerSumEt"),
+    Feature("electron_dr04HcalTowerSumEtBc")
+};
  
 class UnpackedTree
 {
@@ -78,272 +470,46 @@ class UnpackedTree
         float global_eta;
         float global_phi;
 
-        float global_mass;
-        float global_area;
-        float global_n60;
-        float global_n90;
-        float global_chargedEmEnergyFraction;
-        float global_chargedHadronEnergyFraction;
-        float global_chargedMuEnergyFraction;
-        float global_electronEnergyFraction;
-
-        float global_tau1;
-        float global_tau2;
-        float global_tau3;
-    
-        float global_relMassDropMassAK;
-        float global_relMassDropMassCA;
-        float global_relSoftDropMassAK;
-        float global_relSoftDropMassCA;
-    
-        float global_thrust;
-        float global_sphericity;
-        float global_circularity;
-        float global_isotropy;
-        float global_eventShapeC;
-        float global_eventShapeD;
-        
-        float csv_trackSumJetEtRatio;
-        float csv_trackSumJetDeltaR;
-        float csv_vertexCategory;
-        float csv_trackSip2dValAboveCharm;
-        float csv_trackSip2dSigAboveCharm;
-        float csv_trackSip3dValAboveCharm;
-        float csv_trackSip3dSigAboveCharm;
-        float csv_jetNSelectedTracks;
-        float csv_jetNTracksEtaRel;
-
         float isData;
         float xsecweight;
         float processId;
         
-        unsigned int ncpf;
-        float cpf_trackEtaRel[maxEntries_cpf];
-        float cpf_trackPtRel[maxEntries_cpf];
-        float cpf_trackPPar[maxEntries_cpf];
-        float cpf_trackDeltaR[maxEntries_cpf];
-        float cpf_trackPtRatio[maxEntries_cpf];
-        float cpf_trackPParRatio[maxEntries_cpf];
-        float cpf_trackSip2dVal[maxEntries_cpf];
-        float cpf_trackSip2dSig[maxEntries_cpf];
-        float cpf_trackSip3dVal[maxEntries_cpf];
-        float cpf_trackSip3dSig[maxEntries_cpf];
-        float cpf_trackJetDistVal[maxEntries_cpf];
-        float cpf_trackJetDistSig[maxEntries_cpf];
-        float cpf_ptrel[maxEntries_cpf];
-        float cpf_deta[maxEntries_cpf];
-        float cpf_dphi[maxEntries_cpf];
-        float cpf_drminsv[maxEntries_cpf];
-        float cpf_vertex_association[maxEntries_cpf];
-        float cpf_fromPV[maxEntries_cpf];
-        float cpf_puppi_weight[maxEntries_cpf];
-        float cpf_track_chi2[maxEntries_cpf];
-        float cpf_track_ndof[maxEntries_cpf];
-        float cpf_track_quality[maxEntries_cpf];
-        float cpf_relmassdrop[maxEntries_cpf];
+        std::vector<std::shared_ptr<BranchData>> globalBranches;
+        std::vector<std::shared_ptr<BranchData>> csvBranches;
         
-        float cpf_matchedSV[maxEntries_cpf];
-        float cpf_matchedMuon[maxEntries_cpf];
-        float cpf_matchedElectron[maxEntries_cpf];
+        unsigned int ncpf;
+        std::vector<std::shared_ptr<BranchData>> cpfBranches;
         
         unsigned int nnpf;
-        float npf_ptrel[maxEntries_npf];
-        float npf_deta[maxEntries_npf];
-        float npf_dphi[maxEntries_npf];
-        float npf_deltaR[maxEntries_npf];
-        float npf_isGamma[maxEntries_npf];
-        float npf_hcal_fraction[maxEntries_npf];
-        float npf_drminsv[maxEntries_npf];
-        float npf_puppi_weight[maxEntries_npf];
-        float npf_relmassdrop[maxEntries_npf];
+        std::vector<std::shared_ptr<BranchData>> npfBranches;
         
         unsigned int nsv;
-        float sv_ptrel[maxEntries_sv];
-        float sv_deta[maxEntries_sv];
-        float sv_dphi[maxEntries_sv];
-        float sv_mass[maxEntries_sv];
-        float sv_deltaR[maxEntries_sv];
-        float sv_ntracks[maxEntries_sv];
-        float sv_chi2[maxEntries_sv];
-        float sv_ndof[maxEntries_sv];
-        float sv_dxy[maxEntries_sv];
-        float sv_dxysig[maxEntries_sv];
-        float sv_d3d[maxEntries_sv];
-        float sv_d3dsig[maxEntries_sv];
-        float sv_costhetasvpv[maxEntries_sv];
-        float sv_enratio[maxEntries_sv];
+        std::vector<std::shared_ptr<BranchData>> svBranches;
 
         unsigned int nmuon;
-        float muon_isGlobal[maxEntries_muon] ; 
-        float muon_isTight[maxEntries_muon] ; 
-        float muon_isMedium[maxEntries_muon] ; 
-        float muon_isLoose[maxEntries_muon] ; 
-        float muon_isStandAlone[maxEntries_muon] ;
-
-        float muon_ptrel [maxEntries_muon];
-        float muon_EtaRel[maxEntries_muon];
-        float muon_dphi[maxEntries_muon];
-        float muon_deta[maxEntries_muon];
-        float muon_charge [maxEntries_muon]; 
-        float muon_energy[maxEntries_muon];
-        float muon_jetDeltaR [maxEntries_muon]; 
-        float muon_numberOfMatchedStations [maxEntries_muon];
-
-        float muon_2dIp [maxEntries_muon]; 
-        float muon_2dIpSig [maxEntries_muon];
-        float muon_3dIp [maxEntries_muon]; 
-        float muon_3dIpSig [maxEntries_muon]; 
-
-        float muon_dxy [maxEntries_muon]; 
-        float muon_dxyError [maxEntries_muon]; 
-        float muon_dxySig [maxEntries_muon]; 
-        float muon_dz [maxEntries_muon]; 
-        float muon_dzError [maxEntries_muon]; 
-        float muon_numberOfValidPixelHits[maxEntries_muon]; 
-        float muon_numberOfpixelLayersWithMeasurement [maxEntries_muon]; 
-
-        float muon_chi2 [maxEntries_muon]; 
-        float muon_ndof [maxEntries_muon]; 
-
-        float muon_caloIso [maxEntries_muon]; 
-        float muon_ecalIso [maxEntries_muon]; 
-        float muon_hcalIso [maxEntries_muon];
-
-        float muon_sumPfChHadronPt [maxEntries_muon]; 
-        float muon_sumPfNeuHadronEt [maxEntries_muon]; 
-        float muon_Pfpileup [maxEntries_muon]; 
-        float muon_sumPfPhotonEt [maxEntries_muon]; 
-
-        float muon_sumPfChHadronPt03 [maxEntries_muon]; 
-        float muon_sumPfNeuHadronEt03 [maxEntries_muon]; 
-        float muon_Pfpileup03 [maxEntries_muon]; 
-        float muon_sumPfPhotonEt03 [maxEntries_muon]; 
-
-        float muon_sumChHadronPt [maxEntries_muon]; 
-        float muon_sumNeuHadronEt [maxEntries_muon]; 
-        float muon_pileup [maxEntries_muon]; 
-        float muon_sumPhotonEt [maxEntries_muon]; 
-
-        float muon_timeAtIpInOut [maxEntries_muon]; 
-        float muon_timeAtIpInOutErr [maxEntries_muon]; 
-        float muon_timeAtIpOutIn [maxEntries_muon];
-
-        unsigned int nelectron;
-        float electron_ptrel[maxEntries_electron];
-        float electron_jetDeltaR[maxEntries_electron]; 
-        float electron_deta[maxEntries_electron];
-        float electron_dphi[maxEntries_electron];
-        float electron_charge[maxEntries_electron]; 
-        float electron_energy[maxEntries_electron];
-        float electron_EtFromCaloEn[maxEntries_electron];
-        float electron_isEB[maxEntries_electron]; 
-        float electron_isEE[maxEntries_electron]; 
-        float electron_ecalEnergy[maxEntries_electron]; 
-        float electron_isPassConversionVeto[maxEntries_electron];
-        float electron_convDist[maxEntries_electron]; 
-        float electron_convFlags[maxEntries_electron]; 
-        float electron_convRadius[maxEntries_electron]; 
-        float electron_hadronicOverEm[maxEntries_electron];
-        float electron_ecalDrivenSeed[maxEntries_electron];
-
-        float electron_SC_energy[maxEntries_electron]; 
-        float electron_SC_deta[maxEntries_electron]; 
-        float electron_SC_dphi[maxEntries_electron];
-        float electron_SC_et[maxEntries_electron];
-        float electron_SC_eSuperClusterOverP[maxEntries_electron]; 
-        float electron_scE1x5Overe5x5[maxEntries_electron]; 
-        float electron_scE2x5MaxOvere5x5[maxEntries_electron]; 
-        float electron_scE5x5[maxEntries_electron]; 
-        float electron_scE5x5Rel[maxEntries_electron]; 
-        float electron_scPixCharge[maxEntries_electron]; 
-        float electron_scSigmaEtaEta[maxEntries_electron];
-        float electron_scSigmaIEtaIEta[maxEntries_electron];  
-        float electron_superClusterFbrem[maxEntries_electron]; 
-
-        float electron_2dIP[maxEntries_electron]; 
-        float electron_2dIPSig[maxEntries_electron];
-        float electron_3dIP[maxEntries_electron]; 
-        float electron_3dIPSig[maxEntries_electron]; 
-        float electron_eSeedClusterOverP[maxEntries_electron];
-        float electron_eSeedClusterOverPout[maxEntries_electron];
-        float electron_eSuperClusterOverP[maxEntries_electron];
-        float electron_eTopOvere5x5[maxEntries_electron]; 
-
-        float electron_deltaEtaEleClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaEtaSeedClusterTrackAtCalo[maxEntries_electron];
-        float electron_deltaPhiSeedClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaEtaSeedClusterTrackAtVtx[maxEntries_electron]; 
-        float electron_deltaEtaSuperClusterTrackAtVtx[maxEntries_electron];
-        float electron_deltaPhiEleClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaPhiSuperClusterTrackAtVtx[maxEntries_electron];
-        float electron_sCseedEta[maxEntries_electron];  
-
-        float electron_EtaRel[maxEntries_electron]; 
-        float electron_dxy[maxEntries_electron]; 
-        float electron_dz[maxEntries_electron];
-        float electron_nbOfMissingHits[maxEntries_electron]; 
-        float electron_gsfCharge[maxEntries_electron];
-
-
-        float electron_numberOfBrems[maxEntries_electron];
-        float electron_trackFbrem[maxEntries_electron]; 
-        float electron_fbrem[maxEntries_electron]; 
-        float electron_e5x5[maxEntries_electron]; 
-        float electron_e5x5Rel[maxEntries_electron]; 
-        float electron_e1x5Overe5x5[maxEntries_electron]; 
-        float electron_e2x5MaxOvere5x5[maxEntries_electron];
-
-        float electron_full5x5_e5x5[maxEntries_electron];
-        float electron_full5x5_e5x5Rel[maxEntries_electron]; 
-        float electron_full5x5_sigmaIetaIeta[maxEntries_electron];
-        float electron_full5x5_e1x5Overe5x5[maxEntries_electron];
-        float electron_full5x5_e2x5BottomOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5LeftOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5MaxOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5RightOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5TopOvere5x5[maxEntries_electron];
+        std::vector<std::shared_ptr<BranchData>> muonBranches;
         
-        float electron_full5x5_eBottomOvere5x5[maxEntries_electron];
-        float electron_full5x5_eLeftOvere5x5[maxEntries_electron];
-        float electron_full5x5_eRightOvere5x5[maxEntries_electron];
-        float electron_full5x5_eTopOvere5x5[maxEntries_electron];
-        float electron_full5x5_hcalDepth1OverEcal[maxEntries_electron];
-        float electron_full5x5_hcalDepth1OverEcalBc[maxEntries_electron];
-        float electron_full5x5_hcalDepth2OverEcal[maxEntries_electron];
-        float electron_full5x5_hcalDepth2OverEcalBc[maxEntries_electron];
-        float electron_full5x5_hcalOverEcal[maxEntries_electron];
-        float electron_full5x5_hcalOverEcalBc[maxEntries_electron];   
-        float electron_full5x5_r9[maxEntries_electron];
-
-        float electron_neutralHadronIso[maxEntries_electron]; 
-        float electron_particleIso [maxEntries_electron]; 
-        float electron_photonIso[maxEntries_electron];
-        float electron_puChargedHadronIso[maxEntries_electron]; 
-        float electron_trackIso[maxEntries_electron];  
-        float electron_hcalDepth1OverEcal[maxEntries_electron]; 
-        float electron_hcalDepth2OverEcal[maxEntries_electron]; 
-        float electron_ecalPFClusterIso[maxEntries_electron];
-        float electron_hcalPFClusterIso[maxEntries_electron];  
-        float electron_dr03TkSumPt[maxEntries_electron]; 
-
-        float electron_dr03EcalRecHitSumEt[maxEntries_electron]; 
-        float electron_dr03HcalDepth1TowerSumEt[maxEntries_electron];  
-        float electron_dr03HcalDepth1TowerSumEtBc[maxEntries_electron]; 
-        float electron_dr03HcalDepth2TowerSumEt[maxEntries_electron]; 
-        float electron_dr03HcalDepth2TowerSumEtBc[maxEntries_electron]; 
-        float electron_pfSumPhotonEt[maxEntries_electron]; 
-        float electron_pfSumChargedHadronPt[maxEntries_electron]; 
-        float electron_pfSumNeutralHadronEt[maxEntries_electron]; 
-        float electron_pfSumPUPt[maxEntries_electron];
-
-        float electron_dr04EcalRecHitSumEt[maxEntries_electron];  
-        float electron_dr04HcalDepth1TowerSumEt[maxEntries_electron];  
-        float electron_dr04HcalDepth1TowerSumEtBc[maxEntries_electron];
-        float electron_dr04HcalDepth2TowerSumEt[maxEntries_electron]; 
-        float electron_dr04HcalDepth2TowerSumEtBc [maxEntries_electron];
-        float electron_dr04HcalTowerSumEt[maxEntries_electron];
-        float electron_dr04HcalTowerSumEtBc[maxEntries_electron];
-	
+        unsigned int nelectron;
+        std::vector<std::shared_ptr<BranchData>> electronBranches;
+        
+        template<size_t N>
+        std::vector<std::shared_ptr<BranchData>> makeBranches(TTree* tree, const std::vector<Feature>& features, const std::string& lengthName="") const
+        {
+            std::vector<std::shared_ptr<BranchData>> branches;
+            for (size_t ifeature = 0; ifeature < features.size(); ++ifeature)
+            {
+                auto const& feature = features[ifeature];
+                auto branchData = BranchData::makeBranch<N>(
+                    feature.type(),
+                    tree,
+                    feature.name().c_str(),
+                    lengthName.size()>0 ? (feature.name()+"["+lengthName+"]/"+feature.rootTypeId()).c_str() : (feature.name()+"/"+feature.rootTypeId()).c_str(),
+                    bufferSize 
+                );
+                branches.push_back(branchData);
+            }
+            return branches;
+        }
 
     public:
         UnpackedTree(const std::string& fileName, bool addTruth=true):
@@ -413,270 +579,24 @@ class UnpackedTree
             tree_->Branch("global_eta",&global_eta,"global_eta/F",bufferSize);
             tree_->Branch("global_phi",&global_phi,"global_phi/F",bufferSize);
 
-            tree_->Branch("global_mass",&global_mass,"global_mass/F", bufferSize);
-            tree_->Branch("global_area",&global_area,"global_area/F", bufferSize);
-            tree_->Branch("global_n60",&global_n60,"global_n60/F", bufferSize);
-            tree_->Branch("global_n90",&global_n90,"global_n90/F", bufferSize);
-            tree_->Branch("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction,"global_chargedEmEnergyFraction/F", bufferSize);
-            tree_->Branch("global_chargedHadronEnergyFraction",&global_chargedHadronEnergyFraction,"global_chargedHadronEnergyFraction/F", bufferSize);
-            tree_->Branch("global_chargedMuEnergyFraction",&global_chargedMuEnergyFraction,"global_chargedMuEnergyFraction/F", bufferSize);
-            tree_->Branch("global_electronEnergyFraction",&global_electronEnergyFraction,"global_electronEnergyFraction/F", bufferSize);
-
-            tree_->Branch("global_tau1",&global_tau1,"global_tau1/F", bufferSize);
-            tree_->Branch("global_tau2",&global_tau2,"global_tau2/F", bufferSize);
-            tree_->Branch("global_tau3",&global_tau3,"global_tau3/F", bufferSize);
-    
-            tree_->Branch("global_relMassDropMassAK",&global_relMassDropMassAK,"global_relMassDropMassAK/F", bufferSize);
-            tree_->Branch("global_relMassDropMassCA",&global_relMassDropMassCA,"global_relMassDropMassCA/F", bufferSize);
-            tree_->Branch("global_relSoftDropMassAK",&global_relSoftDropMassAK,"global_relSoftDropMassAK/F", bufferSize);
-            tree_->Branch("global_relSoftDropMassCA",&global_relSoftDropMassCA,"global_relSoftDropMassCA/F", bufferSize);
-    
-            tree_->Branch("global_thrust",&global_thrust,"global_thrust/F", bufferSize);
-            tree_->Branch("global_sphericity",&global_sphericity,"global_sphericity/F", bufferSize);
-            tree_->Branch("global_circularity",&global_circularity,"global_circularity/F", bufferSize);
-            tree_->Branch("global_isotropy",&global_isotropy,"global_isotropy/F", bufferSize);
-            tree_->Branch("global_eventShapeC",&global_eventShapeC,"global_eventShapeC/F", bufferSize);
-            tree_->Branch("global_eventShapeD",&global_eventShapeD ,"global_eventShapeD/F", bufferSize);
-            
-            
-            tree_->Branch("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio,"csv_trackSumJetEtRatio/F",bufferSize);
-            tree_->Branch("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR,"csv_trackSumJetDeltaR/F",bufferSize);
-            tree_->Branch("csv_vertexCategory",&csv_vertexCategory,"csv_vertexCategory/F",bufferSize);
-            tree_->Branch("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm,"csv_trackSip2dValAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm,"csv_trackSip2dSigAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm,"csv_trackSip3dValAboveCharm/F",bufferSize);
-            tree_->Branch("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm,"csv_trackSip3dSigAboveCharm/F",bufferSize);
-            tree_->Branch("csv_jetNSelectedTracks",&csv_jetNSelectedTracks,"csv_jetNSelectedTracks/F",bufferSize);
-            tree_->Branch("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel,"csv_jetNTracksEtaRel/F",bufferSize);
-            
+            globalBranches = makeBranches<0>(tree_,globalFeatures);
+            csvBranches = makeBranches<0>(tree_,csvFeatures);
 
             tree_->Branch("ncpf",&ncpf,"ncpf/I",bufferSize);
-            tree_->Branch("cpf_trackEtaRel",&cpf_trackEtaRel,"cpf_trackEtaRel[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackPtRel",&cpf_trackPtRel,"cpf_trackPtRel[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackPPar",&cpf_trackPPar,"cpf_trackPPar[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackDeltaR",&cpf_trackDeltaR,"cpf_trackDeltaR[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackPtRatio",&cpf_trackPtRatio,"cpf_trackPtRatio[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackPParRatio",&cpf_trackPParRatio,"cpf_trackPParRatio[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackSip2dVal",&cpf_trackSip2dVal,"cpf_trackSip2dVal[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackSip2dSig",&cpf_trackSip2dSig,"cpf_trackSip2dSig[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackSip3dVal",&cpf_trackSip3dVal,"cpf_trackSip3dVal[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackSip3dSig",&cpf_trackSip3dSig,"cpf_trackSip3dSig[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackJetDistVal",&cpf_trackJetDistVal,"cpf_trackJetDistVal[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_trackJetDistSig",&cpf_trackJetDistSig,"cpf_trackJetDistSig[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_ptrel",&cpf_ptrel,"cpf_ptrel[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_deta",&cpf_deta,"cpf_deta[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_dphi",&cpf_dphi,"cpf_dphi[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_drminsv",&cpf_drminsv,"cpf_drminsv[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_vertex_association",&cpf_vertex_association,"cpf_vertex_association[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_fromPV",&cpf_fromPV,"cpf_fromPV[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_puppi_weight",&cpf_puppi_weight,"cpf_puppi_weight[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_track_chi2",&cpf_track_chi2,"cpf_track_chi2[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_track_ndof",&cpf_track_ndof,"cpf_track_ndof[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_track_quality",&cpf_track_quality,"cpf_track_quality[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_relmassdrop",&cpf_relmassdrop,"cpf_relmassdrop[ncpf]/F",bufferSize);
+            cpfBranches = makeBranches<maxEntries_cpf>(tree_,cpfFeatures,"ncpf");
             
-            tree_->Branch("cpf_matchedSV",&cpf_matchedSV,"cpf_matchedSV[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_matchedMuon",&cpf_matchedMuon,"cpf_matchedMuon[ncpf]/F",bufferSize);
-            tree_->Branch("cpf_matchedElectron",&cpf_matchedElectron,"cpf_matchedElectron[ncpf]/F",bufferSize);
-            
-
             tree_->Branch("nnpf",&nnpf,"nnpf/I",bufferSize);
-            tree_->Branch("npf_ptrel",&npf_ptrel,"npf_ptrel[nnpf]/F",bufferSize);
-            tree_->Branch("npf_deta",&npf_deta,"npf_deta[nnpf]/F",bufferSize);
-            tree_->Branch("npf_dphi",&npf_dphi,"npf_dphi[nnpf]/F",bufferSize);
-            tree_->Branch("npf_deltaR",&npf_deltaR,"npf_deltaR[nnpf]/F",bufferSize);
-            tree_->Branch("npf_isGamma",&npf_isGamma,"npf_isGamma[nnpf]/F",bufferSize);
-            tree_->Branch("npf_hcal_fraction",&npf_hcal_fraction,"npf_hcal_fraction[nnpf]/F",bufferSize);
-            tree_->Branch("npf_drminsv",&npf_drminsv,"npf_drminsv[nnpf]/F",bufferSize);
-            tree_->Branch("npf_puppi_weight",&npf_puppi_weight,"npf_puppi_weight[nnpf]/F",bufferSize);
-            tree_->Branch("npf_relmassdrop",&npf_relmassdrop,"npf_relmassdrop[nnpf]/F",bufferSize);
-
+            npfBranches = makeBranches<maxEntries_npf>(tree_,npfFeatures,"nnpf");
+            
             tree_->Branch("nsv",&nsv,"nsv/I",bufferSize);
-            tree_->Branch("sv_ptrel",&sv_ptrel,"sv_ptrel[nsv]/F",bufferSize);
-            tree_->Branch("sv_deta",&sv_deta,"sv_deta[nsv]/F",bufferSize);
-            tree_->Branch("sv_dphi",&sv_dphi,"sv_dphi[nsv]/F",bufferSize);
-            tree_->Branch("sv_mass",&sv_deltaR,"sv_mass[nsv]/F",bufferSize);
-            tree_->Branch("sv_deltaR",&sv_deltaR,"sv_deltaR[nsv]/F",bufferSize);
-            tree_->Branch("sv_ntracks",&sv_ntracks,"sv_ntracks[nsv]/F",bufferSize);
-            tree_->Branch("sv_chi2",&sv_chi2,"sv_chi2[nsv]/F",bufferSize);
-            tree_->Branch("sv_ndof",&sv_ndof,"sv_ndof[nsv]/F",bufferSize);
-            tree_->Branch("sv_dxy",&sv_dxy,"sv_dxy[nsv]/F",bufferSize);
-            tree_->Branch("sv_dxysig",&sv_dxysig,"sv_dxysig[nsv]/F",bufferSize);
-            tree_->Branch("sv_d3d",&sv_d3d,"sv_d3d[nsv]/F",bufferSize);
-            tree_->Branch("sv_d3dsig",&sv_d3dsig,"sv_d3dsig[nsv]/F",bufferSize);
-            tree_->Branch("sv_costhetasvpv",&sv_costhetasvpv,"sv_costhetasvpv[nsv]/F",bufferSize);
-            tree_->Branch("sv_enratio",&sv_enratio,"sv_enratio[nsv]/F",bufferSize);
+            svBranches = makeBranches<maxEntries_sv>(tree_,svFeatures,"nsv");
 
-		
     	    tree_->Branch("nmuon",&nmuon,"nmuon/I",bufferSize); 
-            tree_->Branch("muon_isGlobal",&muon_isGlobal, "muon_isGlobal[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_isTight",&muon_isTight,"muon_isTight[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_isMedium",&muon_isMedium,"muon_isMedium[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_isLoose",&muon_isLoose,"muon_isLoose[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_isStandAlone",&muon_isStandAlone,"muon_isStandAlone[nmuon]/F",bufferSize);
-
-    
-            tree_->Branch("muon_ptrel", &muon_ptrel,"muon_ptrel[nmuon]/F",bufferSize);
-            tree_->Branch("muon_EtaRel", &muon_EtaRel,"muon_EtaRel[nmuon]/F",bufferSize);
-            tree_->Branch("muon_dphi",&muon_dphi,"muon_dphi[nmuon]/F",bufferSize);
-            tree_->Branch("muon_deta",&muon_dphi,"muon_deta[nmuon]/F",bufferSize);
-            tree_->Branch("muon_charge",&muon_charge,"muon_charge[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_energy",&muon_energy,"muon_energy[nmuon]/F",bufferSize);
-            tree_->Branch("muon_jetDeltaR",&muon_jetDeltaR,"muon_jetDeltaR[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_numberOfMatchedStations",&muon_numberOfMatchedStations,"muon_numberOfMatchedStations[nmuon]/F",bufferSize);
-
-            tree_->Branch("muon_2dIp", &muon_2dIp,"muon_2dIp[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_2dIpSig", &muon_2dIpSig, "muon_2dIpSi[nmuon]/F",bufferSize);
-            tree_->Branch("muon_3dIp",&muon_3dIp,"muon_3dIp[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_3dIpSig",&muon_3dIpSig,"muon_3dIpSig[nmuon]/F",bufferSize); 
-
-            tree_->Branch("muon_dxy", &muon_dxy, "muon_dxy[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_dxyError", &muon_dxyError,"muon_dxyError[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_dxySig",&muon_dxySig,"muon_dxySig[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_dz",&muon_dz, "muon_dz[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_dzError", &muon_dzError,"muon_dzError[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_numberOfValidPixelHits",&muon_numberOfValidPixelHits, "muon_numberOfValidPixelHits[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_numberOfpixelLayersWithMeasurement", &muon_numberOfpixelLayersWithMeasurement, "muon_numberOfpixelLayersWithMeasurement[nmuon]/F",bufferSize); 
-
-
-            tree_->Branch("muon_chi2", &muon_chi2, "muon_chi2[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_ndof",&muon_ndof, "muon_ndof[nmuon]/F",bufferSize); 
-
-            tree_->Branch("muon_caloIso",&muon_caloIso,"muon_caloIso[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_ecalIso",&muon_ecalIso,"muon_ecalIso[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_hcalIso",&muon_hcalIso,"muon_hcalIso[nmuon]/F",bufferSize);
-
-            tree_->Branch("muon_sumPfChHadronPt",&muon_sumPfChHadronPt,"muon_sumPfChHadronPt[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_sumPfNeuHadronEt",&muon_sumPfNeuHadronEt,"muon_sumPfNeuHadronEt[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_Pfpileup",&muon_Pfpileup,"muon_Pfpileup[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_sumPfPhotonEt",&muon_sumPfPhotonEt,"muon_sumPfPhotonEt[nmuon]/F",bufferSize); 
-
-            tree_->Branch("muon_sumPfChHadronPt03",&muon_sumPfChHadronPt03, "muon_sumPfChHadronPt03[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_sumPfNeuHadronEt03",&muon_sumPfNeuHadronEt03,"muon_sumPfNeuHadronEt03[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_Pfpileup03",&muon_Pfpileup03,"muon_Pfpileup03[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_sumPfPhotonEt03",&muon_sumPfPhotonEt03,"muon_sumPfPhotonEt03[nmuon]/F",bufferSize); 
-            tree_->Branch("muon_sumChHadronPt",&muon_sumChHadronPt, "muon_sumChHadronPt[nmuon]/F",bufferSize);
-
-	    
+            muonBranches = makeBranches<maxEntries_muon>(tree_,muonFeatures,"nmuon");
+            
             tree_->Branch("nelectron",&nelectron,"nelectron/I",bufferSize);
-            tree_->Branch("electron_ptrel",&electron_ptrel,"electron_ptrel[nelectron]/F",bufferSize);
-            tree_->Branch("electron_jetDeltaR",&electron_jetDeltaR,"electron_jetDeltaR[nelectron]/F" ,bufferSize); 
-            tree_->Branch("electron_deta",&electron_deta,"electron_deta[nelectron]/F",bufferSize);
-            tree_->Branch("electron_dphi",&electron_dphi,"electron_dphi[nelectron]/F",bufferSize);
-            tree_->Branch("electron_charge",&electron_charge,"electron_charge[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_energy",&electron_energy,"electron_energy[nelectron]/F",bufferSize);
-            tree_->Branch("electron_EtFromCaloEn",&electron_EtFromCaloEn,"electron_EtFromCaloEn[nelectron]/F",bufferSize);
-            tree_->Branch("electron_isEB",&electron_isEB,"electron_isEB[nelectron]/F", bufferSize); 
-            tree_->Branch("electron_isEE",&electron_isEE,"electron_isEE[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_ecalEnergy",&electron_ecalEnergy,"electron_ecalEnergy[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_isPassConversionVeto", &electron_isPassConversionVeto, "electron_isPassConversionVeto[nelectron]/F" ,bufferSize);
-            tree_->Branch("electron_convDist",&electron_convDist,"electron_convDist[nelectron]/F" ,bufferSize); 
-            tree_->Branch("electron_convFlags",&electron_convFlags,"electron_convFlags[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_convRadius",&electron_convRadius,"electron_convRadius[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_hadronicOverEm",&electron_hadronicOverEm,"electron_hadronicOverEm[nelectron]/F",bufferSize);
-            tree_->Branch("electron_ecalDrivenSeed",&electron_ecalDrivenSeed,"electron_ecalDrivenSeed[nelectron]/F",bufferSize);
+            electronBranches = makeBranches<maxEntries_electron>(tree_,electronFeatures,"nelectron");
 
-            tree_->Branch("electron_SC_energy",&electron_SC_energy,"electron_SC_energy[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_SC_deta",&electron_SC_deta,"electron_SC_deta[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_SC_dphi",&electron_SC_dphi,"electron_SC_dphi[nelectron]/F",bufferSize);
-            tree_->Branch("electron_SC_et",&electron_SC_et,"electron_SC_et[nelectron]/F",bufferSize);
-            tree_->Branch("electron_SC_eSuperClusterOverP",&electron_SC_eSuperClusterOverP,"electron_SC_eSuperClusterOverP[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scE1x5Overe5x5",&electron_scE1x5Overe5x5,"electron_scE1x5Overe5x5[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scE2x5MaxOvere5x5",&electron_scE2x5MaxOvere5x5,"electron_scE2x5MaxOvere5x5[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scE5x5",&electron_scE5x5,"electron_scE5x5[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scE5x5Rel",&electron_scE5x5Rel,"electron_scE5x5Rel[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scPixCharge",&electron_scPixCharge,"electron_scPixCharge[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_scSigmaEtaEta",&electron_scSigmaEtaEta,"electron_scSigmaEtaEta[nelectron]/F",bufferSize);
-            tree_->Branch("electron_scSigmaIEtaIEta",&electron_scSigmaIEtaIEta,"electron_scSigmaIEtaIEta[nelectron]/F",bufferSize);  
-            tree_->Branch("electron_superClusterFbrem",&electron_superClusterFbrem,"electron_superClusterFbrem/F",bufferSize); 
-
-            tree_->Branch("electron_2dIP",&electron_2dIP,"electron_2dIP[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_2dIPSig",&electron_2dIPSig,"electron_2dIPSig[nelectron]/F",bufferSize);
-            tree_->Branch("electron_3dIP",&electron_3dIP,"electron_3dIP[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_3dIPSig",&electron_3dIPSig,"electron_3dIPSig[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_eSeedClusterOverP",&electron_eSeedClusterOverP,"electron_eSeedClusterOverP[nelectron]/F",bufferSize);
-            tree_->Branch("electron_eSeedClusterOverPout",&electron_eSeedClusterOverPout,"electron_eSeedClusterOverPout[nelectron]/F",bufferSize);
-            tree_->Branch("electron_eSuperClusterOverP",&electron_eSuperClusterOverP,"electron_eSuperClusterOverP[nelectron]/F",bufferSize);
-            tree_->Branch("electron_eTopOvere5x5",&electron_eTopOvere5x5,"electron_eTopOvere5x5[nelectron]/F",bufferSize); 
-
-            tree_->Branch("electron_deltaEtaEleClusterTrackAtCalo",&electron_deltaEtaEleClusterTrackAtCalo,"electron_deltaEtaEleClusterTrackAtCalo[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_deltaEtaSeedClusterTrackAtCalo",&electron_deltaEtaSeedClusterTrackAtCalo,"electron_deltaEtaSeedClusterTrackAtCalo[nelectron]/F",bufferSize);
-            tree_->Branch("electron_deltaPhiSeedClusterTrackAtCalo",&electron_deltaPhiSeedClusterTrackAtCalo,"electron_deltaPhiSeedClusterTrackAtCalo[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_deltaEtaSeedClusterTrackAtVtx",&electron_deltaPhiSeedClusterTrackAtCalo,"electron_deltaPhiSeedClusterTrackAtCalo[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_deltaEtaSuperClusterTrackAtVtx",&electron_deltaEtaSuperClusterTrackAtVtx,"electron_deltaEtaSuperClusterTrackAtVtx[nelectron]/F",bufferSize);
-            tree_->Branch("electron_deltaPhiEleClusterTrackAtCalo",&electron_deltaPhiEleClusterTrackAtCalo,"electron_deltaPhiEleClusterTrackAtCalo[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_deltaPhiSuperClusterTrackAtVtx",&electron_deltaPhiSuperClusterTrackAtVtx,"electron_deltaPhiSuperClusterTrackAtVtx[nelectron]/F",bufferSize);
-            tree_->Branch("electron_sCseedEta",&electron_sCseedEta,"electron_sCseedEta[nelectron]/F",bufferSize);  
-
-            tree_->Branch("electron_EtaRel",&electron_EtaRel,"electron_EtaRel[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dxy",&electron_dxy,"electron_dxy[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dz",&electron_dz,"electron_dz[nelectron]/F",bufferSize);
-            tree_->Branch("electron_nbOfMissingHits",&electron_nbOfMissingHits,"electron_nbOfMissingHits[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_gsfCharge",&electron_gsfCharge,"electron_gsfCharge[nelectron]/F",bufferSize);
-
-            tree_->Branch("electron_numberOfBrems",&electron_numberOfBrems,"electron_numberOfBrems[nelectron]/F",bufferSize);
-            tree_->Branch("electron_trackFbrem",&electron_trackFbrem,"electron_trackFbrem[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_fbrem",&electron_fbrem,"electron_fbrem[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_e5x5",&electron_e5x5,"electron_e5x5[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_e5x5Rel",&electron_e5x5Rel,"electron_e5x5Rel[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_e1x5Overe5x5",&electron_e1x5Overe5x5,"electron_e1x5Overe5x5[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_e2x5MaxOvere5x5",&electron_e2x5MaxOvere5x5,"electron_e2x5MaxOvere5x5[nelectron]/F",bufferSize);
-
-
-            tree_->Branch("electron_full5x5_e5x5",&electron_full5x5_e5x5,"electron_full5x5_e5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e5x5Rel",&electron_full5x5_e5x5Rel,"electron_full5x5_e5x5Rel[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_full5x5_sigmaIetaIeta",&electron_full5x5_sigmaIetaIeta,"electron_full5x5_sigmaIetaIeta[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e1x5Overe5x5",&electron_full5x5_e1x5Overe5x5,"electron_full5x5_e1x5Overe5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e2x5BottomOvere5x5",&electron_full5x5_e2x5BottomOvere5x5,"electron_full5x5_e2x5BottomOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e2x5LeftOvere5x5",&electron_full5x5_e2x5LeftOvere5x5,"electron_full5x5_e2x5LeftOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e2x5MaxOvere5x5",&electron_full5x5_e2x5MaxOvere5x5,"electron_full5x5_e2x5MaxOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e2x5RightOvere5x5",&electron_full5x5_e2x5RightOvere5x5,"electron_full5x5_e2x5RightOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_e2x5TopOvere5x5",&electron_full5x5_e2x5TopOvere5x5,"electron_full5x5_e2x5TopOvere5x5[nelectron]/F",bufferSize);
-
-
-
-            tree_->Branch("electron_full5x5_eBottomOvere5x5",&electron_full5x5_eBottomOvere5x5,"electron_full5x5_eBottomOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_eLeftOvere5x5",&electron_full5x5_eLeftOvere5x5,"electron_full5x5_eLeftOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_eRightOvere5x5",&electron_full5x5_eRightOvere5x5,"electron_full5x5_eRightOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_eTopOvere5x5",&electron_full5x5_eTopOvere5x5,"electron_full5x5_eTopOvere5x5[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalDepth1OverEcal",&electron_full5x5_hcalDepth1OverEcal,"electron_full5x5_hcalDepth1OverEcal[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalDepth1OverEcalBc",&electron_full5x5_hcalDepth1OverEcalBc,"electron_full5x5_hcalDepth1OverEcalBc[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalDepth2OverEcal",&electron_full5x5_hcalDepth2OverEcal,"electron_full5x5_hcalDepth2OverEcal[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalDepth2OverEcalBc",&electron_full5x5_hcalDepth2OverEcalBc,"electron_full5x5_hcalDepth2OverEcalBc[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalOverEcal",&electron_full5x5_hcalOverEcal,"electron_full5x5_hcalOverEcal[nelectron]/F",bufferSize);
-            tree_->Branch("electron_full5x5_hcalOverEcalBc",&electron_full5x5_hcalOverEcalBc, "electron_full5x5_hcalOverEcalBc[nelectron]/F",bufferSize);   
-            tree_->Branch("electron_full5x5_r9",&electron_full5x5_r9,"electron_full5x5_r9[nelectron]/F",bufferSize);
-
-
-            tree_->Branch("electron_neutralHadronIso",&electron_neutralHadronIso,"electron_neutralHadronIso[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_particleIso",&electron_particleIso,"electron_particleIso[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_photonIso",&electron_photonIso,"electron_photonIso[nelectron]/F",bufferSize);
-            tree_->Branch("electron_puChargedHadronIso",&electron_puChargedHadronIso,"electron_puChargedHadronIso[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_trackIso",&electron_trackIso,"electron_trackIso[nelectron]/F",bufferSize);  
-            tree_->Branch("electron_hcalDepth1OverEcal",&electron_hcalDepth1OverEcal,"electron_hcalDepth1OverEcal[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_hcalDepth2OverEcal",&electron_hcalDepth2OverEcal,"electron_hcalDepth2OverEcal[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_ecalPFClusterIso",&electron_ecalPFClusterIso,"electron_ecalPFClusterIso[nelectron]/F",bufferSize);
-            tree_->Branch("electron_hcalPFClusterIso",&electron_hcalPFClusterIso,"electron_hcalPFClusterIso[nelectron]/F",bufferSize);  
-            tree_->Branch("electron_dr03TkSumPt",&electron_dr03TkSumPt,"electron_dr03TkSumPt[nelectron]/F",bufferSize); 
-
-            tree_->Branch("electron_dr03EcalRecHitSumEt",&electron_dr03EcalRecHitSumEt,"electron_dr03EcalRecHitSumEt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dr03HcalDepth1TowerSumEt",&electron_dr03HcalDepth1TowerSumEt,"electron_dr03HcalDepth1TowerSumEt[nelectron]/F",bufferSize);  
-            tree_->Branch("electron_dr03HcalDepth1TowerSumEtBc",&electron_dr03HcalDepth1TowerSumEtBc,"electron_dr03HcalDepth1TowerSumEtBc[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dr03HcalDepth2TowerSumEt",&electron_dr03HcalDepth2TowerSumEt,"electron_dr03HcalDepth2TowerSumEt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dr03HcalDepth2TowerSumEtBc",&electron_dr03HcalDepth2TowerSumEtBc,"electron_dr03HcalDepth2TowerSumEtBc[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_pfSumPhotonEt",&electron_pfSumPhotonEt,"electron_pfSumPhotonEt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_pfSumChargedHadronPt",&electron_pfSumChargedHadronPt,"electron_pfSumChargedHadronPt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_pfSumNeutralHadronEt",&electron_pfSumNeutralHadronEt,"electron_pfSumNeutralHadronEt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_pfSumPUPt",&electron_pfSumPUPt,"electron_pfSumPUPt[nelectron]/F",bufferSize);
-
-            tree_->Branch("electron_dr04EcalRecHitSumEt",&electron_dr04EcalRecHitSumEt,"electron_dr04EcalRecHitSumEt[nelectron]/F",bufferSize);  
-            tree_->Branch("electron_dr04HcalDepth1TowerSumEt",&electron_dr04HcalDepth1TowerSumEt,"electron_dr04HcalDepth1TowerSumEt[nelectron]",bufferSize);  
-            tree_->Branch("electron_dr04HcalDepth1TowerSumEtBc",&electron_dr04HcalDepth1TowerSumEtBc,"electron_dr04HcalDepth1TowerSumEtBc[nelectron]/F",bufferSize);
-            tree_->Branch("electron_dr04HcalDepth2TowerSumEt",&electron_dr04HcalDepth2TowerSumEt,"electron_dr04HcalDepth2TowerSumEt[nelectron]/F",bufferSize); 
-            tree_->Branch("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc,"electron_dr04HcalDepth2TowerSumEtBc[nelectron]/F",bufferSize);
-            tree_->Branch("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt,"electron_dr04HcalTowerSumEt[nelectron]/F",bufferSize);
-            tree_->Branch("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc,"electron_dr04HcalTowerSumEtBc[nelectron]/F",bufferSize);
-		    
             tree_->SetBasketSize("*",bufferSize); //default is 16kB
         }
         
@@ -781,41 +701,6 @@ class NanoXTree
         int   jetorigin_llpId[maxEntries_global];
         float jetorigin_llp_mass[maxEntries_global];
         float jetorigin_llp_pt[maxEntries_global];
-
-        unsigned int nglobal;
-        float global_pt[maxEntries_global];
-        float global_eta[maxEntries_global];
-        float global_phi[maxEntries_global];
-        float global_mass[maxEntries_global];
-        float global_area[maxEntries_global];
-        int global_n60[maxEntries_global];
-        int global_n90[maxEntries_global];
-        float global_chargedEmEnergyFraction[maxEntries_global];
-        float global_chargedHadronEnergyFraction[maxEntries_global];
-        float global_chargedMuEnergyFraction[maxEntries_global];
-        float global_electronEnergyFraction[maxEntries_global];
-
-        float global_tau1[maxEntries_global];
-        float global_tau2[maxEntries_global];
-        float global_tau3[maxEntries_global];
-
-    
-        float global_relMassDropMassAK[maxEntries_global];
-        float global_relMassDropMassCA[maxEntries_global];
-        float global_relSoftDropMassAK[maxEntries_global];
-        float global_relSoftDropMassCA[maxEntries_global];
-    
-
-        float global_thrust[maxEntries_global];
-        float global_sphericity[maxEntries_global];
-        float global_circularity[maxEntries_global];
-        float global_isotropy[maxEntries_global];
-        float global_eventShapeC[maxEntries_global];
-        float global_eventShapeD[maxEntries_global];
-
-        float xsecweight;
-        float processId;
-        float isData;
         
         unsigned int nlength;
         int length_cpf[maxEntries_global];
@@ -824,250 +709,35 @@ class NanoXTree
         int length_muon[maxEntries_global];
         int length_electron[maxEntries_global];
         
-        unsigned int ncpf;
-        float cpf_trackEtaRel[maxEntries_cpf];
-        float cpf_trackPtRel[maxEntries_cpf];
-        float cpf_trackPPar[maxEntries_cpf];
-        float cpf_trackDeltaR[maxEntries_cpf];
-        float cpf_trackPtRatio[maxEntries_cpf];
-        float cpf_trackPParRatio[maxEntries_cpf];
-        float cpf_trackSip2dVal[maxEntries_cpf];
-        float cpf_trackSip2dSig[maxEntries_cpf];
-        float cpf_trackSip3dVal[maxEntries_cpf];
-        float cpf_trackSip3dSig[maxEntries_cpf];
-        float cpf_trackJetDistVal[maxEntries_cpf];
-        float cpf_trackJetDistSig[maxEntries_cpf];
-        float cpf_ptrel[maxEntries_cpf];
-        float cpf_deta[maxEntries_cpf];
-        float cpf_dphi[maxEntries_cpf];
-        float cpf_drminsv[maxEntries_cpf];
-        float cpf_vertex_association[maxEntries_cpf];
-        int cpf_fromPV[maxEntries_cpf];
-        float cpf_puppi_weight[maxEntries_cpf];
-        float cpf_track_chi2[maxEntries_cpf];
-        float cpf_track_ndof[maxEntries_cpf];
-        float cpf_track_quality[maxEntries_cpf];
-        float cpf_relmassdrop[maxEntries_cpf];
+        float xsecweight;
+        float processId;
+        float isData;
         
-        int cpf_matchedSV[maxEntries_cpf];
-        int cpf_matchedMuon[maxEntries_cpf];
-        int cpf_matchedElectron[maxEntries_cpf];
+
+        unsigned int nglobal;
+        float global_pt[maxEntries_global];
+        float global_eta[maxEntries_global];
+        float global_phi[maxEntries_global];
+        
+        std::vector<std::shared_ptr<BranchData>> globalBranches;
         
         unsigned int ncsv;
-        float csv_trackSumJetEtRatio[maxEntries_global];
-        float csv_trackSumJetDeltaR[maxEntries_global];
-        float csv_vertexCategory[maxEntries_global];
-        float csv_trackSip2dValAboveCharm[maxEntries_global];
-        float csv_trackSip2dSigAboveCharm[maxEntries_global];
-        float csv_trackSip3dValAboveCharm[maxEntries_global];
-        float csv_trackSip3dSigAboveCharm[maxEntries_global];
-        float csv_jetNSelectedTracks[maxEntries_global];
-        float csv_jetNTracksEtaRel[maxEntries_global];
-        
+        std::vector<std::shared_ptr<BranchData>> csvBranches;
+
+        unsigned int ncpf;
+        std::vector<std::shared_ptr<BranchData>> cpfBranches;
 
         unsigned int nnpf;
-        float npf_ptrel[maxEntries_npf];
-        float npf_deta[maxEntries_npf];
-        float npf_dphi[maxEntries_npf];
-        float npf_deltaR[maxEntries_npf];
-        float npf_isGamma[maxEntries_npf];
-        float npf_hcal_fraction[maxEntries_npf];
-        float npf_drminsv[maxEntries_npf];
-        float npf_puppi_weight[maxEntries_npf];
-        float npf_relmassdrop[maxEntries_npf];
+        std::vector<std::shared_ptr<BranchData>> npfBranches;
         
         unsigned int nsv;
-        float sv_ptrel[maxEntries_sv];
-        float sv_deta[maxEntries_sv];
-        float sv_dphi[maxEntries_sv];
-        float sv_mass[maxEntries_sv];
-        float sv_deltaR[maxEntries_sv];
-        float sv_ntracks[maxEntries_sv];
-        float sv_chi2[maxEntries_sv];
-        float sv_ndof[maxEntries_sv];
-        float sv_dxy[maxEntries_sv];
-        float sv_dxysig[maxEntries_sv];
-        float sv_d3d[maxEntries_sv];
-        float sv_d3dsig[maxEntries_sv];
-        float sv_costhetasvpv[maxEntries_sv];
-        float sv_enratio[maxEntries_sv];
+        std::vector<std::shared_ptr<BranchData>> svBranches;
 
         unsigned int nmuon;
-        float muon_isGlobal[maxEntries_muon] ; 
-        float muon_isTight[maxEntries_muon] ; 
-        float muon_isMedium[maxEntries_muon] ; 
-        float muon_isLoose[maxEntries_muon] ; 
-        float muon_isStandAlone[maxEntries_muon] ;
-
-        float muon_ptrel [maxEntries_muon];
-        float muon_EtaRel[maxEntries_muon];
-        float muon_deta[maxEntries_muon];
-        float muon_dphi[maxEntries_muon];
-        float muon_charge [maxEntries_muon]; 
-        float muon_energy[maxEntries_muon];
-        float muon_jetDeltaR [maxEntries_muon]; 
-        float muon_numberOfMatchedStations [maxEntries_muon];
-
-        float muon_2dIp [maxEntries_muon]; 
-        float muon_2dIpSig [maxEntries_muon];
-        float muon_3dIp [maxEntries_muon]; 
-        float muon_3dIpSig [maxEntries_muon]; 
-
-        float muon_dxy [maxEntries_muon]; 
-        float muon_dxyError [maxEntries_muon]; 
-        float muon_dxySig [maxEntries_muon]; 
-        float muon_dz [maxEntries_muon]; 
-        float muon_dzError [maxEntries_muon]; 
-        float muon_numberOfValidPixelHits[maxEntries_muon]; 
-        float muon_numberOfpixelLayersWithMeasurement[maxEntries_muon]; 
-
-        float muon_chi2 [maxEntries_muon]; 
-        float muon_ndof [maxEntries_muon]; 
-
-        float muon_caloIso [maxEntries_muon]; 
-        float muon_ecalIso [maxEntries_muon]; 
-        float muon_hcalIso [maxEntries_muon];
-
-        float muon_sumPfChHadronPt [maxEntries_muon]; 
-        float muon_sumPfNeuHadronEt [maxEntries_muon]; 
-        float muon_Pfpileup [maxEntries_muon]; 
-        float muon_sumPfPhotonEt [maxEntries_muon]; 
-
-        float muon_sumPfChHadronPt03 [maxEntries_muon]; 
-        float muon_sumPfNeuHadronEt03 [maxEntries_muon]; 
-        float muon_Pfpileup03 [maxEntries_muon]; 
-        float muon_sumPfPhotonEt03 [maxEntries_muon]; 
-
-        float muon_sumChHadronPt [maxEntries_muon]; 
-        float muon_sumNeuHadronEt [maxEntries_muon]; 
-        float muon_pileup [maxEntries_muon]; 
-        float muon_sumPhotonEt [maxEntries_muon]; 
-
-        float muon_timeAtIpInOut [maxEntries_muon]; 
-        float muon_timeAtIpInOutErr [maxEntries_muon]; 
-        float muon_timeAtIpOutIn [maxEntries_muon]; 
-
+        std::vector<std::shared_ptr<BranchData>> muonBranches;
 
         unsigned int nelectron;
-        float electron_ptrel[maxEntries_electron];
-        float electron_jetDeltaR[maxEntries_electron]; 
-        float electron_deta[maxEntries_electron];
-        float electron_dphi[maxEntries_electron];
-        float electron_charge[maxEntries_electron]; 
-        float electron_energy[maxEntries_electron];
-        float electron_EtFromCaloEn[maxEntries_electron];
-        float electron_isEB[maxEntries_electron]; 
-        float electron_isEE[maxEntries_electron]; 
-        float electron_ecalEnergy[maxEntries_electron]; 
-        float electron_isPassConversionVeto[maxEntries_electron];
-        float electron_convDist[maxEntries_electron]; 
-        int electron_convFlags[maxEntries_electron]; 
-        float electron_convRadius[maxEntries_electron]; 
-        float electron_hadronicOverEm[maxEntries_electron];
-        float electron_ecalDrivenSeed[maxEntries_electron];
-
-        float electron_SC_energy[maxEntries_electron]; 
-        float electron_SC_deta[maxEntries_electron]; 
-        float electron_SC_dphi[maxEntries_electron];
-        float electron_SC_et[maxEntries_electron];
-        float electron_SC_eSuperClusterOverP[maxEntries_electron]; 
-        float electron_scE1x5Overe5x5[maxEntries_electron]; 
-        float electron_scE2x5MaxOvere5x5[maxEntries_electron]; 
-        float electron_scE5x5[maxEntries_electron]; 
-        float electron_scE5x5Rel[maxEntries_electron]; 
-        float electron_scPixCharge[maxEntries_electron]; 
-        float electron_scSigmaEtaEta[maxEntries_electron];
-        float electron_scSigmaIEtaIEta[maxEntries_electron];  
-        float electron_superClusterFbrem[maxEntries_electron]; 
-
-        float electron_2dIP[maxEntries_electron]; 
-        float electron_2dIPSig[maxEntries_electron];
-        float electron_3dIP[maxEntries_electron]; 
-        float electron_3dIPSig[maxEntries_electron]; 
-        float electron_eSeedClusterOverP[maxEntries_electron];
-        float electron_eSeedClusterOverPout[maxEntries_electron];
-        float electron_eSuperClusterOverP[maxEntries_electron];
-        float electron_eTopOvere5x5[maxEntries_electron]; 
-
-        float electron_deltaEtaEleClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaEtaSeedClusterTrackAtCalo[maxEntries_electron];
-        float electron_deltaPhiSeedClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaEtaSeedClusterTrackAtVtx[maxEntries_electron]; 
-        float electron_deltaEtaSuperClusterTrackAtVtx[maxEntries_electron];
-        float electron_deltaPhiEleClusterTrackAtCalo[maxEntries_electron]; 
-        float electron_deltaPhiSuperClusterTrackAtVtx[maxEntries_electron];
-        float electron_sCseedEta[maxEntries_electron];  
-
-        float electron_EtaRel[maxEntries_electron]; 
-        float electron_dxy[maxEntries_electron]; 
-        float electron_dz[maxEntries_electron];
-        float electron_nbOfMissingHits[maxEntries_electron]; 
-        float electron_gsfCharge[maxEntries_electron];
-
-
-        int electron_numberOfBrems[maxEntries_electron];
-        float electron_trackFbrem[maxEntries_electron]; 
-        float electron_fbrem[maxEntries_electron]; 
-        float electron_e5x5[maxEntries_electron]; 
-        float electron_e5x5Rel[maxEntries_electron]; 
-        float electron_e1x5Overe5x5[maxEntries_electron]; 
-        float electron_e2x5MaxOvere5x5[maxEntries_electron];
-
-        float electron_full5x5_e5x5[maxEntries_electron];
-        float electron_full5x5_e5x5Rel[maxEntries_electron]; 
-        float electron_full5x5_sigmaIetaIeta[maxEntries_electron];
-        float electron_full5x5_e1x5Overe5x5[maxEntries_electron];
-        float electron_full5x5_e2x5BottomOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5LeftOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5MaxOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5RightOvere5x5[maxEntries_electron];
-        float electron_full5x5_e2x5TopOvere5x5[maxEntries_electron];
-
-
-
-        float electron_full5x5_eBottomOvere5x5[maxEntries_electron];
-        float electron_full5x5_eLeftOvere5x5[maxEntries_electron];
-        float electron_full5x5_eRightOvere5x5[maxEntries_electron];
-        float electron_full5x5_eTopOvere5x5[maxEntries_electron];
-        float electron_full5x5_hcalDepth1OverEcal[maxEntries_electron];
-        float electron_full5x5_hcalDepth1OverEcalBc[maxEntries_electron];
-        float electron_full5x5_hcalDepth2OverEcal[maxEntries_electron];
-        float electron_full5x5_hcalDepth2OverEcalBc[maxEntries_electron];
-        float electron_full5x5_hcalOverEcal[maxEntries_electron];
-        float electron_full5x5_hcalOverEcalBc[maxEntries_electron];   
-        float electron_full5x5_r9[maxEntries_electron];
-
-
-
-        float electron_neutralHadronIso[maxEntries_electron]; 
-        float electron_particleIso [maxEntries_electron]; 
-        float electron_photonIso[maxEntries_electron];
-        float electron_puChargedHadronIso[maxEntries_electron]; 
-        float electron_trackIso[maxEntries_electron];  
-        float electron_hcalDepth1OverEcal[maxEntries_electron]; 
-        float electron_hcalDepth2OverEcal[maxEntries_electron]; 
-        float electron_ecalPFClusterIso[maxEntries_electron];
-        float electron_hcalPFClusterIso[maxEntries_electron];  
-        float electron_dr03TkSumPt[maxEntries_electron]; 
-
-        float electron_dr03EcalRecHitSumEt[maxEntries_electron]; 
-        float electron_dr03HcalDepth1TowerSumEt[maxEntries_electron];  
-        float electron_dr03HcalDepth1TowerSumEtBc[maxEntries_electron]; 
-        float electron_dr03HcalDepth2TowerSumEt[maxEntries_electron]; 
-        float electron_dr03HcalDepth2TowerSumEtBc[maxEntries_electron]; 
-        float electron_pfSumPhotonEt[maxEntries_electron]; 
-        float electron_pfSumChargedHadronPt[maxEntries_electron]; 
-        float electron_pfSumNeutralHadronEt[maxEntries_electron]; 
-        float electron_pfSumPUPt[maxEntries_electron];
-
-        float electron_dr04EcalRecHitSumEt[maxEntries_electron];  
-        float electron_dr04HcalDepth1TowerSumEt[maxEntries_electron];  
-        float electron_dr04HcalDepth1TowerSumEtBc[maxEntries_electron];
-        float electron_dr04HcalDepth2TowerSumEt[maxEntries_electron]; 
-        float electron_dr04HcalDepth2TowerSumEtBc[maxEntries_electron];
-        float electron_dr04HcalTowerSumEt[maxEntries_electron];
-        float electron_dr04HcalTowerSumEtBc[maxEntries_electron];
-	
+        std::vector<std::shared_ptr<BranchData>> electronBranches;
 
         std::mt19937 randomGenerator_;
         std::uniform_real_distribution<> uniform_dist_;
@@ -1122,6 +792,24 @@ class NanoXTree
         SymbolTable symbolTable_;
         std::vector<Expression> selections_;
         std::vector<Expression> setters_;
+        
+        
+        template<size_t N>
+        std::vector<std::shared_ptr<BranchData>> branchAddresses(TTree* tree, const std::vector<Feature>& features) const
+        {
+            std::vector<std::shared_ptr<BranchData>> branches;
+            for (size_t ifeature = 0; ifeature < features.size(); ++ifeature)
+            {
+                auto const& feature = features[ifeature];
+                auto branchData = BranchData::branchAddress<N>(
+                    feature.type(),
+                    tree,
+                    feature.name().c_str()
+                );
+                branches.push_back(branchData);
+            }
+            return branches;
+        }
         
     public:
         NanoXTree(
@@ -1222,266 +910,26 @@ class NanoXTree
             tree_->SetBranchAddress("global_eta",&global_eta);
             tree_->SetBranchAddress("global_phi",&global_phi);
 
-            tree_->SetBranchAddress("global_mass",&global_mass);
-            tree_->SetBranchAddress("global_area",&global_area);
-            tree_->SetBranchAddress("global_n60",&global_n60);
-            tree_->SetBranchAddress("global_n90",&global_n90);
-            tree_->SetBranchAddress("global_chargedEmEnergyFraction",&global_chargedEmEnergyFraction);
-            tree_->SetBranchAddress("global_chargedHadronEnergyFraction",&global_chargedHadronEnergyFraction);
-            tree_->SetBranchAddress("global_chargedMuEnergyFraction",&global_chargedMuEnergyFraction);
-            tree_->SetBranchAddress("global_electronEnergyFraction",&global_electronEnergyFraction);
-
-            tree_->SetBranchAddress("global_tau1",&global_tau1);
-            tree_->SetBranchAddress("global_tau2",&global_tau2);
-            tree_->SetBranchAddress("global_tau3",&global_tau3);
-    
-            tree_->SetBranchAddress("global_relMassDropMassAK",&global_relMassDropMassAK);
-            tree_->SetBranchAddress("global_relMassDropMassCA",&global_relMassDropMassCA);
-            tree_->SetBranchAddress("global_relSoftDropMassAK",&global_relSoftDropMassAK);
-            tree_->SetBranchAddress("global_relSoftDropMassCA",&global_relSoftDropMassCA);
-    
-            tree_->SetBranchAddress("global_thrust",&global_thrust);
-            tree_->SetBranchAddress("global_sphericity",&global_sphericity);
-            tree_->SetBranchAddress("global_circularity",&global_circularity);
-            tree_->SetBranchAddress("global_isotropy",&global_isotropy);
-            tree_->SetBranchAddress("global_eventShapeC",&global_eventShapeC);
-            tree_->SetBranchAddress("global_eventShapeD",&global_eventShapeD);
+            globalBranches = branchAddresses<maxEntries_global>(tree_,globalFeatures);
             
             tree_->SetBranchAddress("ncsv",&ncsv);
-            tree_->SetBranchAddress("csv_trackSumJetEtRatio",&csv_trackSumJetEtRatio);
-            tree_->SetBranchAddress("csv_trackSumJetDeltaR",&csv_trackSumJetDeltaR);
-            tree_->SetBranchAddress("csv_vertexCategory",&csv_vertexCategory);
-            tree_->SetBranchAddress("csv_trackSip2dValAboveCharm",&csv_trackSip2dValAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip2dSigAboveCharm",&csv_trackSip2dSigAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip3dValAboveCharm",&csv_trackSip3dValAboveCharm);
-            tree_->SetBranchAddress("csv_trackSip3dSigAboveCharm",&csv_trackSip3dSigAboveCharm);
-            tree_->SetBranchAddress("csv_jetNSelectedTracks",&csv_jetNSelectedTracks);
-            tree_->SetBranchAddress("csv_jetNTracksEtaRel",&csv_jetNTracksEtaRel);
+            csvBranches = branchAddresses<maxEntries_global>(tree_,csvFeatures);
             
-
             tree_->SetBranchAddress("ncpf",&ncpf);
-            tree_->SetBranchAddress("cpf_trackEtaRel",&cpf_trackEtaRel);
-            tree_->SetBranchAddress("cpf_trackPtRel",&cpf_trackPtRel);
-            tree_->SetBranchAddress("cpf_trackPPar",&cpf_trackPPar);
-            tree_->SetBranchAddress("cpf_trackDeltaR",&cpf_trackDeltaR);
-            tree_->SetBranchAddress("cpf_trackPtRatio",&cpf_trackPtRatio);
-            tree_->SetBranchAddress("cpf_trackPParRatio",&cpf_trackPParRatio);
-            tree_->SetBranchAddress("cpf_trackSip2dVal",&cpf_trackSip2dVal);
-            tree_->SetBranchAddress("cpf_trackSip2dSig",&cpf_trackSip2dSig);
-            tree_->SetBranchAddress("cpf_trackSip3dVal",&cpf_trackSip3dVal);
-            tree_->SetBranchAddress("cpf_trackSip3dSig",&cpf_trackSip3dSig);
-            tree_->SetBranchAddress("cpf_trackJetDistVal",&cpf_trackJetDistVal);
-            tree_->SetBranchAddress("cpf_trackJetDistSig",&cpf_trackJetDistSig);
-            tree_->SetBranchAddress("cpf_ptrel",&cpf_ptrel);
-            tree_->SetBranchAddress("cpf_deta",&cpf_deta);
-            tree_->SetBranchAddress("cpf_dphi",&cpf_dphi);
-            tree_->SetBranchAddress("cpf_drminsv",&cpf_drminsv);
-            tree_->SetBranchAddress("cpf_vertex_association",&cpf_vertex_association);
-            tree_->SetBranchAddress("cpf_fromPV",&cpf_fromPV);
-            tree_->SetBranchAddress("cpf_puppi_weight",&cpf_puppi_weight);
-            tree_->SetBranchAddress("cpf_track_chi2",&cpf_track_chi2);
-            tree_->SetBranchAddress("cpf_track_ndof",&cpf_track_ndof);
-            tree_->SetBranchAddress("cpf_track_quality",&cpf_track_quality);
-            tree_->SetBranchAddress("cpf_relmassdrop",&cpf_relmassdrop);
+            cpfBranches = branchAddresses<maxEntries_cpf>(tree_,cpfFeatures);
             
-            tree_->SetBranchAddress("cpf_matchedSV",&cpf_matchedSV);
-            tree_->SetBranchAddress("cpf_matchedMuon",&cpf_matchedMuon);
-            tree_->SetBranchAddress("cpf_matchedElectron",&cpf_matchedElectron);
-            
-          
             tree_->SetBranchAddress("nnpf",&nnpf);
-            tree_->SetBranchAddress("npf_ptrel",&npf_ptrel);
-            tree_->SetBranchAddress("npf_deta",&npf_deta);
-            tree_->SetBranchAddress("npf_dphi",&npf_dphi);
-            tree_->SetBranchAddress("npf_deltaR",&npf_deltaR);
-            tree_->SetBranchAddress("npf_isGamma",&npf_isGamma);
-            tree_->SetBranchAddress("npf_hcal_fraction",&npf_hcal_fraction);
-            tree_->SetBranchAddress("npf_drminsv",&npf_drminsv);
-            tree_->SetBranchAddress("npf_puppi_weight",&npf_puppi_weight);
-            tree_->SetBranchAddress("npf_relmassdrop",&npf_relmassdrop);
+            npfBranches = branchAddresses<maxEntries_npf>(tree_,npfFeatures);
             
             tree_->SetBranchAddress("nsv",&nsv);
-            tree_->SetBranchAddress("sv_ptrel",&sv_ptrel);
-            tree_->SetBranchAddress("sv_deta",&sv_deta);
-            tree_->SetBranchAddress("sv_dphi",&sv_dphi);
-            tree_->SetBranchAddress("sv_mass",&sv_mass);
-            tree_->SetBranchAddress("sv_deltaR",&sv_deltaR);
-            tree_->SetBranchAddress("sv_ntracks",&sv_ntracks);
-            tree_->SetBranchAddress("sv_chi2",&sv_chi2);
-            tree_->SetBranchAddress("sv_ndof",&sv_ndof);
-            tree_->SetBranchAddress("sv_dxy",&sv_dxy);
-            tree_->SetBranchAddress("sv_dxysig",&sv_dxysig);
-            tree_->SetBranchAddress("sv_d3d",&sv_d3d);
-            tree_->SetBranchAddress("sv_d3dsig",&sv_d3dsig);
-            tree_->SetBranchAddress("sv_costhetasvpv",&sv_costhetasvpv);
-            tree_->SetBranchAddress("sv_enratio",&sv_enratio);
+            svBranches = branchAddresses<maxEntries_sv>(tree_,svFeatures);
 		  
 		    tree_->SetBranchAddress("nmuon",&nmuon); 
-            tree_->SetBranchAddress("muon_isGlobal",&muon_isGlobal); 
-            tree_->SetBranchAddress("muon_isTight",&muon_isTight); 
-            tree_->SetBranchAddress("muon_isMedium",&muon_isMedium); 
-            tree_->SetBranchAddress("muon_isLoose",&muon_isLoose); 
-            tree_->SetBranchAddress("muon_isStandAlone",&muon_isStandAlone);
-
-            tree_->SetBranchAddress("muon_ptrel", &muon_ptrel);
-            tree_->SetBranchAddress("muon_EtaRel", &muon_EtaRel);
-            tree_->SetBranchAddress("muon_dphi",&muon_dphi);
-            tree_->SetBranchAddress("muon_deta",&muon_deta);
-            tree_->SetBranchAddress("muon_charge",&muon_charge); 
-            tree_->SetBranchAddress("muon_energy",&muon_energy);
-            tree_->SetBranchAddress("muon_jetDeltaR",&muon_jetDeltaR); 
-            tree_->SetBranchAddress("muon_numberOfMatchedStations",&muon_numberOfMatchedStations);
-
-            tree_->SetBranchAddress("muon_2dIp", &muon_2dIp); 
-            tree_->SetBranchAddress("muon_2dIpSig", &muon_2dIpSig);
-            tree_->SetBranchAddress("muon_3dIp",&muon_3dIp); 
-            tree_->SetBranchAddress("muon_3dIpSig",&muon_3dIpSig); 
-
-            tree_->SetBranchAddress("muon_dxy", &muon_dxy); 
-            tree_->SetBranchAddress("muon_dxyError", &muon_dxyError); 
-            tree_->SetBranchAddress("muon_dxySig",&muon_dxySig); 
-            tree_->SetBranchAddress("muon_dz",&muon_dz); 
-            tree_->SetBranchAddress("muon_dzError", &muon_dzError); 
-            tree_->SetBranchAddress("muon_numberOfValidPixelHits",&muon_numberOfValidPixelHits); 
-            tree_->SetBranchAddress("muon_numberOfpixelLayersWithMeasurement", &muon_numberOfpixelLayersWithMeasurement); 
-
-            tree_->SetBranchAddress("muon_chi2", &muon_chi2); 
-            tree_->SetBranchAddress("muon_ndof",&muon_ndof); 
-
-            tree_->SetBranchAddress("muon_caloIso",&muon_caloIso); 
-            tree_->SetBranchAddress("muon_ecalIso",&muon_ecalIso); 
-            tree_->SetBranchAddress("muon_hcalIso",&muon_hcalIso);
-
-            tree_->SetBranchAddress("muon_sumPfChHadronPt",&muon_sumPfChHadronPt); 
-            tree_->SetBranchAddress("muon_sumPfNeuHadronEt",&muon_sumPfNeuHadronEt); 
-            tree_->SetBranchAddress("muon_Pfpileup",&muon_Pfpileup); 
-            tree_->SetBranchAddress("muon_sumPfPhotonEt",&muon_sumPfPhotonEt); 
-
-            tree_->SetBranchAddress("muon_sumPfChHadronPt03",&muon_sumPfChHadronPt03); 
-            tree_->SetBranchAddress("muon_sumPfNeuHadronEt03",&muon_sumPfNeuHadronEt03); 
-            tree_->SetBranchAddress("muon_Pfpileup03",&muon_Pfpileup03); 
-            tree_->SetBranchAddress("muon_sumPfPhotonEt03",&muon_sumPfPhotonEt03); 
-            tree_->SetBranchAddress("muon_sumChHadronPt",&muon_sumChHadronPt);
- 
+            muonBranches = branchAddresses<maxEntries_muon>(tree_,muonFeatures);
  
             tree_->SetBranchAddress("nelectron",&nelectron); 
-            tree_->SetBranchAddress("electron_ptrel",&electron_ptrel);
-            tree_->SetBranchAddress("electron_jetDeltaR",&electron_jetDeltaR); 
-            tree_->SetBranchAddress("electron_deta",&electron_deta);
-            tree_->SetBranchAddress("electron_dphi",&electron_dphi);
-            tree_->SetBranchAddress("electron_charge",&electron_charge); 
-            tree_->SetBranchAddress("electron_energy",&electron_energy);
-            tree_->SetBranchAddress("electron_EtFromCaloEn",&electron_EtFromCaloEn);
-            tree_->SetBranchAddress("electron_isEB",&electron_isEB); 
-            tree_->SetBranchAddress("electron_isEE",&electron_isEE); 
-            tree_->SetBranchAddress("electron_ecalEnergy",&electron_ecalEnergy); 
-            tree_->SetBranchAddress("electron_isPassConversionVeto", &electron_isPassConversionVeto);
-            tree_->SetBranchAddress("electron_convDist",&electron_convDist); 
-            tree_->SetBranchAddress("electron_convFlags",&electron_convFlags); 
-            tree_->SetBranchAddress("electron_convRadius",&electron_convRadius); 
-            tree_->SetBranchAddress("electron_hadronicOverEm",&electron_hadronicOverEm);
-            tree_->SetBranchAddress("electron_ecalDrivenSeed",&electron_ecalDrivenSeed);
-
-            tree_->SetBranchAddress("electron_SC_energy",&electron_SC_energy); 
-            tree_->SetBranchAddress("electron_SC_deta",&electron_SC_deta); 
-            tree_->SetBranchAddress("electron_SC_dphi",&electron_SC_dphi);
-            tree_->SetBranchAddress("electron_SC_et",&electron_SC_et);
-            tree_->SetBranchAddress("electron_SC_eSuperClusterOverP",&electron_SC_eSuperClusterOverP); 
-            tree_->SetBranchAddress("electron_scE1x5Overe5x5",&electron_scE1x5Overe5x5); 
-            tree_->SetBranchAddress("electron_scE2x5MaxOvere5x5",&electron_scE2x5MaxOvere5x5); 
-            tree_->SetBranchAddress("electron_scE5x5",&electron_scE5x5); 
-            tree_->SetBranchAddress("electron_scE5x5Rel",&electron_scE5x5Rel); 
-            tree_->SetBranchAddress("electron_scPixCharge",&electron_scPixCharge); 
-            tree_->SetBranchAddress("electron_scSigmaEtaEta",&electron_scSigmaEtaEta);
-            tree_->SetBranchAddress("electron_scSigmaIEtaIEta",&electron_scSigmaIEtaIEta);  
-            tree_->SetBranchAddress("electron_superClusterFbrem",&electron_superClusterFbrem); 
-
-            tree_->SetBranchAddress("electron_2dIP",&electron_2dIP); 
-            tree_->SetBranchAddress("electron_2dIPSig",&electron_2dIPSig);
-            tree_->SetBranchAddress("electron_3dIP",&electron_3dIP); 
-            tree_->SetBranchAddress("electron_3dIPSig",&electron_3dIPSig); 
-            tree_->SetBranchAddress("electron_eSeedClusterOverP",&electron_eSeedClusterOverP);
-            tree_->SetBranchAddress("electron_eSeedClusterOverPout",&electron_eSeedClusterOverPout);
-            tree_->SetBranchAddress("electron_eSuperClusterOverP",&electron_eSuperClusterOverP);
-            tree_->SetBranchAddress("electron_eTopOvere5x5",&electron_eTopOvere5x5); 
-
-            tree_->SetBranchAddress("electron_deltaEtaEleClusterTrackAtCalo",&electron_deltaEtaEleClusterTrackAtCalo); 
-            tree_->SetBranchAddress("electron_deltaEtaSeedClusterTrackAtCalo",&electron_deltaEtaSeedClusterTrackAtCalo);
-            tree_->SetBranchAddress("electron_deltaPhiSeedClusterTrackAtCalo",&electron_deltaPhiSeedClusterTrackAtCalo); 
-            tree_->SetBranchAddress("electron_deltaEtaSeedClusterTrackAtVtx",&electron_deltaPhiSeedClusterTrackAtCalo); 
-            tree_->SetBranchAddress("electron_deltaEtaSuperClusterTrackAtVtx",&electron_deltaEtaSuperClusterTrackAtVtx);
-            tree_->SetBranchAddress("electron_deltaPhiEleClusterTrackAtCalo",&electron_deltaPhiEleClusterTrackAtCalo); 
-            tree_->SetBranchAddress("electron_deltaPhiSuperClusterTrackAtVtx",&electron_deltaPhiSuperClusterTrackAtVtx);
-            tree_->SetBranchAddress("electron_sCseedEta",&electron_sCseedEta);  
-
-            tree_->SetBranchAddress("electron_EtaRel",&electron_EtaRel); 
-            tree_->SetBranchAddress("electron_dxy",&electron_dxy); 
-            tree_->SetBranchAddress("electron_dz",&electron_dz);
-            tree_->SetBranchAddress("electron_nbOfMissingHits",&electron_nbOfMissingHits); 
-            tree_->SetBranchAddress("electron_gsfCharge",&electron_gsfCharge);
-
-
-            tree_->SetBranchAddress("electron_numberOfBrems",&electron_numberOfBrems);
-            tree_->SetBranchAddress("electron_trackFbrem",&electron_trackFbrem); 
-            tree_->SetBranchAddress("electron_fbrem",&electron_fbrem); 
-            tree_->SetBranchAddress("electron_e5x5",&electron_e5x5); 
-            tree_->SetBranchAddress("electron_e5x5Rel",&electron_e5x5Rel); 
-            tree_->SetBranchAddress("electron_e1x5Overe5x5",&electron_e1x5Overe5x5); 
-            tree_->SetBranchAddress("electron_e2x5MaxOvere5x5",&electron_e2x5MaxOvere5x5);
-
-            tree_->SetBranchAddress("electron_full5x5_e5x5",&electron_full5x5_e5x5);
-            tree_->SetBranchAddress("electron_full5x5_e5x5Rel",&electron_full5x5_e5x5Rel); 
-            tree_->SetBranchAddress("electron_full5x5_sigmaIetaIeta",&electron_full5x5_sigmaIetaIeta);
-            tree_->SetBranchAddress("electron_full5x5_e1x5Overe5x5",&electron_full5x5_e1x5Overe5x5);
-            tree_->SetBranchAddress("electron_full5x5_e2x5BottomOvere5x5",&electron_full5x5_e2x5BottomOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_e2x5LeftOvere5x5",&electron_full5x5_e2x5LeftOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_e2x5MaxOvere5x5",&electron_full5x5_e2x5MaxOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_e2x5RightOvere5x5",&electron_full5x5_e2x5RightOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_e2x5TopOvere5x5",&electron_full5x5_e2x5TopOvere5x5);
-
-
-
-            tree_->SetBranchAddress("electron_full5x5_eBottomOvere5x5",&electron_full5x5_eBottomOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_eLeftOvere5x5",&electron_full5x5_eLeftOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_eRightOvere5x5",&electron_full5x5_eRightOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_eTopOvere5x5",&electron_full5x5_eTopOvere5x5);
-            tree_->SetBranchAddress("electron_full5x5_hcalDepth1OverEcal",&electron_full5x5_hcalDepth1OverEcal);
-            tree_->SetBranchAddress("electron_full5x5_hcalDepth1OverEcalBc",&electron_full5x5_hcalDepth1OverEcalBc);
-            tree_->SetBranchAddress("electron_full5x5_hcalDepth2OverEcal",&electron_full5x5_hcalDepth2OverEcal);
-            tree_->SetBranchAddress("electron_full5x5_hcalDepth2OverEcalBc",&electron_full5x5_hcalDepth2OverEcalBc);
-            tree_->SetBranchAddress("electron_full5x5_hcalOverEcal",&electron_full5x5_hcalOverEcal);
-            tree_->SetBranchAddress("electron_full5x5_hcalOverEcalBc",&electron_full5x5_hcalOverEcalBc);   
-            tree_->SetBranchAddress("electron_full5x5_r9",&electron_full5x5_r9);
-
-            tree_->SetBranchAddress("electron_neutralHadronIso",&electron_neutralHadronIso); 
-            tree_->SetBranchAddress("electron_particleIso",&electron_particleIso); 
-            tree_->SetBranchAddress("electron_photonIso",&electron_photonIso);
-            tree_->SetBranchAddress("electron_puChargedHadronIso",&electron_puChargedHadronIso); 
-            tree_->SetBranchAddress("electron_trackIso",&electron_trackIso);  
-            tree_->SetBranchAddress("electron_hcalDepth1OverEcal",&electron_hcalDepth1OverEcal); 
-            tree_->SetBranchAddress("electron_hcalDepth2OverEcal",&electron_hcalDepth2OverEcal); 
-            tree_->SetBranchAddress("electron_ecalPFClusterIso",&electron_ecalPFClusterIso);
-            tree_->SetBranchAddress("electron_hcalPFClusterIso",&electron_hcalPFClusterIso);  
-            tree_->SetBranchAddress("electron_dr03TkSumPt",&electron_dr03TkSumPt); 
-
-            tree_->SetBranchAddress("electron_dr03EcalRecHitSumEt",&electron_dr03EcalRecHitSumEt); 
-            tree_->SetBranchAddress("electron_dr03HcalDepth1TowerSumEt",&electron_dr03HcalDepth1TowerSumEt);  
-            tree_->SetBranchAddress("electron_dr03HcalDepth1TowerSumEtBc",&electron_dr03HcalDepth1TowerSumEtBc); 
-            tree_->SetBranchAddress("electron_dr03HcalDepth2TowerSumEt",&electron_dr03HcalDepth2TowerSumEt); 
-            tree_->SetBranchAddress("electron_dr03HcalDepth2TowerSumEtBc",&electron_dr03HcalDepth2TowerSumEtBc); 
-            tree_->SetBranchAddress("electron_pfSumPhotonEt",&electron_pfSumPhotonEt); 
-            tree_->SetBranchAddress("electron_pfSumChargedHadronPt",&electron_pfSumChargedHadronPt); 
-            tree_->SetBranchAddress("electron_pfSumNeutralHadronEt",&electron_pfSumNeutralHadronEt); 
-            tree_->SetBranchAddress("electron_pfSumPUPt",&electron_pfSumPUPt);
-
-            tree_->SetBranchAddress("electron_dr04EcalRecHitSumEt",&electron_dr04EcalRecHitSumEt);  
-            tree_->SetBranchAddress("electron_dr04HcalDepth1TowerSumEt",&electron_dr04HcalDepth1TowerSumEt);  
-            tree_->SetBranchAddress("electron_dr04HcalDepth1TowerSumEtBc",&electron_dr04HcalDepth1TowerSumEtBc);
-            tree_->SetBranchAddress("electron_dr04HcalDepth2TowerSumEt",&electron_dr04HcalDepth2TowerSumEt); 
-            tree_->SetBranchAddress("electron_dr04HcalDepth2TowerSumEtBc",&electron_dr04HcalDepth2TowerSumEtBc);
-            tree_->SetBranchAddress("electron_dr04HcalTowerSumEt",&electron_dr04HcalTowerSumEt);
-            tree_->SetBranchAddress("electron_dr04HcalTowerSumEtBc",&electron_dr04HcalTowerSumEtBc);
-
+            electronBranches = branchAddresses<maxEntries_electron>(tree_,electronFeatures);
+            
             
             symbolTable_.add_variable("isB",isB);
             symbolTable_.add_variable("isBB",isBB);
@@ -1907,44 +1355,17 @@ class NanoXTree
             unpackedTree.global_eta = global_eta[jet];
             unpackedTree.global_phi = global_phi[jet];
 
-            unpackedTree.global_mass= global_mass[jet];
-            unpackedTree.global_area= global_area[jet];
-            unpackedTree.global_n60= global_n60[jet];
-            unpackedTree.global_n90= global_n90[jet];
-            unpackedTree.global_chargedEmEnergyFraction= global_chargedEmEnergyFraction[jet];
-            unpackedTree.global_chargedHadronEnergyFraction= global_chargedHadronEnergyFraction[jet];
-            unpackedTree.global_chargedMuEnergyFraction= global_chargedMuEnergyFraction[jet];
-            unpackedTree.global_electronEnergyFraction= global_electronEnergyFraction[jet];
-
-            unpackedTree.global_tau1= global_tau1[jet];
-            unpackedTree.global_tau2= global_tau2[jet];
-            unpackedTree.global_tau3= global_tau3[jet];
-    
-            unpackedTree.global_relMassDropMassAK= global_relMassDropMassAK[jet];
-            unpackedTree.global_relMassDropMassCA= global_relMassDropMassCA[jet];
-            unpackedTree.global_relSoftDropMassAK= global_relSoftDropMassAK[jet];
-            unpackedTree.global_relSoftDropMassCA= global_relSoftDropMassCA[jet];
-    
-            unpackedTree.global_thrust= global_thrust[jet];
-            unpackedTree.global_sphericity= global_sphericity[jet];
-            unpackedTree.global_circularity= global_circularity[jet];
-            unpackedTree.global_isotropy= global_isotropy[jet];
-            unpackedTree.global_eventShapeC= global_eventShapeC[jet];
-            unpackedTree.global_eventShapeD= global_eventShapeD[jet];
+            if (unpackedTree.globalBranches.size()!=globalBranches.size()) throw std::runtime_error("Global branches have different size!");
+            for (size_t ifeature = 0; ifeature < globalBranches.size(); ++ifeature)
+            {
+                unpackedTree.globalBranches[ifeature]->setFloat(0,globalBranches[ifeature]->getFloat(jet));
+            }
             
-            
-            unpackedTree.csv_trackSumJetEtRatio = csv_trackSumJetEtRatio[jet];
-            unpackedTree.csv_trackSumJetDeltaR = csv_trackSumJetDeltaR[jet];
-            unpackedTree.csv_vertexCategory = csv_vertexCategory[jet];
-            unpackedTree.csv_trackSip2dValAboveCharm = csv_trackSip2dValAboveCharm[jet];
-            unpackedTree.csv_trackSip2dSigAboveCharm = csv_trackSip2dSigAboveCharm[jet];
-            unpackedTree.csv_trackSip3dValAboveCharm = csv_trackSip3dValAboveCharm[jet];
-            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
-            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
-            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
-            unpackedTree.csv_trackSip3dSigAboveCharm = csv_trackSip3dSigAboveCharm[jet];
-            unpackedTree.csv_jetNSelectedTracks = csv_jetNSelectedTracks[jet];
-            unpackedTree.csv_jetNTracksEtaRel = csv_jetNTracksEtaRel[jet];
+            if (unpackedTree.csvBranches.size()!=csvBranches.size()) throw std::runtime_error("CSV branches have different size!");
+            for (size_t ifeature = 0; ifeature < csvBranches.size(); ++ifeature)
+            {
+                unpackedTree.csvBranches[ifeature]->setFloat(0,csvBranches[ifeature]->getFloat(jet));
+            }
 
             
             int cpf_offset = 0;
@@ -1956,37 +1377,14 @@ class NanoXTree
             int ncpf = std::min<int>(UnpackedTree::maxEntries_cpf,length_cpf[jet]);
             unpackedTree.ncpf = ncpf;
             
-            for (int i = 0; i < ncpf; ++i)
+            if (unpackedTree.cpfBranches.size()!=cpfBranches.size()) throw std::runtime_error("CPF branches have different size!");
+            
+            for (size_t ifeature = 0; ifeature < cpfBranches.size(); ++ifeature)
             {
-                unpackedTree.cpf_trackEtaRel[i] = cpf_trackEtaRel[cpf_offset+i];
-                unpackedTree.cpf_trackPtRel[i] = cpf_trackPtRel[cpf_offset+i];
-                unpackedTree.cpf_trackPPar[i] = cpf_trackPPar[cpf_offset+i];
-                unpackedTree.cpf_trackDeltaR[i] = cpf_trackDeltaR[cpf_offset+i];
-                unpackedTree.cpf_trackPtRatio[i] = cpf_trackPtRatio[cpf_offset+i];
-                unpackedTree.cpf_trackPParRatio[i] = cpf_trackPParRatio[cpf_offset+i];
-                
-                unpackedTree.cpf_trackSip2dVal[i] = cpf_trackSip2dVal[cpf_offset+i];
-                unpackedTree.cpf_trackSip2dSig[i] = cpf_trackSip2dSig[cpf_offset+i];
-                unpackedTree.cpf_trackSip3dVal[i] = cpf_trackSip3dVal[cpf_offset+i];
-                unpackedTree.cpf_trackSip3dSig[i] = cpf_trackSip3dSig[cpf_offset+i];
-                
-                unpackedTree.cpf_trackJetDistVal[i] = cpf_trackJetDistVal[cpf_offset+i];
-                unpackedTree.cpf_trackJetDistSig[i] = cpf_trackJetDistSig[cpf_offset+i];
-                unpackedTree.cpf_ptrel[i] = cpf_ptrel[cpf_offset+i];
-                unpackedTree.cpf_deta[i] = cpf_deta[cpf_offset+i];
-                unpackedTree.cpf_dphi[i] = cpf_dphi[cpf_offset+i];
-                unpackedTree.cpf_drminsv[i] = cpf_drminsv[cpf_offset+i];
-                unpackedTree.cpf_vertex_association[i] = cpf_vertex_association[cpf_offset+i];
-                unpackedTree.cpf_puppi_weight[i] = cpf_puppi_weight[cpf_offset+i];
-                unpackedTree.cpf_fromPV[i] = cpf_fromPV[cpf_offset+i];
-                unpackedTree.cpf_track_chi2[i] = cpf_track_chi2[cpf_offset+i];
-                unpackedTree.cpf_track_ndof[i] = cpf_track_ndof[cpf_offset+i];
-                unpackedTree.cpf_track_quality[i] = cpf_track_quality[cpf_offset+i];
-                unpackedTree.cpf_relmassdrop[i] = cpf_relmassdrop[cpf_offset+i];
-                
-                unpackedTree.cpf_matchedSV[i] = cpf_matchedSV[cpf_offset+i];
-                unpackedTree.cpf_matchedMuon[i] = cpf_matchedMuon[cpf_offset+i];
-                unpackedTree.cpf_matchedElectron[i] = cpf_matchedElectron[cpf_offset+i];
+                for (int i = 0; i < ncpf; ++i)
+                {
+                    unpackedTree.cpfBranches[ifeature]->setFloat(i,cpfBranches[ifeature]->getFloat(cpf_offset+i));
+                }
             }
             
             
@@ -1998,18 +1396,16 @@ class NanoXTree
             int nnpf = std::min<int>(UnpackedTree::maxEntries_npf,length_npf[jet]);
             unpackedTree.nnpf = nnpf;
             
-            for (int i = 0; i < nnpf; ++i)
+            if (unpackedTree.npfBranches.size()!=npfBranches.size()) throw std::runtime_error("NPF branches have different size!");
+            
+            for (size_t ifeature = 0; ifeature < npfBranches.size(); ++ifeature)
             {
-                unpackedTree.npf_ptrel[i] = npf_ptrel[npf_offset+i];
-                unpackedTree.npf_deta[i] = npf_deta[npf_offset+i];
-                unpackedTree.npf_dphi[i] = npf_dphi[npf_offset+i];
-                unpackedTree.npf_deltaR[i] = npf_deltaR[npf_offset+i];
-                unpackedTree.npf_isGamma[i] = npf_isGamma[npf_offset+i];
-                unpackedTree.npf_hcal_fraction[i] = npf_hcal_fraction[npf_offset+i];
-                unpackedTree.npf_drminsv[i] = npf_drminsv[npf_offset+i];
-                unpackedTree.npf_puppi_weight[i] = npf_puppi_weight[npf_offset+i];
-                unpackedTree.npf_relmassdrop[i] = npf_relmassdrop[npf_offset+i];
+                for (int i = 0; i < nnpf; ++i)
+                {
+                    unpackedTree.npfBranches[ifeature]->setFloat(i,npfBranches[ifeature]->getFloat(npf_offset+i));
+                }   
             }
+
 
             int sv_offset = 0;
             for (size_t i = 0; i < jet; ++i)
@@ -2020,22 +1416,14 @@ class NanoXTree
             int nsv = std::min<int>(UnpackedTree::maxEntries_sv,length_sv[jet]);
             unpackedTree.nsv = nsv;
             
-            for (int i = 0; i < nsv; ++i)
+            if (unpackedTree.svBranches.size()!=svBranches.size()) throw std::runtime_error("SV branches have different size!");
+            
+            for (size_t ifeature = 0; ifeature < svBranches.size(); ++ifeature)
             {
-                unpackedTree.sv_ptrel[i] = sv_ptrel[sv_offset+i];
-                unpackedTree.sv_deta[i] = sv_deta[sv_offset+i];
-                unpackedTree.sv_dphi[i] = sv_dphi[sv_offset+i];
-                unpackedTree.sv_mass[i] = sv_mass[sv_offset+i];
-                unpackedTree.sv_deltaR[i] = sv_deltaR[sv_offset+i];
-                unpackedTree.sv_ntracks[i] = sv_ntracks[sv_offset+i];
-                unpackedTree.sv_chi2[i] = sv_chi2[sv_offset+i];
-                unpackedTree.sv_ndof[i] = sv_ndof[sv_offset+i];
-                unpackedTree.sv_dxy[i] = sv_dxy[sv_offset+i];
-                unpackedTree.sv_dxysig[i] = sv_dxysig[sv_offset+i];
-                unpackedTree.sv_d3d[i] = sv_d3d[sv_offset+i];
-                unpackedTree.sv_d3dsig[i] = sv_d3dsig[sv_offset+i];
-                unpackedTree.sv_costhetasvpv[i] = sv_costhetasvpv[sv_offset+i];
-                unpackedTree.sv_enratio[i] = sv_enratio[sv_offset+i];
+                for (int i = 0; i < nsv; ++i)
+                {
+                    unpackedTree.svBranches[ifeature]->setFloat(i,svBranches[ifeature]->getFloat(sv_offset+i));
+                }
             }
             
             
@@ -2048,63 +1436,15 @@ class NanoXTree
             int nmuon = std::min<int>(UnpackedTree::maxEntries_muon,length_muon[jet]);
             unpackedTree.nmuon = nmuon;
             
-            for (int i = 0; i < nmuon; ++i)
+            if (unpackedTree.muonBranches.size()!=muonBranches.size()) throw std::runtime_error("Muon branches have different size!");
+            for (size_t ifeature = 0; ifeature < muonBranches.size(); ++ifeature)
             {
-                unpackedTree.muon_isGlobal[i] = muon_isGlobal[muon_offset+i];
-                unpackedTree.muon_isTight[i] = muon_isTight[muon_offset+i];
-                unpackedTree.muon_isMedium[i] = muon_isMedium[muon_offset+i]; 
-                unpackedTree.muon_isLoose[i] = muon_isLoose[muon_offset+i];
-                unpackedTree.muon_isStandAlone[i] = muon_isStandAlone[muon_offset+i];
+                for (int i = 0; i < nmuon; ++i)
+                {
+                    unpackedTree.muonBranches[ifeature]->setFloat(i,muonBranches[ifeature]->getFloat(muon_offset+i));
+	            }
+            }
 
-                unpackedTree.muon_ptrel[i] = muon_ptrel[muon_offset+i];
-                unpackedTree.muon_EtaRel[i] = muon_EtaRel[muon_offset+i];
-                unpackedTree.muon_dphi[i] = muon_dphi[muon_offset+i];
-                unpackedTree.muon_deta[i] = muon_deta[muon_offset+i];
-                unpackedTree.muon_charge[i] = muon_charge[muon_offset+i];
-                unpackedTree.muon_energy[i] = muon_energy[muon_offset+i];
-                unpackedTree.muon_jetDeltaR[i] = muon_jetDeltaR[muon_offset+i]; 
-                unpackedTree.muon_numberOfMatchedStations[i] = muon_numberOfMatchedStations[muon_offset+i];
-
-                unpackedTree.muon_2dIp[i] = muon_2dIp[muon_offset+i];
-                unpackedTree.muon_2dIpSig[i] = muon_2dIpSig[muon_offset+i];
-                unpackedTree.muon_3dIp[i] = muon_3dIp[muon_offset+i];
-                unpackedTree.muon_3dIpSig[i] = muon_3dIpSig[muon_offset+i];
-
-                unpackedTree.muon_dxy[i] = muon_dxy[muon_offset+i];
-                unpackedTree.muon_dxyError[i] = muon_dxyError[muon_offset+i];
-                unpackedTree.muon_dxySig[i] = muon_dxySig[muon_offset+i]; 
-                unpackedTree.muon_dz[i] = muon_dz[muon_offset+i];
-                unpackedTree.muon_dzError[i] = muon_dzError[muon_offset+i];
-                unpackedTree.muon_numberOfValidPixelHits[i] = muon_numberOfValidPixelHits[muon_offset+i]; 
-                unpackedTree.muon_numberOfpixelLayersWithMeasurement[i] = muon_numberOfpixelLayersWithMeasurement[muon_offset+i];
-
-                unpackedTree.muon_chi2[i] = muon_chi2[muon_offset+i];
-                unpackedTree.muon_ndof[i] = muon_ndof[muon_offset+i];
-
-                unpackedTree.muon_caloIso[i] = muon_caloIso[muon_offset+i];
-                unpackedTree.muon_ecalIso[i] = muon_ecalIso[muon_offset+i];
-                unpackedTree.muon_hcalIso[i] = muon_hcalIso[muon_offset+i];
-
-                unpackedTree.muon_sumPfChHadronPt[i] = muon_sumPfChHadronPt[muon_offset+i];
-                unpackedTree.muon_sumPfNeuHadronEt[i] = muon_sumPfNeuHadronEt[muon_offset+i];
-                unpackedTree.muon_Pfpileup[i] = muon_Pfpileup[muon_offset+i];
-                unpackedTree.muon_sumPfPhotonEt[i] = muon_sumPfPhotonEt[muon_offset+i];
-
-                unpackedTree.muon_sumPfChHadronPt03[i] = muon_sumPfChHadronPt03[muon_offset+i];
-                unpackedTree.muon_sumPfNeuHadronEt03[i] = muon_sumPfNeuHadronEt03[muon_offset+i];
-                unpackedTree.muon_Pfpileup03[i] = muon_Pfpileup03[muon_offset+i];
-                unpackedTree.muon_sumPfPhotonEt03[i] = muon_sumPfPhotonEt03[muon_offset+i];
-
-                unpackedTree.muon_sumChHadronPt[i] = muon_sumChHadronPt[muon_offset+i];
-                unpackedTree.muon_sumNeuHadronEt[i] = muon_sumNeuHadronEt[muon_offset+i];
-                unpackedTree.muon_pileup[i] = muon_pileup[muon_offset+i];
-                unpackedTree.muon_sumPhotonEt[i] = muon_sumPhotonEt[muon_offset+i];
-
-                unpackedTree.muon_timeAtIpInOut[i] = muon_timeAtIpInOut[muon_offset+i];
-                unpackedTree.muon_timeAtIpInOutErr[i] = muon_timeAtIpInOutErr[muon_offset+i];
-                unpackedTree.muon_timeAtIpOutIn[i] = muon_timeAtIpOutIn[muon_offset+i];
-
-	        }
 
             int electron_offset = 0;
             for (size_t i = 0; i < jet; ++i)
@@ -2115,132 +1455,18 @@ class NanoXTree
             int nelectron = std::min<int>(UnpackedTree::maxEntries_electron,length_electron[jet]);
             unpackedTree.nelectron = nelectron;
 
-            for (int i = 0; i < nelectron; ++i)
+            if (unpackedTree.electronBranches.size()!=electronBranches.size()) throw std::runtime_error("Electron branches have different size!");
+            for (size_t ifeature = 0; ifeature < electronBranches.size(); ++ifeature)
             {
-
-                unpackedTree.electron_ptrel[i] = electron_ptrel[electron_offset+i]; 
-                unpackedTree.electron_jetDeltaR[i] =electron_jetDeltaR[electron_offset+i];  
-                unpackedTree.electron_deta[i] = electron_deta[electron_offset+i]; 
-                unpackedTree.electron_dphi[i] = electron_dphi[electron_offset+i]; 
-                unpackedTree.electron_charge[i] =electron_charge[electron_offset+i];  
-                unpackedTree.electron_energy[i] = electron_energy[electron_offset+i]; 
-                unpackedTree.electron_EtFromCaloEn[i] = electron_EtFromCaloEn[electron_offset+i]; 
-                unpackedTree.electron_isEB[i] = electron_isEB[electron_offset+i];  
-                unpackedTree.electron_isEE[i] = electron_isEE[electron_offset+i];  
-                unpackedTree.electron_ecalEnergy[i] = electron_ecalEnergy[electron_offset+i];  
-                unpackedTree.electron_isPassConversionVeto[i] = electron_isPassConversionVeto[electron_offset+i]; 
-                unpackedTree.electron_convDist[i] = electron_convDist[electron_offset+i];  
-    	        unpackedTree.electron_convFlags[i] = electron_convFlags[electron_offset+i];  
-                unpackedTree.electron_convRadius[i] = electron_convRadius[electron_offset+i];  
-                unpackedTree.electron_hadronicOverEm[i] = electron_hadronicOverEm[electron_offset+i]; 
-                unpackedTree.electron_ecalDrivenSeed[i] = electron_ecalDrivenSeed[electron_offset+i]; 
-
-                unpackedTree.electron_SC_energy[i] = electron_SC_energy[electron_offset+i];  
-                unpackedTree.electron_SC_deta[i] = electron_SC_deta[electron_offset+i];  
-                unpackedTree.electron_SC_dphi[i] = electron_SC_dphi[electron_offset+i]; 
-                unpackedTree.electron_SC_et[i] = electron_SC_et[electron_offset+i]; 
-                unpackedTree.electron_SC_eSuperClusterOverP[i] = electron_SC_eSuperClusterOverP[electron_offset+i];  
-                unpackedTree.electron_scE1x5Overe5x5[i] = electron_scE1x5Overe5x5[electron_offset+i];  
-                unpackedTree.electron_scE2x5MaxOvere5x5[i] = electron_scE2x5MaxOvere5x5[electron_offset+i];  
-                unpackedTree.electron_scE5x5[i] = electron_scE5x5[electron_offset+i];  
-                unpackedTree.electron_scE5x5Rel [i] = electron_scE5x5Rel[electron_offset+i];  
-                unpackedTree.electron_scPixCharge [i] = electron_scPixCharge[electron_offset+i];  
-                unpackedTree.electron_scSigmaEtaEta [i] = electron_scSigmaEtaEta[electron_offset+i]; 
-                unpackedTree.electron_scSigmaIEtaIEta [i] = electron_scSigmaIEtaIEta[electron_offset+i];   
-                unpackedTree.electron_superClusterFbrem [i] = electron_superClusterFbrem[electron_offset+i];  
-
-                unpackedTree.electron_2dIP[i] = electron_2dIP[electron_offset+i];  
-                unpackedTree.electron_2dIPSig[i] =electron_2dIPSig[electron_offset+i]; 
-                unpackedTree.electron_3dIP[i] = electron_3dIP[electron_offset+i];  
-                unpackedTree.electron_3dIPSig[i] =electron_3dIPSig[electron_offset+i];  
-                unpackedTree.electron_eSeedClusterOverP[i] = electron_eSeedClusterOverP[electron_offset+i]; 
-                unpackedTree.electron_eSeedClusterOverPout[i] =electron_eSeedClusterOverPout[electron_offset+i]; 
-                unpackedTree.electron_eSuperClusterOverP[i] = electron_eSuperClusterOverP[electron_offset+i]; 
-                unpackedTree.electron_eTopOvere5x5[i] = electron_eTopOvere5x5[electron_offset+i];  
-
-                unpackedTree.electron_deltaEtaEleClusterTrackAtCalo [i] =electron_deltaEtaEleClusterTrackAtCalo [electron_offset+i];  
-                unpackedTree.electron_deltaEtaSeedClusterTrackAtCalo [i] = electron_deltaEtaSeedClusterTrackAtCalo[electron_offset+i]; 
-                unpackedTree.electron_deltaPhiSeedClusterTrackAtCalo [i] = electron_deltaPhiSeedClusterTrackAtCalo[electron_offset+i];  
-                unpackedTree.electron_deltaEtaSeedClusterTrackAtVtx [i] = electron_deltaEtaSeedClusterTrackAtVtx[electron_offset+i];  
-                unpackedTree.electron_deltaEtaSuperClusterTrackAtVtx [i] = electron_deltaEtaSuperClusterTrackAtVtx[electron_offset+i]; 
-                unpackedTree.electron_deltaPhiEleClusterTrackAtCalo [i] = electron_deltaPhiEleClusterTrackAtCalo[electron_offset+i];  
-                unpackedTree.electron_deltaPhiSuperClusterTrackAtVtx [i] = electron_deltaPhiSuperClusterTrackAtVtx[electron_offset+i]; 
-                unpackedTree.electron_sCseedEta [i] = electron_sCseedEta[electron_offset+i];   
-
-                unpackedTree.electron_EtaRel [i] = electron_EtaRel[electron_offset+i];  
-                unpackedTree.electron_dxy [i] = electron_dxy[electron_offset+i];  
-                unpackedTree.electron_dz [i] = electron_dz[electron_offset+i]; 
-                unpackedTree.electron_nbOfMissingHits [i] = electron_nbOfMissingHits[electron_offset+i];  
-                unpackedTree.electron_gsfCharge [i] = electron_gsfCharge[electron_offset+i]; 
-
-
-                unpackedTree.electron_numberOfBrems [i] = electron_numberOfBrems[electron_offset+i]; 
-                unpackedTree.electron_trackFbrem [i] = electron_trackFbrem[electron_offset+i];  
-                unpackedTree.electron_fbrem [i] = electron_fbrem[electron_offset+i];  
-                unpackedTree.electron_e5x5 [i] = electron_e5x5[electron_offset+i];  
-                unpackedTree.electron_e5x5Rel [i] =electron_e5x5Rel[electron_offset+i];  
-                unpackedTree.electron_e1x5Overe5x5 [i] = electron_e1x5Overe5x5[electron_offset+i];  
-                unpackedTree.electron_e2x5MaxOvere5x5[i] = electron_e2x5MaxOvere5x5[electron_offset+i]; 
-
-
-                unpackedTree.electron_full5x5_e5x5 [i] = electron_full5x5_e5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e5x5Rel [i] = electron_full5x5_e5x5Rel[electron_offset+i];  
-                unpackedTree.electron_full5x5_sigmaIetaIeta [i] = electron_full5x5_sigmaIetaIeta[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e1x5Overe5x5 [i] = electron_full5x5_e1x5Overe5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e2x5BottomOvere5x5 [i] = electron_full5x5_e2x5BottomOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e2x5LeftOvere5x5 [i] = electron_full5x5_e2x5LeftOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e2x5MaxOvere5x5 [i] = electron_full5x5_e2x5MaxOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e2x5RightOvere5x5 [i] = electron_full5x5_e2x5RightOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_e2x5TopOvere5x5 [i] = electron_full5x5_e2x5TopOvere5x5[electron_offset+i]; 
-
-
-
-                unpackedTree.electron_full5x5_eBottomOvere5x5[i] = electron_full5x5_eBottomOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_eLeftOvere5x5[i] = electron_full5x5_eLeftOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_eRightOvere5x5[i] = electron_full5x5_eRightOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_eTopOvere5x5[i] = electron_full5x5_eTopOvere5x5[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalDepth1OverEcal [i] = electron_full5x5_hcalDepth1OverEcal[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalDepth1OverEcalBc [i] = electron_full5x5_hcalDepth1OverEcalBc[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalDepth2OverEcal[i] = electron_full5x5_hcalDepth2OverEcal[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalDepth2OverEcalBc [i] = electron_full5x5_hcalDepth2OverEcalBc[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalOverEcal [i] = electron_full5x5_hcalOverEcal[electron_offset+i]; 
-                unpackedTree.electron_full5x5_hcalOverEcalBc[i] = electron_full5x5_hcalOverEcalBc[electron_offset+i];    
-                unpackedTree.electron_full5x5_r9 [i] = electron_full5x5_r9[electron_offset+i]; 
-
-                unpackedTree.electron_neutralHadronIso[i] = electron_neutralHadronIso[electron_offset+i];  
-                unpackedTree.electron_particleIso [i] = electron_particleIso[electron_offset+i];  
-                unpackedTree.electron_photonIso[i] = electron_photonIso[electron_offset+i]; 
-                unpackedTree.electron_puChargedHadronIso[i] = electron_puChargedHadronIso[electron_offset+i];  
-                unpackedTree.electron_trackIso [i] = electron_trackIso[electron_offset+i];   
-                unpackedTree.electron_hcalDepth1OverEcal [i] = electron_hcalDepth1OverEcal[electron_offset+i];  
-                unpackedTree.electron_hcalDepth2OverEcal [i] = electron_hcalDepth2OverEcal[electron_offset+i];  
-                unpackedTree.electron_ecalPFClusterIso [i] = electron_ecalPFClusterIso[electron_offset+i]; 
-                unpackedTree.electron_hcalPFClusterIso [i] = electron_hcalPFClusterIso[electron_offset+i];   
-                unpackedTree.electron_dr03TkSumPt [i] = electron_dr03TkSumPt[electron_offset+i];  
-
-                unpackedTree.electron_dr03EcalRecHitSumEt [i] = electron_dr03EcalRecHitSumEt[electron_offset+i];  
-                unpackedTree.electron_dr03HcalDepth1TowerSumEt [i] = electron_dr03HcalDepth1TowerSumEt[electron_offset+i];   
-                unpackedTree.electron_dr03HcalDepth1TowerSumEtBc [i] = electron_dr03HcalDepth1TowerSumEtBc[electron_offset+i];  
-                unpackedTree.electron_dr03HcalDepth2TowerSumEt [i] = electron_dr03HcalDepth2TowerSumEt[electron_offset+i];  
-                unpackedTree.electron_dr03HcalDepth2TowerSumEtBc [i] = electron_dr03HcalDepth2TowerSumEtBc[electron_offset+i];  
-                unpackedTree.electron_pfSumPhotonEt [i] = electron_pfSumPhotonEt[electron_offset+i];  
-                unpackedTree.electron_pfSumChargedHadronPt [i] = electron_pfSumChargedHadronPt[electron_offset+i];  
-                unpackedTree.electron_pfSumNeutralHadronEt [i] = electron_pfSumNeutralHadronEt[electron_offset+i];  
-                unpackedTree.electron_pfSumPUPt [i] = electron_pfSumPUPt[electron_offset+i]; 
-
-                unpackedTree.electron_dr04EcalRecHitSumEt [i] = electron_dr04EcalRecHitSumEt[electron_offset+i];   
-                unpackedTree.electron_dr04HcalDepth1TowerSumEt [i] = electron_dr04HcalDepth1TowerSumEt[electron_offset+i];   
-                unpackedTree.electron_dr04HcalDepth1TowerSumEtBc [i] = electron_dr04HcalDepth1TowerSumEtBc[electron_offset+i]; 
-                unpackedTree.electron_dr04HcalDepth2TowerSumEt [i] = electron_dr04HcalDepth2TowerSumEt[electron_offset+i];  
-                unpackedTree.electron_dr04HcalDepth2TowerSumEtBc  [i] = electron_dr04HcalDepth2TowerSumEtBc[electron_offset+i]; 
-                unpackedTree.electron_dr04HcalTowerSumEt  [i] = electron_dr04HcalTowerSumEt[electron_offset+i]; 
-                unpackedTree.electron_dr04HcalTowerSumEtBc  [i] = electron_dr04HcalTowerSumEtBc[electron_offset+i]; 
+                for (int i = 0; i < nelectron; ++i)
+                {
+                    unpackedTree.electronBranches[ifeature]->setFloat(i,electronBranches[ifeature]->getFloat(electron_offset+i));
+                }
 		    }
 
             unpackedTree.fill();
             return true;
         }
-       
 };
 
 inline bool ends_with(std::string const & value, std::string const & ending)

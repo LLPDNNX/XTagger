@@ -14,10 +14,13 @@ After the installation the environments can be used with `source Env/env_cpu.sh`
 ## Custom operations
 A set of custom operation modules for [Tensorflow](https://www.tensorflow.org/) can be installed using [cmake](https://cmake.org/) as following. These allow to train on [ROOT](https://root.cern.ch/) trees directly and to perform preprocessing of the training data such as resampling.
 ```
+PROJECTDIR=$PWD
 mkdir Ops/build
 cd Ops/build
-cmake ..
+cmake -DCMAKE_INSTALL_PREFIX=$PROJECTDIR/Ops/release ..
 make
+make install
+export PYTHONPATH=$PROJECTDIR/Ops/release/lib/python2.7/site-packages
 ```
 
 ## Training using nanoX unpacked samples:

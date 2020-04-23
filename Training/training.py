@@ -1,4 +1,3 @@
-import keras
 import os
 import time
 import math
@@ -10,7 +9,9 @@ import datetime
 import numpy as np
 import copy
 
+os.environ['KERAS_BACKEND']='tensorflow'
 import tensorflow as tf
+import keras
 import ROOT
 
 from keras import backend as K

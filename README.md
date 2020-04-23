@@ -15,9 +15,8 @@ After the installation the environments can be used with `source Env/env_cpu.sh`
 A set of custom operation modules for [Tensorflow](https://www.tensorflow.org/) can be installed using [cmake](https://cmake.org/) as following. These allow to train on [ROOT](https://root.cern.ch/) trees directly and to perform preprocessing of the training data such as resampling.
 ```
 PROJECTDIR=$PWD
-mkdir Ops/build
-cd Ops/build
-cmake -DCMAKE_INSTALL_PREFIX=$PROJECTDIR/Ops/release ..
+cd Ops
+cmake -DCMAKE_INSTALL_PREFIX=$PROJECTDIR/Ops/release .
 make
 make install
 export PYTHONPATH=$PROJECTDIR/Ops/release/lib/python2.7/site-packages
@@ -33,3 +32,9 @@ python Training/training.py --gpu -b 10000 --train samples/nanox_ctau_10_train.t
 This would start training using GPUs if available, with a batch size of 10000 and with specified training and testing samples.
 Furthermore, the training would be performed for 100 epochs and achieving balance of all classes as well as kinematic resampling. The output folder will be created as output/ctau_10.
 To load a different model, the ``-m`` parameter can be used.
+
+## Training using hdf5 files (skipping ROOT-to-TF input pipeline)
+
+```
+python Training/training.py --train samples/train_hdf5.txt --test samples/test_hdf5.txt -e 10 --name test_hdf5 --hdf5 
+```

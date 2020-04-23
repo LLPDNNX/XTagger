@@ -1,5 +1,6 @@
 import os
 import time
+import h5py
 import math
 import random
 import sys
@@ -16,8 +17,6 @@ import ROOT
 
 from keras import backend as K
 from keras.utils import plot_model
-from xtagger import root_reader, resampler
-from xtagger import classification_weights, fake_background
 from sklearn.metrics import auc
 from feature_dict import featureDict as featureDictTmpl
 from plot_macros import plot_resampled, make_plots, makePlot
@@ -75,7 +74,7 @@ parser.add_argument('-n', action='store', type=int,
 parser.add_argument('--gpu', action='store_true', dest='isGPU',
                     help='try to use gpu', default=False)
 parser.add_argument('-b', '--batch', action='store', type=int,
-                    help='batch_size', default=10000)
+                    help='batch_size', default=1000)
 parser.add_argument('-c', action='store_true',
                     help='achieve class balance', default=False)
 parser.add_argument('-e', '--epoch', action='store', type=int,
@@ -110,6 +109,7 @@ parser.add_argument('--kappa', type=float,help='learning rate decay val',
                     default=0.1,dest='kappa')
 parser.add_argument('--gamma', type=float,help='domain loss weight',
                     default=0.2,dest='gamma')
+parser.add_argument('--hdf5', action='store_true', default=False)
 
 arguments = parser.parse_args()
 
@@ -134,6 +134,13 @@ bagging = arguments.bagging
 kappa = arguments.kappa
 lambda_val = arguments.lambda_val
 gamma = arguments.gamma
+noPipeline = arguments.hdf5 
+
+if noPipeline:
+    noDA = True
+else:
+    from xtagger import root_reader, resampler
+    from xtagger import classification_weights, fake_background
 
 modelPath = arguments.model
 import importlib
@@ -286,164 +293,166 @@ if not noDA:
 
 # define the feature dictionary for training
 # Count the number of entries in total
-histsPerClass = {}
-weightsPerClass = {}
-branchNameList = []
-eventsPerClass = {}
-dropoutPerClass = {}
-resampledEventsPerClass = {}
-
-chain = ROOT.TChain("jets")
-for f in fileListTrain:
-    chain.AddFile(f)
-nEntries = chain.GetEntries()
-print "total entries", nEntries
-
-# Calculate weights for resampling in pt and eta
 binningPt = np.linspace(1.3, 3.0, num=30)
 binningEta = np.linspace(-2.4, 2.4, num=10)
 binningctau = -.5 + np.linspace(-3., 6., num=20)
-targetShape = ROOT.TH2F("ptetaTarget", "", len(binningPt)-1, binningPt,
-                        len(binningEta)-1, binningEta)
+if not noPipeline:
 
-targetEvents = 0
+    histsPerClass = {}
+    weightsPerClass = {}
+    branchNameList = []
+    eventsPerClass = {}
+    dropoutPerClass = {}
+    resampledEventsPerClass = {}
 
-print_delimiter
+    chain = ROOT.TChain("jets")
+    for f in fileListTrain:
+        chain.AddFile(f)
+    nEntries = chain.GetEntries()
+    print "total entries", nEntries
 
-for label in featureDict["truth"]["branches"]:
-    branchName = label.split("/")[0]
-    branchNameList.append(branchName)
-    print "projecting ... ", branchName
-    hist = ROOT.TH2F("pteta"+branchName, "", len(binningPt)-1, binningPt,
-                     len(binningEta)-1, binningEta)
-    hist.Sumw2()
-    chain.Project(hist.GetName(), "global_eta:global_pt",
-                  "("+branchName+"==1)")
-    # scale w.r.t. LLP
-    if label.find("fromLLP") >= 0:
-        targetShape.Add(hist)
-        targetEvents += hist.GetEntries()
-    if hist.Integral() > 0:
-        print " -> entries ", hist.GetEntries()
-        eventsPerClass[branchName] = hist.GetEntries()
-    else:
-        print " -> no entries found for class: ", branchName
-    histsPerClass[branchName] = hist
+    # Calculate weights for resampling in pt and eta
+    targetShape = ROOT.TH2F("ptetaTarget", "", len(binningPt)-1, binningPt,
+                            len(binningEta)-1, binningEta)
 
-print_delimiter()
-print "class labels:", eventsPerClass.keys()
-print "class balance before resampling", \
-        [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
-print_delimiter()
+    targetEvents = 0
 
-#make flat in pt
-for ieta in range(targetShape.GetNbinsY()):
-    ptAve = 0
-    for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
-        ptAve += targetShape.GetBinContent(ipt+1,ieta+1)*0.8
-    ptMin = 2.*ptAve/(targetShape.GetNbinsX())
-    for ipt in range(targetShape.GetNbinsX()):
-        if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
-            targetShape.SetBinContent(ipt+1,ieta+1,ptMin)
+    print_delimiter
 
-'''
-for ieta in range(targetShape.GetNbinsY()):
-    ptSum = 0.
-    for ipt in range(targetShape.GetNbinsX()):
-        ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
-    ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
-    #ptAvg = ptSum/targetShape.GetNbinsX()
-    for ipt in range(targetShape.GetNbinsX()):
-        if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
-            targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
-'''
-
-weightsPt = {}
-weightsEta = {}
-
-for label in branchNameList:
-    hist = histsPerClass[label]
-    weight = targetShape.Clone(label)
-    factor = 0.
-    the_sum = 0.
-    
-    weightsPt[label] = targetShape.ProjectionX().Clone(label+"pt")
-    weightsEta[label] = targetShape.ProjectionY().Clone(label+"eta")
-
-    if (hist.Integral() > 0):
-        weight.Divide(hist)
-        weightsPt[label].Divide(hist.ProjectionX())
-        weightsEta[label].Divide(hist.ProjectionY())
-        
-        if weight.GetMaximum() > 1:
-            factor = weight.GetMaximum()
-            print "rescale ", label, 1./factor
+    for label in featureDict["truth"]["branches"]:
+        branchName = label.split("/")[0]
+        branchNameList.append(branchName)
+        print "projecting ... ", branchName
+        hist = ROOT.TH2F("pteta"+branchName, "", len(binningPt)-1, binningPt,
+                         len(binningEta)-1, binningEta)
+        hist.Sumw2()
+        chain.Project(hist.GetName(), "global_eta:global_pt",
+                      "("+branchName+"==1)")
+        # scale w.r.t. LLP
+        if label.find("fromLLP") >= 0:
+            targetShape.Add(hist)
+            targetEvents += hist.GetEntries()
+        if hist.Integral() > 0:
+            print " -> entries ", hist.GetEntries()
+            eventsPerClass[branchName] = hist.GetEntries()
         else:
-            factor = 1.
-        weight.Scale(1./factor)
-        weightsPt[label].Scale(1./factor)
-        weightsEta[label].Scale(1./factor)
+            print " -> no entries found for class: ", branchName
+        histsPerClass[branchName] = hist
+
+    print_delimiter()
+    print "class labels:", eventsPerClass.keys()
+    print "class balance before resampling", \
+            [x / min(eventsPerClass.values()) for x in eventsPerClass.values()]
+    print_delimiter()
+
+    #make flat in pt
+    for ieta in range(targetShape.GetNbinsY()):
+        ptAve = 0
+        for ipt in range(targetShape.GetNbinsX()/2, targetShape.GetNbinsX()):
+            ptAve += targetShape.GetBinContent(ipt+1,ieta+1)*0.8
+        ptMin = 2.*ptAve/(targetShape.GetNbinsX())
+        for ipt in range(targetShape.GetNbinsX()):
+            if targetShape.GetBinContent(ipt+1,ieta+1) > ptMin:
+                targetShape.SetBinContent(ipt+1,ieta+1,ptMin)
+
+    '''
+    for ieta in range(targetShape.GetNbinsY()):
+        ptSum = 0.
+        for ipt in range(targetShape.GetNbinsX()):
+            ptSum += targetShape.GetBinContent(ipt+1,ieta+1)
+        ptAvg = ptSum/targetShape.GetNbinsX()*0.8 #reduce a bit
+        #ptAvg = ptSum/targetShape.GetNbinsX()
+        for ipt in range(targetShape.GetNbinsX()):
+            if (targetShape.GetBinContent(ipt+1,ieta+1)>ptAvg):
+                targetShape.SetBinContent(ipt+1,ieta+1,ptAvg)
+    '''
+
+    weightsPt = {}
+    weightsEta = {}
+
+    for label in branchNameList:
+        hist = histsPerClass[label]
+        weight = targetShape.Clone(label)
+        factor = 0.
+        the_sum = 0.
         
-        for ibin in range(hist.GetNbinsX()):
-            for jbin in range(hist.GetNbinsY()):
-                '''
-                if weight.GetBinContent(ibin+1, jbin+1) > 0:
-                    weight.SetBinContent(ibin+1, jbin+1,
-                                         weight.GetBinContent(ibin+1, jbin+1)
-                                         / factor)
-                '''
-                the_sum += hist.GetBinContent(ibin+1, jbin+1) * \
-                    weight.GetBinContent(ibin+1, jbin+1)
+        weightsPt[label] = targetShape.ProjectionX().Clone(label+"pt")
+        weightsEta[label] = targetShape.ProjectionY().Clone(label+"eta")
+
+        if (hist.Integral() > 0):
+            weight.Divide(hist)
+            weightsPt[label].Divide(hist.ProjectionX())
+            weightsEta[label].Divide(hist.ProjectionY())
+            
+            if weight.GetMaximum() > 1:
+                factor = weight.GetMaximum()
+                print "rescale ", label, 1./factor
+            else:
+                factor = 1.
+            weight.Scale(1./factor)
+            weightsPt[label].Scale(1./factor)
+            weightsEta[label].Scale(1./factor)
+            
+            for ibin in range(hist.GetNbinsX()):
+                for jbin in range(hist.GetNbinsY()):
+                    '''
+                    if weight.GetBinContent(ibin+1, jbin+1) > 0:
+                        weight.SetBinContent(ibin+1, jbin+1,
+                                             weight.GetBinContent(ibin+1, jbin+1)
+                                             / factor)
+                    '''
+                    the_sum += hist.GetBinContent(ibin+1, jbin+1) * \
+                        weight.GetBinContent(ibin+1, jbin+1)
+            
+        else:
+            weight.Scale(0)
+            weightsPt[label].Scale(0)
+            weightsEta[label].Scale(0)
+
+        resampledEventsPerClass[label] = the_sum
+        weightsPerClass[label] = weight
+
+    print_delimiter()
+
+    print resampledEventsPerClass
+
+    min_sum = min(resampledEventsPerClass.values())
+    print "min: ",min_sum
+    dropoutPerClass = {k: min_sum/resampledEventsPerClass[k]
+                       for k, v in resampledEventsPerClass.iteritems()}
+
+    weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
+    for label in weightsPerClass.keys():
         
-    else:
-        weight.Scale(0)
-        weightsPt[label].Scale(0)
-        weightsEta[label].Scale(0)
-
-    resampledEventsPerClass[label] = the_sum
-    weightsPerClass[label] = weight
-
-print_delimiter()
-
-print resampledEventsPerClass
-
-min_sum = min(resampledEventsPerClass.values())
-print "min: ",min_sum
-dropoutPerClass = {k: min_sum/resampledEventsPerClass[k]
-                   for k, v in resampledEventsPerClass.iteritems()}
-
-weightFile = ROOT.TFile(os.path.join(outputFolder, "weights.root"), "RECREATE")
-for label in weightsPerClass.keys():
-    
-    if classBalance:
-        classWeight = dropoutPerClass[label]
-        print "performing class balance rescaling: ",label,classWeight
-        weightsPerClass[label].Scale(classWeight)
-        weightsPt[label].Scale(classWeight)
-        weightsEta[label].Scale(classWeight)
-    weightsPerClass[label].Write()
-weightFile.Close()
+        if classBalance:
+            classWeight = dropoutPerClass[label]
+            print "performing class balance rescaling: ",label,classWeight
+            weightsPerClass[label].Scale(classWeight)
+            weightsPt[label].Scale(classWeight)
+            weightsEta[label].Scale(classWeight)
+        weightsPerClass[label].Write()
+    weightFile.Close()
 
 
-# Plot histograms of pt, eta and their weights
+    # Plot histograms of pt, eta and their weights
 
-histsPt = {l: h.ProjectionX() for l, h in histsPerClass.items()}
-histsEta = {l: h.ProjectionY() for l, h in histsPerClass.items()}
+    histsPt = {l: h.ProjectionX() for l, h in histsPerClass.items()}
+    histsEta = {l: h.ProjectionY() for l, h in histsPerClass.items()}
 
-makePlot(outputFolder, histsPt, branchNameList, binningPt,
-         ";Jet log(pT/1 GeV);Normalized events", "pt",
-         target=targetShape.ProjectionX())
-makePlot(outputFolder, histsEta, branchNameList, binningEta,
-         ";Jet #eta;Normalized events", "eta",
-         target=targetShape.ProjectionY())
+    makePlot(outputFolder, histsPt, branchNameList, binningPt,
+             ";Jet log(pT/1 GeV);Normalized events", "pt",
+             target=targetShape.ProjectionX())
+    makePlot(outputFolder, histsEta, branchNameList, binningEta,
+             ";Jet #eta;Normalized events", "eta",
+             target=targetShape.ProjectionY())
 
-makePlot(outputFolder, weightsPt, branchNameList, binningPt,
-         ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
-makePlot(outputFolder, weightsEta, branchNameList, binningEta,
-         ";Jet #eta;Weight", "weight_eta", logy=0)
-         
+    makePlot(outputFolder, weightsPt, branchNameList, binningPt,
+             ";Jet log(pT/1 GeV);Weight", "weight_pt", logy=0)
+    makePlot(outputFolder, weightsEta, branchNameList, binningEta,
+             ";Jet #eta;Weight", "weight_eta", logy=0)
              
-         
+                 
+             
 
    
 def setupDiscriminators(modelDA,add_summary=False, options={}):
@@ -588,9 +597,17 @@ def input_pipeline(files, features, batchSize, resample=True,repeat=1,bagging=1.
         if resample and isParametric:
             isSignal = batch["truth"][:, 4] > 0.5  # index 4 is LLP
             batch["gen"] = fake_background(batch["gen"], isSignal, 0)
-
         return batch
 
+def load_batch(i, fileList):
+    if (i >= len(fileList)):
+        return -1
+    fileName = fileList[i]
+    groups = {}
+    with h5py.File(fileName, 'r') as hf:
+        for group in ['cpf', 'npf', 'sv', 'gen', 'globalvars', 'truth']:
+            groups[group] = hf.get(group).value
+    return groups
 
 
 if resumeTraining>0:
@@ -634,8 +651,9 @@ while (epoch < num_epochs):
     print "Learning rate is "+str(learning_rate_val)
     print_delimiter()
 
-    train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
-    test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
+    if not noPipeline:
+        train_batch = input_pipeline(fileListTrain,featureDict, batchSize,bagging=bagging)
+        test_batch = input_pipeline(fileListTest,featureDict, batchSize/5,bagging=bagging)
 
     if not noDA:
         train_batch_da = input_pipeline(fileListTrainDA,featureDictDA, batchSize,resample=False,repeat=None)
@@ -727,7 +745,6 @@ while (epoch < num_epochs):
 
     sess = K.get_session()
     sess.run(init_op)
-
     flops = tf.profiler.profile(sess.graph, options=tf.profiler.ProfileOptionBuilder.float_operation())
     print('FLOP = ', flops.total_float_ops)
 
@@ -778,13 +795,28 @@ while (epoch < num_epochs):
         step = 0
         while not coord.should_stop():
             step += 1
-            
 
-            train_batch_value = sess.run(train_batch)
+
+            if not noPipeline:
+                train_batch_value = sess.run(train_batch)
+                if train_batch_value['num'].shape[0]==0:
+                    continue
+            else:
+                train_batch_value = load_batch(step, fileListTrain)
+                if train_batch_value == -1:
+                    break
+
+            '''
+            with h5py.File('hdf5_batches/batch%i.h5' % (step), 'w') as hf:
+                hf.create_dataset('gen',  data=train_batch_value['gen'])
+                hf.create_dataset('cpf',  data=train_batch_value['cpf'])
+                hf.create_dataset('npf',  data=train_batch_value['npf'])
+                hf.create_dataset('sv',  data=train_batch_value['sv'])
+                hf.create_dataset('globalvars',  data=train_batch_value['globalvars'])
+                hf.create_dataset('truth',  data=train_batch_value['truth'])
+            '''
+
             
-            if train_batch_value['num'].shape[0]==0:
-                continue
-                
             if isParametric:
                 train_inputs_class = [train_batch_value['gen'],
                                 train_batch_value['globalvars'],
@@ -957,7 +989,6 @@ while (epoch < num_epochs):
         print_delimiter()
 
     if epoch == 0:
-
         plot_resampled(outputFolder, "pt", "$\log{(pT/1 GeV)}$",
                        ptArray, binningPt, truthArray)
         plot_resampled(outputFolder, "eta", "$\eta$",
@@ -966,12 +997,13 @@ while (epoch < num_epochs):
             plot_resampled(outputFolder, "ctau", "$\log{(c {\\tau} / 1mm)}$",
                            ctauArray, binningctau, truthArray)
 
-    print_delimiter()
-    print "class labels:", resampledEventsPerClass.keys()
-    print "predicted class balance after resampling", [x / min(resampledEventsPerClass.values()) for x in resampledEventsPerClass.values()]
-    print "actual class balance after training:", labelsTraining*1./np.min(labelsTraining)
-    print_delimiter()
-    
+    if not noPipeline:
+        print_delimiter()
+        print "class labels:", resampledEventsPerClass.keys()
+        print "predicted class balance after resampling", [x / min(resampledEventsPerClass.values()) for x in resampledEventsPerClass.values()]
+        print "actual class balance after training:", labelsTraining*1./np.min(labelsTraining)
+        print_delimiter()
+        
     epoch_path = os.path.join(outputFolder, "epoch_" + str(epoch))
     if not (os.path.exists(epoch_path)):
       os.makedirs(os.path.join(epoch_path))
@@ -1020,10 +1052,15 @@ while (epoch < num_epochs):
     try:
         step = 0
         while not coord.should_stop():
+            if not noPipeline:
+                test_batch_value = sess.run(test_batch)
+                if test_batch_value['num'].shape[0]==0:
+                    continue
+            else:
+                test_batch_value = load_batch(step, fileListTrain)
+                if test_batch_value == -1:
+                    break
             step += 1
-            test_batch_value = sess.run(test_batch)
-            if test_batch_value['num'].shape[0]==0:
-                continue
 
             if isParametric:
                 test_inputs = [test_batch_value['gen'],

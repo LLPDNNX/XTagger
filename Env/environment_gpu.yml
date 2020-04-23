@@ -1,14 +1,25 @@
 name: tf_gpu
 channels:
- - conda-forge
+    - conda-forge
 dependencies:
- - python==2.7.15
- - root==6.18.00
- - pyyaml==3.12
- - h5py==2.7.1
- - scipy==1.0.0
- - scikit-learn==0.20.0
- - matplotlib==2.2.4
- - pydot==1.2.4
- - tensorflow-gpu==1.6.0
- - Keras==2.1.6
+    - cmake=3.17.0
+    - compilers=1.0.4
+    - curl=7.68.0
+    - cxx-compiler=1.0.4
+    - enum34=1.1.10
+    - gcc_impl_linux-64=7.3.0
+    - gcc_linux-64=7.3.0
+    - glib=2.58.3
+    - h5py=2.10.0
+    - hdf5=1.10.5
+    - importlib-metadata=1.5.0
+    - keras=2.3.1
+    - libgcc-ng=9.2.0
+    - numpy=1.16.5
+    - protobuf=3.11.4
+    - python=2.7.15
+    - root=6.18.00
+    - scikit-learn=0.20.4
+    - scipy=1.2.1
+    - tensorflow-gpu=1.6.0
+    - matplotlib==2.2.4

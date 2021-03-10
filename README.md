@@ -21,6 +21,11 @@ make
 make install
 export PYTHONPATH=$PROJECTDIR/Ops/release/lib/python2.7/site-packages
 ```
+## Standalone evaluation:
+```
+python Training/evaluation_test.py --name test_eval --test hdf5_batches/hdf5_list.txt --overwrite
+```
+Two batches are provided.
 
 ## Training using nanoX unpacked samples:
 

@@ -1,10 +1,7 @@
 import os
 import time
 import h5py
-import math
-import random
 import sys
-import imp
 import argparse
 import datetime
 import numpy as np
@@ -16,52 +13,10 @@ import keras
 import ROOT
 
 from keras import backend as K
-from keras.utils import plot_model
-from sklearn.metrics import auc
 from feature_dict import featureDict as featureDictTmpl
-from plot_macros import plot_resampled, make_plots, makePlot
-from style import ctauSymbol
 
 def print_delimiter():
     print "-"*80
-
-def get_model_memory_usage(batch_size, model):
-    import numpy as np
-    from keras import backend as K
-
-    shapes_mem_count = 0
-    internal_model_mem_count = 0
-    for l in model.layers:
-        layer_type = l.__class__.__name__
-        if layer_type == 'Model':
-            internal_model_mem_count += get_model_memory_usage(batch_size, l)
-        single_layer_mem = 1
-        i = 0
-        try:
-            print l.output_shape
-        except AttributeError:
-              print("An exception occurred")
-              continue
-
-        for s in l.output_shape:
-            if s is None:
-                continue
-            single_layer_mem *= s
-        shapes_mem_count += single_layer_mem
-
-
-    trainable_count = np.sum([K.count_params(p) for p in set(model.trainable_weights)])
-    non_trainable_count = np.sum([K.count_params(p) for p in set(model.non_trainable_weights)])
-
-    number_size = 4.0
-    if K.floatx() == 'float16':
-         number_size = 2.0
-    if K.floatx() == 'float64':
-         number_size = 8.0
-
-    total_memory = number_size*(batch_size*shapes_mem_count + trainable_count + non_trainable_count)
-    gbytes = np.round(total_memory / (1024.0 ** 3), 3) + internal_model_mem_count
-    return gbytes
 
 # tensorflow logging
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
@@ -96,7 +51,6 @@ modelModule = importlib.import_module(modelPath)
 if len(jobName)==0:
     print "Error - no job name specified"
     sys.exit(1)
-
 
 OMP_NUM_THREADS = -1
 if os.environ.has_key('OMP_NUM_THREADS'):
@@ -162,8 +116,6 @@ if (nFiles is not None) and (nFiles<len(fileListTest)):
     
    
 def setupDiscriminators(modelDA,add_summary=False, options={}):
-    result = {}
-
     gen = keras.layers.Input(shape=(1,))
     globalvars = keras.layers.Input(
             shape=(len(featureDict["globalvars"]["branches"]),))
@@ -197,15 +149,6 @@ def load_batch(i, fileList):
         for group in ['cpf', 'npf', 'sv', 'gen', 'globalvars', 'truth']:
             groups[group] = hf.get(group).value
     return groups
-
-
-def random_ctau(start,end,v):
-    #use pseudo random hash
-    h = ((v >> 16) ^ v) * 0x45d9f3b
-    h = ((h >> 16) ^ h) * 0x45d9f3b
-    h = (h >> 16) ^ h
-    return start+((17+h+h/100+h/10000)%(end-start))
-    
 
 epoch_duration = time.time()
 print_delimiter()
